@@ -18,6 +18,15 @@ import { ROOT, treeHash } from '../scripts/tree-hash.ts'
 const makefile = readFileSync(join(ROOT, 'Makefile'), 'utf8')
 const workflow = readFileSync(join(ROOT, '.github/workflows/check.yml'), 'utf8')
 
+/**
+ * The commands CI actually runs.
+ *
+ * Reading the whole file and searching for a substring found the flag inside the
+ * comment that explains the flag, so removing it from the command changed
+ * nothing. A check that reads prose is a check that can be satisfied by prose.
+ */
+const ciCommands = [...workflow.matchAll(/^\s*-\s*run:\s*(.+)$/gm)].map((m) => (m[1] as string).trim())
+
 function makeTargets(): Set<string> {
 	return new Set([...makefile.matchAll(/^([a-z][a-z0-9-]*):/gm)].map((m) => m[1] as string))
 }
@@ -35,9 +44,9 @@ it('every make target the docs name exists', () => {
 })
 
 it('CI runs make check', () => {
-	expect(workflow).toMatch(/run:\s*make check/)
-	expect(workflow).toMatch(/run:\s*make score/)
-	expect(workflow).toMatch(/run:\s*make prove/)
+	expect(ciCommands).toContain('make check')
+	expect(ciCommands).toContain('make prove')
+	expect(ciCommands.some((command) => command.startsWith('make score'))).toBe(true)
 })
 
 it('every scored check exists', () => {
@@ -69,13 +78,12 @@ it('CI stops tolerating unbound points once every point is bound', () => {
 	// A build mid-way through is allowed to score under a hundred, and CI says so
 	// with --allow-unbound. The moment the last phase lands that permission is a
 	// hole, so the test that removes it is the one that notices.
+	const tolerant = ciCommands.some((command) => command.includes('--allow-unbound'))
 	if (declaredPoints() < TOTAL_POINTS) {
-		expect(workflow, 'CI should tolerate unbound points while phases remain').toContain('--allow-unbound')
+		expect(tolerant, 'CI should tolerate unbound points while phases remain').toBe(true)
 		return
 	}
-	expect(workflow, 'every point is bound, so remove --allow-unbound from CI').not.toContain(
-		'--allow-unbound',
-	)
+	expect(tolerant, 'every point is bound, so remove --allow-unbound from CI').toBe(false)
 })
 
 it('the prose check is wired into make check', () => {

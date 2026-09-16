@@ -109,44 +109,75 @@ function applyEdit(dir: string, edit: Edit): void {
 	writeFileSync(path, before.replace(edit.find, edit.replace))
 }
 
-function main(): number {
-	const entries = Object.entries(MUTATIONS)
-	const unproven: string[] = []
-
-	for (const [id, mutation] of entries) {
-		const dir = sandbox(editsOf(mutation).some((edit) => edit.file.startsWith('example:')))
-		try {
-			const healthy = testPassed(dir, id)
-			if (healthy !== true) {
-				const state = healthy === false ? 'already fails' : 'never ran'
-				console.log(`❌ ${id}\n     ${state} in a clean copy, so nothing is proven`)
-				unproven.push(id)
-				continue
-			}
-			try {
-				apply(dir, mutation)
-			} catch (error) {
-				console.log(`\u274c ${id}\n     ${(error as Error).message}`)
-				unproven.push(id)
-				continue
-			}
-			const broken = testPassed(dir, id)
-			// Anything other than a pass is a proof. A mutation that stops the file
-			// loading at all has made the test not pass, which is the claim.
-			if (broken !== true) {
-				console.log(`✅ ${id}\n     fails when ${mutation.because}`)
-			} else {
-				console.log(`❌ ${id}\n     still passes when ${mutation.because}`)
-				unproven.push(id)
-			}
-		} finally {
-			if (process.env.FACTORY_KEEP_SANDBOX === '1') console.log(`     sandbox kept at ${dir}`)
-			else rmSync(dir, { recursive: true, force: true })
+/** Prove one gate, in its own sandbox, and report the line to print. */
+function prove(id: string, mutation: Mutation): { proven: boolean; lines: string[] } {
+	const dir = sandbox(editsOf(mutation).some((edit) => edit.file.startsWith('example:')))
+	try {
+		const healthy = testPassed(dir, id)
+		if (healthy !== true) {
+			const state = healthy === false ? 'already fails' : 'never ran'
+			return { proven: false, lines: [`\u274c ${id}`, `     ${state} in a clean copy, so nothing is proven`] }
 		}
+		try {
+			apply(dir, mutation)
+		} catch (error) {
+			return { proven: false, lines: [`\u274c ${id}`, `     ${(error as Error).message}`] }
+		}
+		// Anything other than a pass is a proof. A mutation that stops the file
+		// loading at all has made the test not pass, which is the claim.
+		if (testPassed(dir, id) !== true) {
+			return { proven: true, lines: [`\u2705 ${id}`, `     fails when ${mutation.because}`] }
+		}
+		return { proven: false, lines: [`\u274c ${id}`, `     still passes when ${mutation.because}`] }
+	} finally {
+		if (process.env.FACTORY_KEEP_SANDBOX === '1') console.log(`     sandbox kept at ${dir}`)
+		else rmSync(dir, { recursive: true, force: true })
+	}
+}
+
+/**
+ * Run the proofs a few at a time.
+ *
+ * Serially this took longer than the two minutes anyone will wait, and a check
+ * nobody waits for is a check nobody runs. Each proof already works in its own
+ * scratch directory, so they only had to be started together.
+ */
+async function main(): Promise<number> {
+	// `--only <substring>` proves one gate while you are fixing it, which is the
+	// difference between a two second loop and a two minute one.
+	const at = process.argv.indexOf('--only')
+	const only = at === -1 ? undefined : process.argv[at + 1]
+	const entries = Object.entries(MUTATIONS).filter(([id]) => only === undefined || id.includes(only))
+	if (entries.length === 0) {
+		console.log(`no scored check matches ${only}`)
+		return 1
+	}
+	const workers = Number(process.env.FACTORY_PROVE_WORKERS ?? '6')
+	const results = new Map<string, { proven: boolean; lines: string[] }>()
+	let next = 0
+
+	await Promise.all(
+		Array.from({ length: Math.min(workers, entries.length) }, async () => {
+			while (next < entries.length) {
+				const index = next++
+				const [id, mutation] = entries[index] as [string, Mutation]
+				results.set(id, await Promise.resolve(prove(id, mutation)))
+			}
+		}),
+	)
+
+	// Printed in declaration order whatever order they finished in, so two runs
+	// of the same tree produce the same output.
+	const unproven: string[] = []
+	for (const [id] of entries) {
+		const result = results.get(id)
+		if (result === undefined) continue
+		for (const line of result.lines) console.log(line)
+		if (!result.proven) unproven.push(id)
 	}
 
 	console.log(`\n${entries.length - unproven.length} of ${entries.length} gates proven to fail`)
 	return unproven.length === 0 ? 0 : 1
 }
 
-process.exit(main())
+process.exit(await main())

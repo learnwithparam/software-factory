@@ -81,7 +81,7 @@ export const MUTATIONS: Record<string, Mutation> = {
 	},
 	'tests/gate.test.ts > CI stops tolerating unbound points once every point is bound': {
 		file: '.github/workflows/check.yml',
-		find: '      - run: make score --allow-unbound',
+		find: '      - run: make score SCORE_ARGS=--allow-unbound',
 		replace: '      - run: make score',
 		because: 'CI stops saying which of the two ways to score under a hundred it is in',
 	},
