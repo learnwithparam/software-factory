@@ -7,7 +7,7 @@ SHELL := /bin/bash
 REPO ?= ../ledger
 export FACTORY_REPO := $(REPO)
 
-.PHONY: help install tokens status check prove e2e score demo lab-reset clean factory-up factory-down factory-connect factory-doctor factory-user factory-app
+.PHONY: help install tokens status check prove e2e score demo lab-reset clean factory-up factory-down factory-model factory-connect factory-doctor factory-user factory-app
 
 help: ## List every target
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[33m%-11s\033[0m %s\n", $$1, $$2}'
@@ -34,6 +34,9 @@ factory-up: ## Start the Mastra Factory and its backing services
 
 factory-down: ## Stop them, leaving no listener behind
 	@bash scripts/factory-down.sh
+
+factory-model: ## Give the factory its model provider, without a key on a command line
+	@bun scripts/factory-model.ts
 
 factory-connect: ## Connect the codebase, and say what to click
 	@bun scripts/factory-connect.ts
