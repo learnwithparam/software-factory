@@ -23,13 +23,14 @@
  * somebody's afternoon to fix it.
  */
 
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 import { session } from './factory-connect.ts'
 import { seedIssues, seedPullRequests } from './lib/webhook-stand-in.ts'
+import { BODY, BRANCH, TITLE, changes } from '../fixtures/saved-view.ts'
 
 const force = process.argv.includes('--force')
 const repo = loadRepo()
@@ -116,6 +117,8 @@ for (const issue of issues) {
 	console.log(`  ${url}  ${issue.route ?? ''}`)
 }
 
+if (issues.some((issue) => issue.route === 'review-rejection')) openTheProposal()
+
 await seedBoard()
 
 console.log(`\n${issues.length} issues open, ${gh(['pr', 'list', '--json', 'number', '--jq', 'length'])} pull requests open.`)
@@ -181,4 +184,27 @@ async function seedBoard(): Promise<void> {
 	const issues = await seedIssues(base, cookie, project.id, slug())
 	const pulls = await seedPullRequests(base, cookie, project.id, slug())
 	console.log(`  seeded ${issues} issues and ${pulls} pull requests onto ${project.name}`)
+}
+
+/**
+ * Open the pull request the review-rejection route reads.
+ *
+ * Route six starts from somebody else's change rather than from an issue, so the
+ * lab has to write it. The two faults in it are the two the recorded cold review
+ * in steps/04-verification/reviews/6.json names, which is how the live review
+ * and the offline one are held to the same answer.
+ */
+function openTheProposal(): void {
+	const testPath = join(repo.root, 'apps', 'console', 'lib', 'ledger.test.ts')
+	const edits = changes(readFileSync(testPath, 'utf8'))
+
+	git(['checkout', '-q', '-b', BRANCH], repo.root)
+	for (const change of edits) writeFileSync(join(repo.root, change.path), change.contents)
+	git(['add', '-A'], repo.root)
+	git(['commit', '-q', '-m', TITLE], repo.root)
+	git(['push', '-q', '-u', 'origin', BRANCH], repo.root)
+	git(['checkout', '-q', 'main'], repo.root)
+
+	const url = gh(['pr', 'create', '--head', BRANCH, '--title', TITLE, '--body', BODY])
+	console.log(`  ${url}  the change route six reviews`)
 }
