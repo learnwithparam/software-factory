@@ -1,0 +1,61 @@
+{
+  "$comment": "Who owns which paths, what checks them, and how much freedom an agent has there. One graph, three uses: the gate runs only affected targets, the router assembles context from the targets a task touches, and the charter grades autonomy per target rather than per repository.",
+  "targets": {
+    "contracts": {
+      "paths": ["packages/contracts/**"],
+      "dependsOn": [],
+      "autonomy": "propose",
+      "why": "One definition three services are built against. A change here is never local, so it is proposed and never landed unattended.",
+      "commands": {
+        "test": "bun test",
+        "typecheck": "bun x tsc --noEmit"
+      },
+      "cwd": "packages/contracts"
+    },
+    "ingest": {
+      "paths": ["services/ingest/**"],
+      "dependsOn": ["contracts"],
+      "autonomy": "build",
+      "why": "Stores runs and stages. Wrong data is visible and recoverable, so an agent may finish work here on its own.",
+      "commands": {
+        "test": "go test ./...",
+        "typecheck": "go vet ./...",
+        "format": "gofmt -l ."
+      },
+      "cwd": "services/ingest"
+    },
+    "budget": {
+      "paths": ["services/budget/**"],
+      "dependsOn": ["contracts"],
+      "autonomy": "refuse",
+      "why": "The money path. It decides what a period is allowed to cost and when spend has breached. A plausible wrong answer here is expensive and slow to notice, so no agent lands a change without a person.",
+      "commands": {
+        "test": "cargo test --quiet",
+        "typecheck": "cargo check --quiet"
+      },
+      "cwd": "services/budget"
+    },
+    "console": {
+      "paths": ["apps/console/**"],
+      "dependsOn": ["contracts"],
+      "autonomy": "build",
+      "why": "Display only. It computes nothing, so the worst outcome is a page that reads badly, which a reviewer sees immediately.",
+      "commands": {
+        "test": "bun test",
+        "typecheck": "bun x tsc --noEmit",
+        "build": "bun run build"
+      },
+      "cwd": "apps/console"
+    },
+    "tooling": {
+      "paths": ["tools/**", "package.json", "bun.lock", "bunfig.toml", "project-graph.json"],
+      "dependsOn": [],
+      "autonomy": "refuse",
+      "why": "The graph and the workspace wiring decide what every other rule means. An agent editing these could widen its own permissions, so it may not.",
+      "commands": {
+        "test": "bun test tools"
+      },
+      "cwd": "."
+    }
+  }
+}
