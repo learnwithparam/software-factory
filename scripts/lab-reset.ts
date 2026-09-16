@@ -29,6 +29,7 @@ import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 import { session } from './factory-connect.ts'
+import { seedIssues, seedPullRequests } from './lib/webhook-stand-in.ts'
 
 const force = process.argv.includes('--force')
 const repo = loadRepo()
@@ -153,12 +154,11 @@ async function clearBoard(): Promise<void> {
 	}
 }
 
-
 /**
- * Put every open issue on the board, the way the webhook would have.
+ * Put the new issues on the board, the way `issues.opened` would have.
  *
- * The external source and metadata match what `issues.opened` writes, so the
- * reconcile worker recognises these items as its own and keeps patching them.
+ * Any pull request still open is seeded too, so a reset that runs mid-run leaves
+ * the review board agreeing with GitHub rather than holding yesterday's.
  */
 async function seedBoard(): Promise<void> {
 	const base = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
@@ -178,42 +178,7 @@ async function seedBoard(): Promise<void> {
 		return
 	}
 
-	const repositoryId = Number(gh(['api', `repos/${slug()}`, '--jq', '.id']))
-	const open = JSON.parse(
-		gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url']),
-	) as Array<{
-		number: number
-		title: string
-		url: string
-		createdAt: string
-		author: { login: string }
-		labels: Array<{ name: string }>
-		assignees: Array<{ login: string }>
-	}>
-
-	for (const issue of open.sort((a, b) => a.number - b.number)) {
-		const created = await fetch(`${base}/web/factory/projects/${project.id}/work-items`, {
-			method: 'POST',
-			headers: { 'content-type': 'application/json', origin: base, cookie },
-			body: JSON.stringify({
-				title: issue.title,
-				board: 'work',
-				externalSource: { url: issue.url, type: 'issue', externalId: `github-issue:${issue.number}`, integrationId: 'github' },
-				stages: ['intake'],
-				metadata: {
-					state: 'open',
-					author: issue.author.login,
-					labels: issue.labels.map((label) => label.name),
-					assignees: issue.assignees.map((assignee) => assignee.login),
-					authorTrusted: true,
-					sourceCreatedAt: issue.createdAt,
-					githubIssueNumber: issue.number,
-					autoStartCandidate: false,
-					githubRepositoryId: repositoryId,
-				},
-			}),
-		})
-		if (!created.ok) throw new Error(`putting issue #${issue.number} on the board answered ${created.status}`)
-	}
-	console.log(`  seeded ${open.length} work items onto ${project.name}`)
+	const issues = await seedIssues(base, cookie, project.id, slug())
+	const pulls = await seedPullRequests(base, cookie, project.id, slug())
+	console.log(`  seeded ${issues} issues and ${pulls} pull requests onto ${project.name}`)
 }
