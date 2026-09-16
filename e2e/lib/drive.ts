@@ -219,3 +219,16 @@ export async function itemForRoute(repoRoot: string, route: string): Promise<Wor
 	if (found === undefined) throw new Error(`no work item titled "${title}" on the work board`)
 	return found
 }
+
+/**
+ * Put a pull request on the review board, the way its webhook would have.
+ *
+ * A run opens one part way through, long after any reset, so nothing else will.
+ * The same module lab-reset uses, called at the moment the event would have
+ * arrived, which is the only difference between this lab and a public one.
+ */
+export async function announcePull(number: number, repo: string): Promise<WorkItem> {
+	const { announcePullRequest } = await import('../../scripts/lib/webhook-stand-in.ts')
+	await announcePullRequest(BASE, await cookie(), await projectId(), repo, number)
+	return itemForPull(number)
+}

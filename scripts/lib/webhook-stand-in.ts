@@ -94,6 +94,20 @@ export async function seedIssues(base: string, cookie: string, projectId: string
 	return open.length
 }
 
+/**
+ * One pull request, as `pull_request.opened` would have delivered it.
+ *
+ * Called at the moment the webhook would have fired: a run opens a pull request
+ * part way through, long after any reset, and nothing else will put it on the
+ * review board.
+ */
+export async function announcePullRequest(base: string, cookie: string, projectId: string, repo: string, number: number): Promise<void> {
+	const pull = JSON.parse(
+		gh(['pr', 'view', String(number), '--repo', repo, '--json', 'number,title,author,labels,assignees,createdAt,url,headRefName,baseRefName,isDraft']),
+	) as PullRequest
+	await put(base, cookie, projectId, repositoryId(repo), pull)
+}
+
 /** Every open pull request, as `pull_request.opened` would have delivered it. */
 export async function seedPullRequests(base: string, cookie: string, projectId: string, repo: string): Promise<number> {
 	const id = repositoryId(repo)
@@ -101,7 +115,12 @@ export async function seedPullRequests(base: string, cookie: string, projectId: 
 		gh(['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url,headRefName,baseRefName,isDraft']),
 	) as PullRequest[]
 
-	for (const pull of open.sort((a, b) => a.number - b.number)) {
+	for (const pull of open.sort((a, b) => a.number - b.number)) await put(base, cookie, projectId, id, pull)
+	return open.length
+}
+
+async function put(base: string, cookie: string, projectId: string, id: number, pull: PullRequest): Promise<void> {
+	{
 		await create(base, cookie, projectId, {
 			title: pull.title,
 			board: 'review',
@@ -128,5 +147,4 @@ export async function seedPullRequests(base: string, cookie: string, projectId: 
 			},
 		}, `pull request #${pull.number}`)
 	}
-	return open.length
 }
