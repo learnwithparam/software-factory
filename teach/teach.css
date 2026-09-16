@@ -162,3 +162,16 @@ figure.diagram .fail { stroke: var(--c-fail); } figure.diagram text.fail { fill:
 figure.diagram .wait { stroke: var(--c-wait); } figure.diagram text.wait { fill: var(--c-wait); stroke: none; }
 figure.diagram .refuse { stroke: var(--c-refuse); } figure.diagram text.refuse { fill: var(--c-refuse); stroke: none; }
 figure.diagram .dashed { stroke-dasharray: 4 4; }
+
+/* Patterns ---------------------------------------------------------------- */
+
+.pattern { border-top: 1px solid var(--c-line); padding: var(--space-8) 0 var(--space-2); scroll-margin-top: var(--space-8); }
+.pattern h3 { font-size: var(--step-1); margin: 0 0 var(--space-1); }
+.pattern .anchor { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin-left: var(--space-2); }
+.pattern dl { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-2) var(--space-4); margin: var(--space-4) 0 0; max-width: 46rem; }
+.pattern dt { font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink-muted); }
+.pattern dd { margin: 0; }
+.pattern dd.here, .pattern dd.there { font-size: var(--step--1); }
+.pattern dd code { font-family: var(--font-mono); background: var(--c-bg-inset); border-radius: var(--radius-sm); padding: 0.08em 0.32em; }
+
+@media (max-width: 40rem) { .pattern dl { grid-template-columns: 1fr; gap: var(--space-1); } .pattern dt { margin-top: var(--space-3); } }

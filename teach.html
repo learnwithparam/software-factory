@@ -27,6 +27,7 @@
 <li><a href="#l-verification">Verification</a></li>
 <li><a href="#l-loop">Self-healing</a></li>
 <li><a href="#l-delivery">Delivery</a></li>
+<li><a href="#l-patterns">Patterns</a></li>
 <li><a href="#l-platform">On a platform</a></li>
 </ul>
 </div>
@@ -458,6 +459,186 @@
 <h3>The run record<span class="anchor">run-record</span></h3>
 <p>One immutable file per run: what was attempted, which files changed, every verdict, the timings, the cost. Appended to, never rewritten, because the value is in comparing the tenth run to the first.</p>
 <p>It is what turns an opinion about whether this is working into a measurement, and it is what the console in this repository displays.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-patterns">
+<div class="wrap col">
+<p class="kicker">What survives the products</p>
+<h2>Fourteen patterns</h2>
+<p>Both of the systems in this repository will be replaced. These will not. Each one is written the
+same way: the problem it answers, the forces pulling against each other, the move, what it costs,
+and where it shows up in the thing built by hand and in the thing bought off the shelf.</p>
+<p class="because">A pattern with no cost listed is a recommendation, and a recommendation is the
+kind of advice you cannot argue with.</p>
+<article class="pattern" id="p-executor-as-interface">
+<h3>The executor is an interface<span class="anchor">executor-as-interface</span></h3>
+<dl>
+<dt>Problem</dt><dd>Every part of the system needs an agent to do work, and binding to one makes the whole thing a wrapper around a product that will change.</dd>
+<dt>Forces</dt><dd>Testing wants determinism and no spend. Teaching wants a real agent. Buying wants the freedom to change the agent later. All three pull against hard-coding one.</dd>
+<dt>The move</dt><dd>Define an executor as any command that takes a prompt on standard input and exits. Everything above it depends on the interface, never on the product.</dd>
+<dt>It costs</dt><dd>One indirection, and usage figures an agent reports rather than ones you measured.</dd>
+<dt>Here</dt><dd class="here"><code>steps/lib/executor.ts</code>, with a replay executor that makes <code>make check</code> free and offline.</dd>
+<dt>On a platform</dt><dd class="there">The agent role on a working phase. Swapping the model is a settings change rather than a code change.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-deterministic-claim">
+<h3>The name is the claim<span class="anchor">deterministic-claim</span></h3>
+<dl>
+<dt>Problem</dt><dd>Two scheduled runs wake up for the same item and both start work on it.</dd>
+<dt>Forces</dt><dd>A lock table is correct and is a service to operate, with an availability story and a question about what happens when a holder dies.</dd>
+<dt>The move</dt><dd>Derive the branch name from the item so both runs compute the same one, and push without force. The first push creates the ref and the second is rejected.</dd>
+<dt>It costs</dt><dd>Nothing, unless somebody adds a force flag, which is why there is no flag to pass.</dd>
+<dt>Here</dt><dd class="here"><code>branchFor()</code> in <code>steps/02-execution/worktree.ts</code>, proven by a real push race in the tests.</dd>
+<dt>On a platform</dt><dd class="there">The server owns session identity, so the race does not arise. The idea still applies to anything you schedule yourself.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-fail-closed-gate">
+<h3>A missing check is louder than a failing one<span class="anchor">fail-closed-gate</span></h3>
+<dl>
+<dt>Problem</dt><dd>A repository with no test command produces a run that looks exactly like a passing one.</dd>
+<dt>Forces</dt><dd>Absence and success are indistinguishable from outside. Treating absence as success is the default in almost every pipeline, because it takes no code.</dd>
+<dt>The move</dt><dd>Make the gate report three states rather than two. Missing is neither a pass nor a failure, and it stops the run.</dd>
+<dt>It costs</dt><dd>A repository that has not finished wiring its checks cannot ship through the factory yet, which is the point.</dd>
+<dt>Here</dt><dd class="here"><code>steps/04-verification/gate.ts</code> returns <code>MISCONFIGURED</code> with exit 2.</dd>
+<dt>On a platform</dt><dd class="there">A tool result rule reading the verdict, which refuses to read a missing check as either outcome.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-verdict-line">
+<h3>One line nothing may restate<span class="anchor">verdict-line</span></h3>
+<dl>
+<dt>Problem</dt><dd>An agent reports that the checks passed, and that report is the only thing anyone reads.</dd>
+<dt>Forces</dt><dd>An agent summarising is useful everywhere except in the sentence somebody will act on.</dd>
+<dt>The move</dt><dd>End the gate with one exact line. Downstream may quote it and may not paraphrase it, and a quotation that does not match the original is a downgrade.</dd>
+<dt>It costs</dt><dd>Slightly stilted output, and a rule people have to be told once.</dd>
+<dt>Here</dt><dd class="here"><code>VERDICT: PASS every selected check passed</code>, compared exactly in <code>judge()</code>.</dd>
+<dt>On a platform</dt><dd class="there">The same line, carried in the tool result the rule reads.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-holdout-sample">
+<h3>Tests the writer never saw<span class="anchor">holdout-sample</span></h3>
+<dl>
+<dt>Problem</dt><dd>The same run writes the code and the tests, so a green suite means the code agrees with itself.</dd>
+<dt>Forces</dt><dd>Tests written with the change are the most useful ones to have. They are also the least independent.</dd>
+<dt>The move</dt><dd>Keep a small set of behavioural checks out of reach of the implementing agent and run them afterwards.</dd>
+<dt>It costs</dt><dd>A second place to maintain, and it must stay small or it becomes a second suite.</dd>
+<dt>Here</dt><dd class="here"><code>steps/04-verification/holdout/</code>, outside the target and never routed.</dd>
+<dt>On a platform</dt><dd class="there">A checking phase whose role has different tools from the building one.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-cold-review">
+<h3>The writer never grades the work<span class="anchor">cold-review</span></h3>
+<dl>
+<dt>Problem</dt><dd>The thing that produced a change is the worst judge of whether it is right.</dd>
+<dt>Forces</dt><dd>The account of how work went is genuinely useful context, and it is also what makes a reviewer confirm rather than check.</dd>
+<dt>The move</dt><dd>Give a second agent the task and the diff, and deliberately not the story of the attempt.</dd>
+<dt>It costs</dt><dd>Minutes per change, and occasional rejections of work that was fine.</dd>
+<dt>Here</dt><dd class="here"><code>judge()</code> in <code>steps/04-verification/verifier.ts</code>, with recorded reviews.</dd>
+<dt>On a platform</dt><dd class="there">The Review board, which gives a pull request its own session rather than continuing the authoring one.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-negative-proof">
+<h3>Undo the change and watch the test fail<span class="anchor">negative-proof</span></h3>
+<dl>
+<dt>Problem</dt><dd>A test that has never been red is not known to test anything.</dd>
+<dt>Forces</dt><dd>Nobody wants to break working code to check a test. It is also the only check that proves the test is connected to the behaviour.</dd>
+<dt>The move</dt><dd>Revert the change, run the new test, require red, restore. Do it every time rather than when somebody remembers.</dd>
+<dt>It costs</dt><dd>One extra run of one test.</dd>
+<dt>Here</dt><dd class="here"><code>make demo STEP=04 -- negative-proof</code>, which does it for real on a scratch module.</dd>
+<dt>On a platform</dt><dd class="there">Not built in. It is a step you add to the checking role, and the most portable idea here.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-evidence-rule">
+<h3>Code decides what a verdict may claim<span class="anchor">evidence-rule</span></h3>
+<dl>
+<dt>Problem</dt><dd>The result a person reads is whatever the agent decided to say.</dd>
+<dt>Forces</dt><dd>Investigation needs freedom. The sentence somebody acts on needs none at all.</dd>
+<dt>The move</dt><dd>After the agent stops talking, ordinary code reads the artifacts the run left and downgrades any claim whose proof is missing.</dd>
+<dt>It costs</dt><dd>The rules have to be written, and each one needs a reason.</dd>
+<dt>Here</dt><dd class="here"><code>judge()</code>: no reverted proof, no holdout, or a misquoted gate line all downgrade.</dd>
+<dt>On a platform</dt><dd class="there">A tool result handler, which sees what a tool returned rather than what was said about it.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-back-pressure">
+<h3>The limit is review attention<span class="anchor">back-pressure</span></h3>
+<dl>
+<dt>Problem</dt><dd>Generation is cheap, so the queue of things waiting for a person grows without bound.</dd>
+<dt>Forces</dt><dd>More agents feels like more throughput. The binding constraint is one person understanding a change well enough to stand behind it.</dd>
+<dt>The move</dt><dd>Cap how many items may wait on a person, and refuse to start work when the cap is reached.</dd>
+<dt>It costs</dt><dd>Idle capacity, which is the correct thing to have.</dd>
+<dt>Here</dt><dd class="here"><code>STOP_IF: awaiting_review &gt;= n</code> in the charter, checked before anything else runs.</dd>
+<dt>On a platform</dt><dd class="there">Not built in. It is yours to add, and it is the first thing people delete.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-autonomy-by-consequence">
+<h3>Freedom follows blast radius, not size<span class="anchor">autonomy-by-consequence</span></h3>
+<dl>
+<dt>Problem</dt><dd>Deciding what an agent may do unattended by how big the change is.</dd>
+<dt>Forces</dt><dd>Size is easy to measure and is the wrong axis. A ten thousand line migration on an unlaunched project is safer than fifty lines in a payment path.</dd>
+<dt>The move</dt><dd>Grade autonomy by how bad the worst outcome is and how easily it is undone, per area rather than per repository.</dd>
+<dt>It costs</dt><dd>Somebody has to decide, area by area, and write it down.</dd>
+<dt>Here</dt><dd class="here">The <code>autonomy</code> column in <code>.factory/targets.json</code>, with a reason beside each.</dd>
+<dt>On a platform</dt><dd class="there">A transition policy, which can also demand recorded acceptance before code exists.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-protected-path">
+<h3>Some paths are never touched<span class="anchor">protected-path</span></h3>
+<dl>
+<dt>Problem</dt><dd>The area where a mistake is most expensive is the area an agent will eventually touch.</dd>
+<dt>Forces</dt><dd>A blanket refusal stops the factory being useful. No refusal at all means the first surprise is the expensive one.</dd>
+<dt>The move</dt><dd>List the paths that are never modified unattended, each with the reason, and have the list protect itself.</dd>
+<dt>It costs</dt><dd>A route for work that legitimately needs those paths, which is a person.</dd>
+<dt>Here</dt><dd class="here">The <code>protected</code> block in the charter, which protects the charter and the graph beside it.</dd>
+<dt>On a platform</dt><dd class="there">The same list, expressed in the policy that allows or rejects a move.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-context-routing">
+<h3>Route, do not pile<span class="anchor">context-routing</span></h3>
+<dl>
+<dt>Problem</dt><dd>The instructions file grows every time something goes wrong, and accuracy falls as it grows.</dd>
+<dt>Forces</dt><dd>Each addition works, which is why it keeps happening. The sentence that matters is now competing with forty that do not apply.</dd>
+<dt>The move</dt><dd>Compute what a task receives from what it will touch: the rules for those areas, the skills for that kind of work, and nothing else.</dd>
+<dt>It costs</dt><dd>A router to maintain, and the discipline to keep it small enough not to need a diagram.</dd>
+<dt>Here</dt><dd class="here"><code>steps/03-context/router.ts</code>, which records what it withheld beside what it included.</dd>
+<dt>On a platform</dt><dd class="there">The prompt a skill invocation builds, plus the repository the sandbox checks out.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-doer-and-tester">
+<h3>Hand back the reason, not the rejection<span class="anchor">doer-and-tester</span></h3>
+<dl>
+<dt>Problem</dt><dd>A failed check comes back as a status, so the next attempt repeats the mistake.</dd>
+<dt>Forces</dt><dd>One agent grading its own output has already spent its reasoning defending it.</dd>
+<dt>The move</dt><dd>Split the roles. The tester returns what failed, where, and what should have been true, and the next attempt starts from that.</dd>
+<dt>It costs</dt><dd>Two roles to run, and a loop that needs declared endings or it will not have one.</dd>
+<dt>Here</dt><dd class="here"><code>handback()</code> in <code>steps/05-loop/loop.ts</code>, with attempt and time budgets.</dd>
+<dt>On a platform</dt><dd class="there">A retry outcome on the checking phase, routing back to building.</dd>
+</dl>
+</article>
+
+<article class="pattern" id="p-phase-and-policy">
+<h3>Separate where work is from who decides<span class="anchor">phase-and-policy</span></h3>
+<dl>
+<dt>Problem</dt><dd>Process and permission get tangled, so changing one changes the other by accident.</dd>
+<dt>Forces</dt><dd>A board is about where work is. A policy is about who may move it. Mixing them makes every rule a layout change.</dd>
+<dt>The move</dt><dd>Declare phases and the moves between them, then declare separately which moves a person must make.</dd>
+<dt>It costs</dt><dd>Two things to read instead of one, and worth it the first time the process changes.</dd>
+<dt>Here</dt><dd class="here">The graph declares areas and the charter declares who decides, and neither restates the other.</dd>
+<dt>On a platform</dt><dd class="there"><code>defineBoard()</code> for phases, <code>transitionPolicy</code> for who may move a card.</dd>
+</dl>
 </article>
 
 </div>
