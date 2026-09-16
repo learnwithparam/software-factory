@@ -1,5 +1,0 @@
-# The target is its own project with its own lockfile. It installs and builds
-# without the factory being present, because on your machine it will be a
-# different repository entirely.
-[install]
-linker = "isolated"

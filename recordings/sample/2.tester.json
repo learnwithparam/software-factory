@@ -1,0 +1,8 @@
+{
+  "text": "VERDICT: PASS no findings. Scope matches the issue.",
+  "toolCalls": 2,
+  "tokensIn": 800,
+  "tokensOut": 150,
+  "costMinor": 1,
+  "changedFiles": []
+}

@@ -1,0 +1,9 @@
+{
+  "$comment": "The cold review of the same change. It receives the task and the diff, never this file's doer counterpart.",
+  "text": "VERDICT: PASS no findings. Scope matches the task. One new test, shown red without the change. No existing assertion altered.",
+  "toolCalls": 9,
+  "tokensIn": 18400,
+  "tokensOut": 2100,
+  "costMinor": 31,
+  "changedFiles": []
+}

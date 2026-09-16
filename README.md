@@ -1,48 +1,72 @@
 # Software Factory
 
 A software factory is the engineering system around a coding agent: what it may attempt, where it
-runs, what context it receives, what proof it must produce, and where a human decides. This
-repository builds one, layer by layer, on a codebase with three languages in it.
+runs, what context it receives, what proof it must produce, and where a human decides.
 
-It is the lab for the learnwithparam Software Factory sessions. It is also readable on its own.
+This repository is that system, built one layer at a time so you can read it. It is the lab for the
+learnwithparam Software Factory sessions, and it is useful on its own.
 
-## What it does
+## It knows nothing about your codebase
 
-An issue becomes a task. The task runs in an isolated worktree behind explicit boundaries. Context
-is routed to it rather than pasted into an ever-longer prompt. The work is verified by gates that
-fail closed and by an independent agent that reads the diff cold. What reaches you is a pull
-request with its evidence attached, and the merge decision stays yours.
+Everything the factory needs to know about a repository lives in that repository, in a `.factory`
+directory its own team owns.
+
+```
+.factory/
+  charter.md      what may be attempted here, and what must never be touched
+  targets.json    who owns which paths, what checks them, how much freedom they get
+  skills/*.md     procedures worth reusing in this codebase
+  issues/*.md     work items, standing in for an issue tracker so the lab runs offline
+```
+
+Point the factory somewhere else and it behaves differently, because it reads that repository's
+rules and no others. Nothing in `steps/` names a service, a language or a directory belonging to any
+particular project.
+
+```bash
+make check REPO=../ledger          # the example repository beside this one
+make check REPO=~/work/your-repo   # yours
+```
 
 ## The six layers
 
-| Layer | The question it answers |
-|---|---|
-| Boundary | What may an agent attempt without asking, and what must it never touch? |
-| Context | What does this task need to know, and where does that come from? |
-| Skills | Which engineering know-how is reusable rather than retyped per prompt? |
-| Execution | Where does the agent run, and what can it reach from there? |
-| Verification | What proof must exist before a human spends attention on this? |
-| Delivery | How does finished work reach a person, and who decides it ships? |
+| Layer | The question it answers | Built in |
+|---|---|---|
+| Boundary | What may an agent attempt unattended, and what must it never touch? | `steps/01-boundary` |
+| Execution | Where does it run, and what can it reach from there? | `steps/02-execution` |
+| Context | What does this task need to know, and where does that come from? | `steps/03-context` |
+| Skills | Which know-how is reusable rather than retyped per prompt? | `skills/` and each repo's own |
+| Verification | What proof must exist before a person spends attention on this? | `steps/04-verification` |
+| Delivery | How does finished work reach a person, and who decides it ships? | `steps/06-delivery` |
 
-## Two codebases
-
-`target/` is an agent run ledger: a Go ingest service, a Rust budget engine, a Next.js console and
-one shared contract the three of them are each tested against. It exists so the factory has real
-work to do across real language boundaries, and so a change to the shared contract goes red in three
-test suites at once.
-
-Everything outside `target/` is the factory. The two never import from one another.
+`steps/05-loop` is how a failure comes back with its reason attached and how a run ends.
+`steps/07-mastra` maps all six onto a hosted platform, which is the honest way to answer whether to
+build this or buy it.
 
 ## Running it
 
 ```bash
 make install
 make check    # prose, types, unit and structural tests. No model, no network
+make prove    # break each scored gate on purpose and confirm it fails
 make score    # what is actually proven, 0 to 100
+make demo STEP=06
 ```
 
 `make check` runs with no model and no network, because the executor is an interface: the same loop
-runs against a recorded transcript for tests and against a real coding agent for `make e2e`.
+runs against a recorded transcript for tests and against a real coding agent for a live run.
+
+## Two things worth stealing even if you never run this
+
+**A gate nobody has seen fail is not a gate.** `make prove` copies the tree to a scratch directory,
+applies one declared break per scored check, and asserts that check goes red. A scorecard entry with
+no break behind it fails the build. Every point is earned against a test that has been watched to
+fail.
+
+**Deterministic code decides what a verdict may claim.** After the reviewing agent has finished
+talking, ordinary code reads the artifacts the run produced. A pass whose test was never shown to
+fail without the change is downgraded. A quoted verdict that does not match the one the gate wrote is
+downgraded. What the agent said about the run is never consulted.
 
 ## Build state
 
@@ -58,10 +82,11 @@ The design borrows openly, and each of these is worth reading on its own:
   [demo write-up](https://github.com/addyosmani/factory-demo/blob/main/LEARNINGS.md) for the timings
   that shaped the latency budget here.
 - [Damian Galarza's Software Factory](https://github.com/dgalarza/mastra-software-factory) for
-  deciding in ordinary code, after the agent has finished talking, what a verdict is allowed to claim.
-- [Owain Lewis's Machinist](https://github.com/owainlewis/machinist), [Blueprint](https://github.com/owainlewis/blueprint)
-  and [Neo](https://github.com/owainlewis/neo) for the executor as a plain interface and for skills
-  that state the outcome rather than script every move.
+  deciding in ordinary code, after the agent has finished talking, what a verdict may claim.
+- [Owain Lewis's Machinist](https://github.com/owainlewis/machinist),
+  [Blueprint](https://github.com/owainlewis/blueprint) and [Neo](https://github.com/owainlewis/neo)
+  for the executor as a plain interface and for skills that state the outcome rather than script
+  every move.
 - [Mastra Factory](https://factory.mastra.ai) for the boards, phase rules and sandbox callback the
   last step maps these layers onto.
 - Dex Horthy's talk, *Harness Engineering Is Not Enough: Why Software Factories Fail*, for the

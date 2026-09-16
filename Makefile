@@ -1,6 +1,12 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+# The repository this factory is pointed at. The factory knows nothing about it
+# beyond what its own .factory directory declares, so this is the only line that
+# has to change to run everything below against your own codebase.
+REPO ?= ../ledger
+export FACTORY_REPO := $(REPO)
+
 .PHONY: help install tokens check prove e2e score demo lab-reset clean
 
 help: ## List every target
@@ -31,11 +37,11 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 score: ## Score the build 0 to 100 from the latest check and e2e results
 	@bun scripts/score.ts
 
-demo: ## Run one step live: make demo STEP=02
-	@bun scripts/demo.ts $(STEP)
+demo: ## Run one step live against $(REPO): make demo STEP=02
+	@bun scripts/demo.ts $(STEP) $(filter-out $@,$(MAKECMDGOALS))
 
-lab-reset: ## Recreate the scratch GitHub repository from the seed commit
+lab-reset: ## Put $(REPO) back the way it started, and drop every workspace
 	@bun scripts/lab-reset.ts
 
 clean: ## Remove build output and run artifacts
-	rm -rf artifacts .worktrees e2e/test-results e2e/playwright-report
+	rm -rf artifacts .worktrees .factory-runs e2e/test-results e2e/playwright-report

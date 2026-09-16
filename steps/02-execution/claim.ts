@@ -23,7 +23,7 @@ export type ClaimResult =
  * work, which is the exact failure this exists to prevent, so there is no flag
  * to pass.
  */
-export function claim(item: string | number, remote = 'origin', cwd?: string): ClaimResult {
+export function claim(item: string | number, remote: string, cwd: string): ClaimResult {
 	const branch = branchFor(item)
 	try {
 		git(['push', remote, `refs/heads/${branch}:refs/heads/${branch}`], cwd)
@@ -37,14 +37,14 @@ export function claim(item: string | number, remote = 'origin', cwd?: string): C
 }
 
 /** Who holds an item now, if anyone. */
-export function heldBy(item: string | number, remote = 'origin', cwd?: string): string | undefined {
+export function heldBy(item: string | number, remote: string, cwd: string): string | undefined {
 	const branch = branchFor(item)
 	const output = git(['ls-remote', '--heads', remote, branch], cwd)
 	return output === '' ? undefined : (output.split(/\s+/)[0] as string)
 }
 
 /** Give up an item, so a later run may take it. */
-export function release(item: string | number, remote = 'origin', cwd?: string): void {
+export function release(item: string | number, remote: string, cwd: string): void {
 	const branch = branchFor(item)
 	try {
 		git(['push', remote, `:refs/heads/${branch}`], cwd)

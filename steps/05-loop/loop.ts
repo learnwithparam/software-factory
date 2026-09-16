@@ -13,10 +13,9 @@
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from '../lib/graph.ts'
-import type { Task } from '../03-context/router.ts'
+import type { Issue } from '../lib/issues.ts'
 
-export const BUDGET = join(ROOT, 'steps/05-loop/budget.json')
+export const BUDGET = join(import.meta.dir, 'budget.json')
 
 export type StageName = 'claim' | 'context' | 'implement' | 'gates' | 'verify' | 'human'
 
@@ -50,14 +49,14 @@ export interface Attempt {
 export type Ending = 'passed' | 'escalated-attempts' | 'escalated-budget'
 
 export interface LoopResult {
-	readonly task: Task
+	readonly issue: Issue
 	readonly ending: Ending
 	readonly attempts: Attempt[]
 	readonly reason: string
 }
 
 /** A Doer: given the task and the last failure, produce a result. */
-export type Doer = (task: Task, previous: Failure | undefined, attempt: number) => Promise<Attempt>
+export type Doer = (issue: Issue, previous: Failure | undefined, attempt: number) => Promise<Attempt>
 
 /**
  * Run the loop until it ends, and make sure it can.
@@ -65,18 +64,18 @@ export type Doer = (task: Task, previous: Failure | undefined, attempt: number) 
  * The result always names which of the three endings happened. A loop whose
  * return type allows "still going" is a loop that will.
  */
-export async function run(task: Task, doer: Doer, budget: Budget = loadBudget()): Promise<LoopResult> {
+export async function run(issue: Issue, doer: Doer, budget: Budget = loadBudget()): Promise<LoopResult> {
 	const attempts: Attempt[] = []
 	let previous: Failure | undefined
 
 	for (let number = 1; number <= budget.attempts.max; number += 1) {
-		const attempt = await doer(task, previous, number)
+		const attempt = await doer(issue, previous, number)
 		attempts.push(attempt)
 
 		const blown = attempt.stages.find((stage) => stage.overBudget)
 		if (blown !== undefined) {
 			return {
-				task,
+				issue,
 				attempts,
 				ending: 'escalated-budget',
 				reason: `${blown.name} ran past its budget of ${budget.stages[blown.name].seconds}s. ${budget.stages[blown.name].why}`,
@@ -84,13 +83,13 @@ export async function run(task: Task, doer: Doer, budget: Budget = loadBudget())
 		}
 
 		if (attempt.passed) {
-			return { task, attempts, ending: 'passed', reason: `passed on attempt ${number}` }
+			return { issue, attempts, ending: 'passed', reason: `passed on attempt ${number}` }
 		}
 		previous = attempt.failure
 	}
 
 	return {
-		task,
+		issue,
 		attempts,
 		ending: 'escalated-attempts',
 		reason: `${budget.attempts.max} attempts with the reason attached, still failing. ${budget.attempts.why}`,

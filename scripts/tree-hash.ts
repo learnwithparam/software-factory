@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const ROOT = join(import.meta.dirname, '..')
@@ -21,7 +21,14 @@ export function trackedFiles(): string[] {
 		cwd: ROOT,
 		encoding: 'utf8',
 	})
-	return out.split('\n').filter(Boolean).sort()
+	// git lists a file it still tracks after it is deleted on disk. Every caller
+	// wants the files that are actually here, and reading one that is not is how
+	// an ordinary rename turned into a crash in three separate scripts.
+	return out
+		.split('\n')
+		.filter(Boolean)
+		.filter((file) => existsSync(join(ROOT, file)))
+		.sort()
 }
 
 export function treeHash(includeProse: boolean): string {
@@ -30,13 +37,7 @@ export function treeHash(includeProse: boolean): string {
 		if (!includeProse && PROSE.test(file)) continue
 		hash.update(file)
 		hash.update('\0')
-		try {
-			hash.update(readFileSync(join(ROOT, file)))
-		} catch {
-			// A file listed by git but gone from disk still changes the hash,
-			// which is the behaviour we want.
-			hash.update('<missing>')
-		}
+		hash.update(readFileSync(join(ROOT, file)))
 		hash.update('\0')
 	}
 	return hash.digest('hex')

@@ -12,7 +12,7 @@ import { expect, it } from 'bun:test'
 import { idOf } from '../scripts/junit.ts'
 import { MUTATIONS } from '../scripts/mutations.ts'
 import { listTests } from '../scripts/run-tests.ts'
-import { allChecks } from '../scripts/rubric.ts'
+import { TOTAL_POINTS, allChecks, declaredPoints } from '../scripts/rubric.ts'
 import { ROOT, treeHash } from '../scripts/tree-hash.ts'
 
 const makefile = readFileSync(join(ROOT, 'Makefile'), 'utf8')
@@ -57,6 +57,12 @@ it('every scored check has a proof that it fails', () => {
 		.map((check) => check.id)
 		.filter((id) => !(id in MUTATIONS))
 	expect(unproven, 'these scored checks have no mutation in scripts/mutations.ts').toEqual([])
+})
+
+it('the scorecard never declares more points than the total', () => {
+	// Adding a phase without rebalancing quietly makes a score above 100 possible,
+	// and a score that can exceed its own maximum is not a score.
+	expect(declaredPoints()).toBeLessThanOrEqual(TOTAL_POINTS)
 })
 
 it('the prose check is wired into make check', () => {

@@ -19,16 +19,31 @@ import {
 	writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { MUTATIONS, type Mutation } from './mutations.ts'
+import { dirname, join, sep } from 'node:path'
+import { MUTATIONS, editsOf, type Edit, type Mutation } from './mutations.ts'
 import { runTests } from './run-tests.ts'
 import { ROOT, trackedFiles } from './tree-hash.ts'
+
+export const EXAMPLE_COPY = '.example'
+
+/** Directories in a repository that have their own installed dependencies. */
+function nodeModulesIn(root: string): string[] {
+	const found = Bun.spawnSync(
+		['bash', '-lc', "find . -maxdepth 4 -type d -name node_modules -not -path '*/node_modules/*'"],
+		{ cwd: root },
+	)
+	return new TextDecoder()
+		.decode(found.stdout)
+		.split('\n')
+		.filter(Boolean)
+		.map((path) => path.replace(/^\.\/?/, '').replace(/\/?node_modules$/, ''))
+}
 
 function git(cwd: string, ...args: string[]): void {
 	execFileSync('git', args, { cwd, stdio: 'ignore' })
 }
 
-function sandbox(): string {
+function sandbox(withExample: boolean): string {
 	const dir = mkdtempSync(join(tmpdir(), 'factory-prove-'))
 	for (const file of trackedFiles()) {
 		// git lists a file it still tracks even after it is deleted on disk.
@@ -39,10 +54,34 @@ function sandbox(): string {
 		cpSync(join(ROOT, file), destination, { recursive: true, errorOnExist: false })
 	}
 	symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir')
+
+	// A proof may break the example repository rather than the factory, so a copy
+	// of it goes into the sandbox too. Mutating the real one would leave the
+	// next session working against a repository this script quietly damaged.
+	const example = join(ROOT, '..', 'ledger')
+	if (withExample && existsSync(example)) {
+		const into = join(dir, EXAMPLE_COPY)
+		cpSync(example, into, {
+			recursive: true,
+			filter: (from) => !from.includes('node_modules') && !from.includes(`${sep}target${sep}`),
+		})
+		// Its commands are the repository's own, and they need what it installed.
+		// Linking rather than copying keeps a proof run to about a second.
+		for (const place of nodeModulesIn(example)) {
+			const link = join(into, place)
+			mkdirSync(dirname(link), { recursive: true })
+			symlinkSync(join(example, place, 'node_modules'), join(link, 'node_modules'), 'dir')
+		}
+	}
 	// The copy must be a git repository: tree-hash.ts asks git which files exist,
 	// and a plain directory would report none, which quietly equalises both stamps.
 	git(dir, 'init', '-q')
+	writeFileSync(join(dir, '.git', 'info', 'exclude'), `${EXAMPLE_COPY}\nnode_modules\n`)
 	git(dir, 'add', '-A')
+	const copied = join(dir, EXAMPLE_COPY)
+	if (existsSync(join(copied, '.git'))) {
+		writeFileSync(join(copied, '.git', 'info', 'exclude'), 'node_modules\n')
+	}
 	return dir
 }
 
@@ -56,12 +95,18 @@ function testPassed(dir: string, id: string): boolean | undefined {
 }
 
 function apply(dir: string, mutation: Mutation): void {
-	const path = join(dir, mutation.file)
+	for (const edit of editsOf(mutation)) applyEdit(dir, edit)
+}
+
+function applyEdit(dir: string, edit: Edit): void {
+	const path = edit.file.startsWith('example:')
+		? join(dir, EXAMPLE_COPY, edit.file.slice('example:'.length))
+		: join(dir, edit.file)
 	const before = readFileSync(path, 'utf8')
-	if (!before.includes(mutation.find)) {
-		throw new Error(`${mutation.file} no longer contains the text this mutation replaces`)
+	if (!before.includes(edit.find)) {
+		throw new Error(`${edit.file} no longer contains the text this mutation replaces`)
 	}
-	writeFileSync(path, before.replace(mutation.find, mutation.replace))
+	writeFileSync(path, before.replace(edit.find, edit.replace))
 }
 
 function main(): number {
@@ -69,11 +114,12 @@ function main(): number {
 	const unproven: string[] = []
 
 	for (const [id, mutation] of entries) {
-		const dir = sandbox()
+		const dir = sandbox(editsOf(mutation).some((edit) => edit.file.startsWith('example:')))
 		try {
 			const healthy = testPassed(dir, id)
 			if (healthy !== true) {
-				console.log(`❌ ${id}\n     does not pass before the mutation, so nothing is proven`)
+				const state = healthy === false ? 'already fails' : 'never ran'
+				console.log(`❌ ${id}\n     ${state} in a clean copy, so nothing is proven`)
 				unproven.push(id)
 				continue
 			}
@@ -85,14 +131,17 @@ function main(): number {
 				continue
 			}
 			const broken = testPassed(dir, id)
-			if (broken === false) {
+			// Anything other than a pass is a proof. A mutation that stops the file
+			// loading at all has made the test not pass, which is the claim.
+			if (broken !== true) {
 				console.log(`✅ ${id}\n     fails when ${mutation.because}`)
 			} else {
 				console.log(`❌ ${id}\n     still passes when ${mutation.because}`)
 				unproven.push(id)
 			}
 		} finally {
-			rmSync(dir, { recursive: true, force: true })
+			if (process.env.FACTORY_KEEP_SANDBOX === '1') console.log(`     sandbox kept at ${dir}`)
+			else rmSync(dir, { recursive: true, force: true })
 		}
 	}
 

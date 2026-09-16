@@ -1,0 +1,12 @@
+{
+  "targets": {
+    "everything": {
+      "paths": ["**"],
+      "dependsOn": [],
+      "autonomy": "refuse",
+      "why": "A fixture that exists only to be refused while being read.",
+      "cwd": ".",
+      "commands": { "test": "true" }
+    }
+  }
+}

@@ -9,16 +9,22 @@ proven by running it, never by reading it.
 ```bash
 make install   # the factory's own dependencies
 make check     # prose, types, unit and structural tests. No model, no network
+make prove     # break each scored gate on purpose and confirm it fails
 make e2e       # real model, real repository, real pull requests
 make score     # 0 to 100 from the latest check and e2e results. Below 100 exits 1
 make demo STEP=02
+make check REPO=~/work/your-repo   # every target takes a repository
 ```
 
-## Two codebases, one repository
+## The factory knows nothing about any codebase
 
-`target/` is the codebase the agents change. Everything else is the factory that changes it. They
-never import from one another. A factory that reaches into the target's source is a factory that
-only works on one repository.
+Everything the factory needs to know about a repository lives in that repository's `.factory`
+directory. Nothing under `steps/` may name a service, a language or a directory belonging to a
+particular project, and no test may assert a fact about one. Tests run against
+`tests/fixtures/sample`, a repository invented for them; `tests/example-repo.test.ts` checks the
+example beside this one for shape only.
+
+A factory whose own suite knows the codebase it was written against is a script for that codebase.
 
 ## Rules
 
@@ -32,6 +38,8 @@ only works on one repository.
 - **Deterministic code decides what a verdict may claim.** A verdict is downgraded when its evidence
   is missing, whatever the agent said about the run.
 - **Merge is never automated.** The pipeline stops at a pull request and an engineer decides.
+- **A mutation that makes its own assertion trivially true proves nothing.** When a proof reports
+  that a check still passes, the mutation is wrong, not the check.
 - **The teach surfaces hold one copy of each idea.** Explanations live in `teach.html`. Run sheets in
   `teach/` carry the talk track and the commands, and cite concepts by id.
 - **No em dashes** in prose. `scripts/check-prose.ts` enforces it across every tracked markdown and

@@ -1,0 +1,3 @@
+# Sample
+
+A fixture repository.

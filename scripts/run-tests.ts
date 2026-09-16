@@ -8,10 +8,23 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseJunit, type JunitCase } from './junit.ts'
+import { ROOT } from './tree-hash.ts'
+
+/**
+ * Which example repository a run should read.
+ *
+ * A sandbox carries its own copy so a proof can break the example's data
+ * without touching the real one. Anything else reads the real one beside us.
+ */
+function example(cwd: string): string {
+	const copied = join(cwd, '.example')
+	if (cwd !== ROOT && existsSync(copied)) return copied
+	return process.env.FACTORY_EXAMPLE ?? join(ROOT, '..', 'ledger')
+}
 
 const NOTHING_MATCHES = '__no_test_has_this_name__'
 
@@ -22,9 +35,21 @@ function junit(cwd: string, extra: string[], outfile?: string): JunitCase[] {
 	try {
 		spawnSync('bun', ['test', ...extra, '--reporter=junit', `--reporter-outfile=${path}`], {
 			cwd,
-			stdio: 'ignore',
+			encoding: 'utf8',
+			// A copy of the tree has no sibling repositories beside it, so the tests
+			// that read one would skip and prove nothing. They are pointed back at
+			// the real example, which is what the mutation is meant to be judged
+			// against anyway: the factory changed, the repository did not.
+			env: { ...process.env, FACTORY_EXAMPLE: example(cwd), FACTORY_REPO: example(cwd) },
 		})
-		return parseJunit(readFileSync(path, 'utf8'))
+		try {
+			return parseJunit(readFileSync(path, 'utf8'))
+		} catch {
+			// A file that cannot even be loaded writes no report at all. That is a
+			// real result for a mutation, so it is returned as "nothing ran" rather
+			// than crashing the whole proof run partway through.
+			return []
+		}
 	} finally {
 		if (temporary) rmSync(dir, { recursive: true, force: true })
 	}

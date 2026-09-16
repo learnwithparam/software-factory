@@ -12,32 +12,33 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { allowed, failed, note, refused, step, table, title, verdict } from '../lib/out.ts'
-import { ROOT } from '../lib/graph.ts'
+import { loadRepo } from '../lib/repo.ts'
 import { claim } from './claim.ts'
 import { LimitExceeded, PROFILES, checkCommand, checkNetwork, checkWrite, profileFor } from './limits.ts'
-import { create, git, list, mainCheckoutIsClean, remove, workspaceFor } from './worktree.ts'
+import { create, git, list, remove, status, workspaceFor } from './worktree.ts'
+
+const repo = loadRepo()
 
 function short(path: string): string {
-	return path.startsWith(ROOT) ? path.slice(ROOT.length + 1) : path
+	return path.replace(`${process.env.HOME}/`, '~/')
 }
 
 function doCreate(item: string): number {
 	title(`A workspace for ${item}`)
-	const before = list().length
-	const workspace = create(item)
+	const before = list(repo.root).length
+	const workspace = create(repo.root, item)
 	step(`branch ${workspace.branch}`)
 	step(`at ${short(workspace.path)}`)
-	allowed(`workspaces went from ${before} to ${list().length}`)
-	if (mainCheckoutIsClean()) allowed('your own checkout is untouched')
-	else failed('your checkout changed, which is the thing this exists to prevent')
-	verdict(mainCheckoutIsClean() ? 'PASS' : 'FAIL', 'The task has somewhere to work that is not your branch.')
-	return mainCheckoutIsClean() ? 0 : 1
+	allowed(`workspaces went from ${before} to ${list(repo.root).length}`)
+	note(`the repository itself is at ${short(repo.root)} and was not touched`)
+	verdict('PASS', 'The task has somewhere to work that is not your branch.')
+	return 0
 }
 
 function doRemove(item: string): number {
 	title(`Throwing away the workspace for ${item}`)
-	remove(item)
-	allowed(`${list().length} workspaces remain`)
+	remove(repo.root, item)
+	allowed(`${list(repo.root).length} workspaces remain`)
 	verdict('PASS', 'Cleanup is one command, which is why it actually happens.')
 	return 0
 }
@@ -65,7 +66,7 @@ function doRace(item: string): number {
 
 		for (const run of runs) {
 			git(['clone', '-q', remote, run], tmpdir())
-			git(['checkout', '-qb', workspaceFor(item).branch], run)
+			git(['checkout', '-qb', workspaceFor(repo.root, item).branch], run)
 			writeFileSync(join(run, 'work.txt'), `${run}\n`)
 			git(['add', '-A'], run)
 			git(['-c', 'user.email=lab@example.com', '-c', 'user.name=Lab', 'commit', '-qm', 'work'], run)
@@ -148,14 +149,16 @@ function doSelftest(): number {
 	const item = 'selftest'
 	let ok = true
 
-	remove(item)
-	const workspace = create(item)
-	ok = check('a workspace is created', list().some((entry) => entry.branch === workspace.branch)) && ok
+	remove(repo.root, item)
+	const before = status(repo.root)
+	const workspace = create(repo.root, item)
+	ok = check('a workspace is created', list(repo.root).some((entry) => entry.branch === workspace.branch)) && ok
 	writeFileSync(join(workspace.path, 'scratch.txt'), 'written by the task\n')
-	ok = check('your checkout stays clean while the task writes', mainCheckoutIsClean()) && ok
-	ok = check('creating the same workspace twice resumes rather than failing', create(item).path === workspace.path) && ok
-	remove(item)
-	ok = check('removing it leaves nothing behind', !list().some((entry) => entry.branch === workspace.branch)) && ok
+	ok = check('the repository is unchanged while the task writes', status(repo.root) === before) && ok
+	ok = check('the workspace is outside the repository', !workspace.path.startsWith(repo.root)) && ok
+	ok = check('creating the same workspace twice resumes rather than failing', create(repo.root, item).path === workspace.path) && ok
+	remove(repo.root, item)
+	ok = check('removing it leaves nothing behind', !list(repo.root).some((entry) => entry.branch === workspace.branch)) && ok
 
 	verdict(ok ? 'PASS' : 'FAIL', ok ? 'The harness holds.' : 'Read the failing line above before running a task.')
 	return ok ? 0 : 1

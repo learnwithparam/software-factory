@@ -7,10 +7,14 @@
  */
 
 import { allowed, note, refused, step, table, title, verdict } from '../lib/out.ts'
-import { findTask, loadSkills, loadTasks, render, route } from './router.ts'
+import { issue, issuesIn } from '../lib/issues.ts'
+import { loadRepo } from '../lib/repo.ts'
+import { render, route } from './router.ts'
+
+const repo = loadRepo()
 
 function doRoute(id: string): number {
-	const context = route(findTask(id))
+	const context = route(repo, issue(repo.root, id))
 	title(`What task ${id} receives`)
 	console.log(render(context))
 
@@ -23,40 +27,40 @@ function doRoute(id: string): number {
 }
 
 function doCompare(): number {
-	const tasks = loadTasks().slice(0, 2)
-	const contexts = tasks.map((task) => route(task))
+	const contexts = issuesIn(repo.root)
+		.slice(0, 2)
+		.map((item) => route(repo, item))
 
 	title('Two tasks, two different bundles')
 	table(
-		['task', 'kind', 'targets it writes', 'rules', 'skills', 'withheld'],
+		['item', 'paths', 'checks', 'rules', 'skills', 'withheld'],
 		contexts.map((context) => [
-			context.task.id,
-			context.task.kind,
-			context.task.paths.length.toString(),
+			context.issue.id,
+			context.issue.paths.length.toString(),
+			context.commands.length.toString(),
 			context.rules.length.toString(),
 			context.skills.map((skill) => skill.name).join(', '),
 			context.withheld.length.toString(),
 		]),
 	)
 
-	const display = contexts[0]
-	const contract = contexts[1]
-	if (display === undefined || contract === undefined) {
-		verdict('FAIL', 'The lab needs at least two tasks to compare.')
+	const [first, second] = contexts
+	if (first === undefined || second === undefined) {
+		verdict('FAIL', 'This repository needs at least two work items to compare.')
 		return 1
 	}
 
 	title('The claim worth checking')
-	const displaySawContractSkill = display.skills.some((skill) => skill.when.includes('contracts'))
-	const contractSawContractSkill = contract.skills.some((skill) => skill.when.includes('contracts'))
+	const differ = render(first) !== render(second)
+	const withheld = first.withheld.length > 0 && second.withheld.length > 0
+	if (differ) allowed('the two items received different material')
+	else refused('both items received the same text, which is piling by another name')
+	if (withheld) allowed('each one records what it was not shown, and why')
+	else refused('nothing records what was left out, so the claim is unverifiable')
 
-	if (!displaySawContractSkill) allowed('the display task was never shown the contract procedure')
-	else refused('the display task was shown a procedure it has no use for')
+	for (const entry of first.withheld.slice(0, 4)) note(`item ${first.issue.id} never saw ${entry.what}`)
 
-	if (contractSawContractSkill) allowed('the contract task was')
-	else refused('the contract task was not shown the procedure it needs')
-
-	const held = !displaySawContractSkill && contractSawContractSkill
+	const held = differ && withheld
 	verdict(held ? 'PASS' : 'FAIL', held ? 'Routed, not piled.' : 'The router is not selecting on anything.')
 	return held ? 0 : 1
 }
@@ -65,11 +69,12 @@ function doSkills(): number {
 	title('Skills')
 	table(
 		['skill', 'applies to', 'outcome'],
-		loadSkills().map((skill) => [skill.name, skill.when, skill.outcome]),
+		repo.skills.map((skill) => [skill.name, `${skill.when} (${skill.origin})`, skill.outcome]),
 	)
 	note('A skill states the outcome and the evidence. Scripting every keystroke produces something worse than the agent had already.')
 	step('Each one is a file. Improving it improves every task that receives it.')
-	verdict('PASS', `${loadSkills().length} procedures kept out of prompts.`)
+	note('A skill the repository ships replaces one of the same name from the factory.')
+	verdict('PASS', `${repo.skills.length} procedures kept out of prompts.`)
 	return 0
 }
 

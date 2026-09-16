@@ -1,0 +1,36 @@
+{
+  "targets": {
+    "lib": {
+      "paths": ["lib/**"],
+      "dependsOn": [],
+      "autonomy": "propose",
+      "why": "Everything else is built on it, so a change here is never local to one place.",
+      "cwd": "lib",
+      "commands": { "test": "true" }
+    },
+    "app": {
+      "paths": ["app/**"],
+      "dependsOn": ["lib"],
+      "autonomy": "build",
+      "why": "Display only, so the worst outcome is visible to a reviewer immediately.",
+      "cwd": "app",
+      "commands": { "test": "true", "typecheck": "true" }
+    },
+    "secrets": {
+      "paths": ["secrets/**"],
+      "dependsOn": [],
+      "autonomy": "refuse",
+      "why": "Credentials. Nothing an agent does here can be undone by reverting a commit.",
+      "cwd": "secrets",
+      "commands": { "test": "true" }
+    },
+    "repo": {
+      "paths": [".factory/**", "README.md"],
+      "dependsOn": [],
+      "autonomy": "refuse",
+      "why": "Configuration decides what every other rule means, so an agent could widen its own permissions.",
+      "cwd": ".",
+      "commands": { "test": "true" }
+    }
+  }
+}

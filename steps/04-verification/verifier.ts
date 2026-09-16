@@ -13,10 +13,7 @@
  * is downgraded. What the agent said about the run is never consulted.
  */
 
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { ROOT } from '../lib/graph.ts'
-import type { Task } from '../03-context/router.ts'
+import type { Issue } from '../lib/issues.ts'
 
 export type Judgement = 'pass' | 'fail' | 'needs-review'
 
@@ -61,7 +58,7 @@ const TEST_PATTERN = /(\.test\.[tj]sx?|_test\.go|^tests?\/|\/tests?\/)/
  * failure into a pass, because the point is to bound what may be asserted, not
  * to argue with the reviewer.
  */
-export function judge(task: Task, claimed: Claimed, evidence: Evidence): Verdict {
+export function judge(issue: Issue, claimed: Claimed, evidence: Evidence): Verdict {
 	const reasons: string[] = []
 	let judgement = claimed.judgement
 	const original = claimed.judgement
@@ -87,7 +84,7 @@ export function judge(task: Task, claimed: Claimed, evidence: Evidence): Verdict
 	}
 
 	// The scope rule. Files the task did not name are the most common real defect.
-	const declared = new Set(task.paths)
+	const declared = new Set(issue.paths)
 	const extra = evidence.changedFiles.filter((file) => !declared.has(file))
 	if (extra.length > 0) {
 		downgrade('needs-review', `changed ${extra.length} file(s) the task did not name: ${extra.join(', ')}`)
@@ -154,13 +151,4 @@ export function weakenedTests(diff: string): Finding[] {
 	}
 	flush()
 	return findings
-}
-
-/** Where a recorded review lives for a task, when the executor is replaying. */
-export function transcriptFor(taskId: string): string {
-	return join(ROOT, 'steps/04-verification/transcripts', `${taskId}.json`)
-}
-
-export function hasTranscript(taskId: string): boolean {
-	return existsSync(transcriptFor(taskId))
 }

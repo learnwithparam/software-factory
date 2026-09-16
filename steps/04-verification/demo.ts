@@ -9,12 +9,17 @@
  * `evidence`                deciding in code what a verdict may claim
  */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { allowed, failed, note, refused, step, table, title, verdict } from '../lib/out.ts'
-import { findTask } from '../03-context/router.ts'
-import { judge, transcriptFor, weakenedTests, type Claimed, type Evidence } from './verifier.ts'
+import { issue, issuesIn } from '../lib/issues.ts'
+import { loadRepo } from '../lib/repo.ts'
+import { runGate } from './gate.ts'
+import { judge, weakenedTests, type Claimed, type Evidence } from './verifier.ts'
+
+const repo = loadRepo()
+const RECORDED_REVIEWS = join(import.meta.dir, 'reviews')
 
 /** A tiny module and its test, written to a scratch directory so the proof is real. */
 function scratch(implementation: string, test: string): string {
@@ -100,9 +105,16 @@ interface Transcript {
 	claimed: { judgement: string; findings: Array<{ file: string; what: string }> }
 }
 
-function doVerify(id = '12'): number {
-	const recorded = JSON.parse(readFileSync(transcriptFor(id), 'utf8')) as Transcript
-	const task = findTask(id)
+function doVerify(): number {
+	const id = issuesIn(repo.root)[0]?.id ?? '1'
+	const path = join(RECORDED_REVIEWS, `${id}.json`)
+	if (!existsSync(path)) {
+		failed(`no recorded review at ${path}`)
+		verdict('MISCONFIGURED', 'Record one with make record, or this demonstrates nothing.')
+		return 2
+	}
+	const recorded = JSON.parse(readFileSync(path, 'utf8')) as Transcript
+	const item = issue(repo.root, id)
 
 	title('What the reviewer is given')
 	for (const item of recorded.given) allowed(item)
@@ -119,7 +131,7 @@ function doVerify(id = '12'): number {
 
 	verdict(
 		recorded.claimed.judgement === 'pass' ? 'PASS' : 'FAIL',
-		`${recorded.claimed.findings.length} finding(s) on a change whose own suite was green. Task ${task.id}.`,
+		`${recorded.claimed.findings.length} finding(s) on a change whose own suite was green. Item ${item.id}.`,
 	)
 	return 0
 }
@@ -137,20 +149,24 @@ function doHoldout(): number {
 			['a refusal is represented', 'sample data that only succeeds teaches the wrong lesson'],
 		],
 	)
-	step('Run them against a live ledger with: make demo STEP=06')
+	step('Run them against a live service with: make demo STEP=06')
 	verdict('PASS', 'Five independent checks, none of them visible to the writer.')
 	return 0
 }
 
 function doEvidence(lostArtifact: boolean): number {
-	const task = findTask('12')
+	const item = issuesIn(repo.root)[0]
+	if (item === undefined) {
+		failed('this repository declares no work items')
+		return 2
+	}
 	const claimed: Claimed = {
 		judgement: 'pass',
 		findings: [],
 		gateLine: 'VERDICT: PASS every selected check passed',
 	}
 	const evidence: Evidence = {
-		changedFiles: [...task.paths],
+		changedFiles: [...item.paths],
 		gateLine: 'VERDICT: PASS every selected check passed',
 		negativeProof: lostArtifact ? undefined : { testName: 'the empty state names what is missing', redWithoutChange: true },
 		holdout: lostArtifact ? [] : [{ name: 'a missing run is a not-found', passed: true }],
@@ -159,7 +175,7 @@ function doEvidence(lostArtifact: boolean): number {
 	title(lostArtifact ? 'The same claim, with its proof missing' : 'A claim with its proof present')
 	step(`the reviewing agent says: ${claimed.judgement}`)
 
-	const result = judge(task, claimed, evidence)
+	const result = judge(item, claimed, evidence)
 	for (const reason of result.reasons) refused(reason)
 
 	if (result.downgradedFrom !== undefined) {
@@ -170,7 +186,7 @@ function doEvidence(lostArtifact: boolean): number {
 
 	title('And the rule no path list can express')
 	const diff = [
-		'+++ b/target/apps/console/lib/ledger.test.ts',
+		'+++ b/somewhere/thing.test.ts',
 		'-\texpect(bars[0].share).toBe(0)',
 		'-\texpect(total).toBeCloseTo(1, 10)',
 		'+\texpect(typeof bars[0].share).toBe("number")',
@@ -187,12 +203,22 @@ function doEvidence(lostArtifact: boolean): number {
 
 function doGate(): number {
 	title('The gate, and the one line it ends in')
-	const result = Bun.spawnSync(['bash', 'steps/04-verification/gates.sh', '--paths', 'apps/console/app/page.tsx'], {
-		cwd: join(import.meta.dir, '..', '..'),
+	const item = issuesIn(repo.root)[0]
+	if (item === undefined) {
+		failed('this repository declares no work items')
+		return 2
+	}
+	const result = runGate(repo, item.paths, {
+		onCheck: (target, name) => step(`${target} ${name}`),
 	})
-	console.log(new TextDecoder().decode(result.stdout).trim())
+	console.log(`\n${result.line}`)
 	note('Nothing downstream may restate that line. A summary of it is a claim; the line is evidence.')
-	return result.exitCode ?? 1
+
+	title('And with a required check removed')
+	const missing = runGate(repo, item.paths, { withoutTests: true })
+	refused(missing.line)
+	note('Neither a pass nor a failure. Absence and success look identical otherwise, and only one is safe.')
+	return result.state === 'PASS' && missing.state === 'MISCONFIGURED' ? 0 : 1
 }
 
 const argv = process.argv.slice(2)

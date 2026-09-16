@@ -1,0 +1,9 @@
+{
+  "$comment": "The cold review of the cross-stack change.",
+  "text": "VERDICT: PASS no findings. Every language that reads the definition was updated in the same change. The new property is required, matching the rule that this contract has no optional fields.",
+  "toolCalls": 14,
+  "tokensIn": 24100,
+  "tokensOut": 3300,
+  "costMinor": 44,
+  "changedFiles": []
+}

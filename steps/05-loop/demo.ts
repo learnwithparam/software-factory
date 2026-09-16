@@ -8,7 +8,10 @@
  */
 
 import { allowed, failed, note, refused, step, table, title, verdict, waiting } from '../lib/out.ts'
-import { findTask } from '../03-context/router.ts'
+import { issue, issuesIn } from '../lib/issues.ts'
+import { loadRepo } from '../lib/repo.ts'
+
+const repo = loadRepo()
 import { humanish } from './report.ts'
 import { handback, loadBudget, overBudget, run, type Attempt, type Failure, type StageName } from './loop.ts'
 
@@ -70,11 +73,11 @@ function tooSlow() {
 }
 
 async function doRun(id: string, mode: 'recover' | 'impossible' | 'slow'): Promise<number> {
-	const task = findTask(id)
+	const item = issue(repo.root, id)
 	const doer = { recover: recovering(), impossible: neverSucceeds(), slow: tooSlow() }[mode]
 
-	title(`Task ${task.id}: ${task.title}`)
-	const result = await run(task, doer)
+	title(`Item ${item.id}: ${item.title}`)
+	const result = await run(item, doer)
 
 	for (const attempt of result.attempts) {
 		if (attempt.passed) {
@@ -145,11 +148,12 @@ function doBudget(): number {
 
 const argv = process.argv.slice(2)
 const [command = 'budget', argument] = argv
+const firstItem = issuesIn(repo.root)[0]?.id ?? '1'
 
 const mode = argv.includes('--impossible') ? 'impossible' : argv.includes('--slow') ? 'slow' : 'recover'
 
 if (command === 'budget') process.exit(doBudget())
-else if (command === 'run') process.exit(await doRun(argument ?? '12', mode))
+else if (command === 'run') process.exit(await doRun(argument ?? firstItem, mode))
 else {
 	console.error(`unknown command: ${command}`)
 	console.error('usage: demo.ts [run <item> [--impossible|--slow]|budget]')
