@@ -1,0 +1,38 @@
+/* Generated from design/tokens.json for the teach surface. Do not edit.
+ * Change design/tokens.json and run `make tokens`. A stale copy fails make check. */
+:root {
+	--c-bg: #FFFFFF; /* page background */
+	--c-bg-alt: #F6F6F4; /* alternating section band */
+	--c-bg-inset: #EDEDE8; /* table headers, inset panels */
+	--c-ink: #16161A; /* body and heading text */
+	--c-ink-muted: #55555E; /* secondary text, captions */
+	--c-line: #E0E0DA; /* hairline borders and rules */
+	--c-accent: #D8431A; /* brand mark, large headings, diagram strokes */
+	--c-pass: #11704A; /* a check that passed */
+	--c-fail: #B5261B; /* a check that failed */
+	--c-wait: #7A5C00; /* waiting on a person */
+	--c-refuse: #4F41B8; /* refused by policy, which is a success */
+	--c-term-bg: #16161A; /* terminal blocks and the run report only */
+	--c-term-ink: #EDEDE8; /* text inside a terminal block */
+	--font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+	--step--1: 0.8125rem;
+	--step-0: 1rem;
+	--step-1: 1.25rem;
+	--step-2: 1.625rem;
+	--step-3: 2.25rem;
+	--step-4: 3rem;
+	--step-5: 4rem;
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-6: 1.5rem;
+	--space-8: 2rem;
+	--space-12: 3rem;
+	--space-16: 4rem;
+	--space-24: 6rem;
+	--radius-sm: 3px;
+	--radius-md: 6px;
+	--radius-lg: 10px;
+}

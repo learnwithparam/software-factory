@@ -1,0 +1,5 @@
+# esbuild ships a prebuilt platform binary that its install script links.
+# Deciding here rather than at an interactive prompt is what lets a fresh clone
+# and CI run `pnpm install` without a human answering a question.
+allowBuilds:
+  esbuild: true

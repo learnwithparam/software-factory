@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+out/
+artifacts/
+.worktrees/
+.factory-runs/
+target/services/pricing/target/
+target/services/catalog/bin/
+*.tsbuildinfo
+.env
+.env.local
+.DS_Store
+e2e/test-results/
+e2e/playwright-report/
