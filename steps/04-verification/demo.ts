@@ -106,7 +106,10 @@ interface Transcript {
 }
 
 function doVerify(): number {
-	const id = issuesIn(repo.root)[0]?.id ?? '1'
+	// Prefer the item that exists to be sent back. A cold review of work that was
+	// fine demonstrates the mechanism and not the point of it.
+	const items = issuesIn(repo.root)
+	const id = (items.find((item) => item.route === 'review-rejection') ?? items[0])?.id ?? '1'
 	const path = join(RECORDED_REVIEWS, `${id}.json`)
 	if (!existsSync(path)) {
 		failed(`no recorded review at ${path}`)
