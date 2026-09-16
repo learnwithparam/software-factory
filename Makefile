@@ -7,7 +7,7 @@ SHELL := /bin/bash
 REPO ?= ../ledger
 export FACTORY_REPO := $(REPO)
 
-.PHONY: help install tokens check prove e2e score demo lab-reset clean factory-up factory-down factory-doctor factory-app
+.PHONY: help install tokens check prove e2e score demo lab-reset clean factory-up factory-down factory-doctor factory-user factory-app
 
 help: ## List every target
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[33m%-11s\033[0m %s\n", $$1, $$2}'
@@ -37,6 +37,9 @@ factory-down: ## Stop them, leaving no listener behind
 
 factory-doctor: ## Is this machine ready to run a session?
 	@bun scripts/factory-doctor.ts
+
+factory-user: ## Create the local sign-in for this machine
+	@bun scripts/factory-user.ts
 
 factory-app: ## Create and install the GitHub App the Factory needs
 	@bun scripts/factory-app.ts
