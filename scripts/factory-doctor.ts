@@ -193,6 +193,51 @@ const CHECKS: Check[] = [
 		},
 	},
 	{
+		what: 'work intake can actually read the repository',
+		run: async () => {
+			// The check that would have saved an evening. Intake stored the repository
+			// slug where the query wanted the source's uuid, so every sweep returned
+			// zero issues and put "invalid input syntax for type uuid" in a failures
+			// array nothing read. Enabled, configured, pointed at the right repository,
+			// and silently fetching nothing.
+			try {
+				const cookie = await session()
+				const response = await fetch(`${FACTORY_URL}/web/intake/items`, {
+					headers: { cookie, accept: 'application/json' },
+					signal: AbortSignal.timeout(20_000),
+				})
+				if (!response.ok) return { ok: false, detail: `intake answered ${response.status}`, fix: 'make factory-connect' }
+
+				const { items, failures } = (await response.json()) as {
+					items: unknown[]
+					failures: Array<{ integrationId: string; message: string }>
+				}
+				if (failures.length > 0) {
+					return {
+						ok: false,
+						detail: failures.map((failure) => `${failure.integrationId}: ${failure.message}`).join('; '),
+						fix: 'make factory-connect',
+					}
+				}
+				if (items.length === 0) return { ok: false, detail: 'no failures, and no issues either', fix: 'make lab-reset' }
+
+				// Reading them is not routing them. An unbound source lists issues for
+				// ever while the board stays empty, which reads as a broken intake.
+				const listed = await fetch(`${FACTORY_URL}/web/intake/bindings`, { headers: { cookie, accept: 'application/json' } })
+				const { bindings } = (await listed.json()) as { bindings: Array<{ board: string | null }> }
+				return {
+					ok: bindings.length > 0,
+					detail: bindings.length > 0
+						? `${items.length} issues visible, routed to the ${bindings[0]?.board ?? 'default'} board`
+						: `${items.length} issues visible, and nothing routes them to a board`,
+					fix: 'make factory-connect',
+				}
+			} catch (error) {
+				return { ok: false, detail: (error as Error).message, fix: 'make factory-up' }
+			}
+		},
+	},
+	{
 		what: 'the repository it works on has its six issues open',
 		run: async () => {
 			const open = command('gh', 'issue', 'list', '--repo', 'learnwithparam/agent-run-ledger', '--state', 'open', '--json', 'number', '--jq', 'length')

@@ -80,6 +80,8 @@ if (import.meta.main) {
 
 	if (status.connected) {
 		allowed(`GitHub is connected, ${status.installations?.length ?? 0} installation(s) visible`)
+		const pointed = await pointIntakeAtSources(cookie)
+		allowed(pointed)
 		verdict('PASS', 'Nothing to do. Run make factory-doctor to check the rest.')
 		process.exit(0)
 	}
@@ -99,4 +101,56 @@ if (import.meta.main) {
 
 	verdict('NEEDS REVIEW', 'One browser step. Everything either side of it is automated.')
 	process.exit(1)
+}
+
+
+/**
+ * Point work intake at every repository the installation can see.
+ *
+ * Intake stores source ids, and the interface once wrote the repository slug
+ * into that field. The query behind it expects a uuid, so every sweep returned
+ * no issues and left "invalid input syntax for type uuid" in a failures array
+ * nothing surfaced: enabled, pointed at the right repository, fetching nothing.
+ *
+ * Writing the ids from the sources listing is both the repair and the setup, so
+ * connecting a codebase and fixing this are the same command.
+ */
+export async function pointIntakeAtSources(cookie: string): Promise<string> {
+	const listed = await fetch(`${BASE}/web/intake/sources`, { headers: { cookie, accept: 'application/json' } })
+	if (!listed.ok) throw new Error(`intake sources answered ${listed.status}`)
+	const { sources } = (await listed.json()) as { sources: Array<{ id: string; name: string; integrationId: string }> }
+
+	const github = sources.filter((source) => source.integrationId === 'github')
+	if (github.length === 0) return 'no repositories visible to intake yet'
+
+	const written = await fetch(`${BASE}/web/intake/config`, {
+		method: 'PUT',
+		headers: { 'content-type': 'application/json', origin: BASE, cookie },
+		body: JSON.stringify({ github: { enabled: true, sourceIds: github.map((source) => source.id) } }),
+	})
+	if (!written.ok) throw new Error(`writing intake config answered ${written.status}`)
+
+	// Read back through the path that was broken, not the one just written.
+	const items = await fetch(`${BASE}/web/intake/items`, { headers: { cookie, accept: 'application/json' } })
+	const { failures } = (await items.json()) as { failures: Array<{ message: string }> }
+	if (failures.length > 0) throw new Error(`intake still fails: ${failures.map((failure) => failure.message).join('; ')}`)
+
+	// Reading the issues is not the same as putting them on a board. Without a
+	// binding, intake lists six issues for ever and the board stays empty, which
+	// looks exactly like an intake that cannot see them.
+	const projectsResponse = await fetch(`${BASE}/web/factory/projects`, { headers: { cookie, accept: 'application/json' } })
+	const { projects } = (await projectsResponse.json()) as { projects: Array<{ id: string; name: string }> }
+	const project = projects.find((candidate) => candidate.name === REPO.split('/')[1]) ?? projects[0]
+	if (project === undefined) return `intake reads ${github.map((source) => source.name).join(', ')}, and no project holds it yet`
+
+	for (const source of github) {
+		const bound = await fetch(`${BASE}/web/intake/bindings`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json', origin: BASE, cookie },
+			body: JSON.stringify({ integrationId: 'github', sourceId: source.id, factoryProjectId: project.id, board: 'work' }),
+		})
+		if (!bound.ok) throw new Error(`binding ${source.name} answered ${bound.status}`)
+	}
+
+	return `intake reads ${github.map((source) => source.name).join(', ')} onto ${project.name}`
 }

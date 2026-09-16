@@ -6,10 +6,17 @@
  * source of truth for their text. A rehearsal and a live run then start from
  * exactly the same board.
  *
- * It clears the Factory's board too. Closing the issues is not enough: a work
- * item holds the session it started, a session is pinned to the model it was
- * created with, and a board left holding yesterday's items replays yesterday's
- * run. The reconcile worker recreates them from the issues within a minute.
+ * It clears the Factory's board and puts the new issues back on it. Closing the
+ * issues is not enough: a work item holds the session it started, a session is
+ * pinned to the model it was created with, and a board left holding yesterday's
+ * items replays yesterday's run.
+ *
+ * It seeds the board itself rather than waiting for intake. Work items are
+ * created by the `issues.opened` webhook, and GitHub will not deliver a webhook
+ * to localhost. The reconcile worker that does poll only patches and closes
+ * items that already exist, which is why a log line saying it started was never
+ * evidence that issues would arrive. Writing the same records the webhook would
+ * have written keeps the lab self-hosted, with no tunnel and no third party.
  *
  * It refuses to touch a repository with uncommitted work unless told to,
  * because the one thing worse than a failed demonstration is destroying
@@ -108,6 +115,8 @@ for (const issue of issues) {
 	console.log(`  ${url}  ${issue.route ?? ''}`)
 }
 
+await seedBoard()
+
 console.log(`\n${issues.length} issues open, ${gh(['pr', 'list', '--json', 'number', '--jq', 'length'])} pull requests open.`)
 
 
@@ -142,4 +151,69 @@ async function clearBoard(): Promise<void> {
 		}
 		console.log(`  cleared ${workItems.length} work items from the board`)
 	}
+}
+
+
+/**
+ * Put every open issue on the board, the way the webhook would have.
+ *
+ * The external source and metadata match what `issues.opened` writes, so the
+ * reconcile worker recognises these items as its own and keeps patching them.
+ */
+async function seedBoard(): Promise<void> {
+	const base = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
+	let cookie: string
+	try {
+		cookie = await session()
+	} catch {
+		console.log('  factory not reachable, board not seeded')
+		return
+	}
+
+	const listed = await fetch(`${base}/web/factory/projects`, { headers: { cookie, accept: 'application/json' } })
+	const { projects } = (await listed.json()) as { projects: Array<{ id: string; name: string }> }
+	const project = projects.find((candidate) => candidate.name === slug().split('/')[1]) ?? projects[0]
+	if (project === undefined) {
+		console.log('  no factory project, board not seeded')
+		return
+	}
+
+	const repositoryId = Number(gh(['api', `repos/${slug()}`, '--jq', '.id']))
+	const open = JSON.parse(
+		gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url']),
+	) as Array<{
+		number: number
+		title: string
+		url: string
+		createdAt: string
+		author: { login: string }
+		labels: Array<{ name: string }>
+		assignees: Array<{ login: string }>
+	}>
+
+	for (const issue of open.sort((a, b) => a.number - b.number)) {
+		const created = await fetch(`${base}/web/factory/projects/${project.id}/work-items`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', origin: base, cookie },
+			body: JSON.stringify({
+				title: issue.title,
+				board: 'work',
+				externalSource: { url: issue.url, type: 'issue', externalId: `github-issue:${issue.number}`, integrationId: 'github' },
+				stages: ['intake'],
+				metadata: {
+					state: 'open',
+					author: issue.author.login,
+					labels: issue.labels.map((label) => label.name),
+					assignees: issue.assignees.map((assignee) => assignee.login),
+					authorTrusted: true,
+					sourceCreatedAt: issue.createdAt,
+					githubIssueNumber: issue.number,
+					autoStartCandidate: false,
+					githubRepositoryId: repositoryId,
+				},
+			}),
+		})
+		if (!created.ok) throw new Error(`putting issue #${issue.number} on the board answered ${created.status}`)
+	}
+	console.log(`  seeded ${open.length} work items onto ${project.name}`)
 }
