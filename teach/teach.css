@@ -136,3 +136,29 @@ footer a { color: inherit; }
 	.segment, .layer { break-inside: avoid; background: none; }
 	pre.term { background: none; color: var(--c-ink); border: 1px solid var(--c-line); }
 }
+
+/* Diagrams ---------------------------------------------------------------- */
+
+figure.diagram { margin: var(--space-8) 0; }
+figure.diagram svg { display: block; width: 100%; height: auto; overflow: visible; }
+figure.diagram text { font-family: var(--font-sans); fill: var(--c-ink); }
+figure.diagram text.mono { font-family: var(--font-mono); }
+figure.diagram text.muted { fill: var(--c-ink-muted); }
+figure.diagram text.label { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-mono); fill: var(--c-ink-muted); }
+figure.diagram text.title { font-size: 15px; font-weight: 600; }
+figure.diagram text.small { font-size: 12.5px; }
+figure.diagram rect.box { fill: var(--c-bg-alt); stroke: var(--c-line); }
+figure.diagram rect.solid { fill: var(--c-ink); stroke: none; }
+/* A CSS variable is not usable in an SVG fill *attribute*, only in a property,
+   so text on a dark box gets a class rather than fill="var(--c-bg)". */
+figure.diagram text.onsolid { fill: var(--c-bg); }
+figure.diagram text.onsolid.small { fill: var(--c-bg-inset); }
+figure.diagram rect.tint { fill: var(--c-bg-inset); stroke: var(--c-line); }
+figure.diagram path, figure.diagram line { stroke: var(--c-ink-muted); fill: none; }
+figure.diagram .accent { stroke: var(--c-accent); }
+figure.diagram text.accent { fill: var(--c-accent); stroke: none; }
+figure.diagram .pass { stroke: var(--c-pass); } figure.diagram text.pass { fill: var(--c-pass); stroke: none; }
+figure.diagram .fail { stroke: var(--c-fail); } figure.diagram text.fail { fill: var(--c-fail); stroke: none; }
+figure.diagram .wait { stroke: var(--c-wait); } figure.diagram text.wait { fill: var(--c-wait); stroke: none; }
+figure.diagram .refuse { stroke: var(--c-refuse); } figure.diagram text.refuse { fill: var(--c-refuse); stroke: none; }
+figure.diagram .dashed { stroke-dasharray: 4 4; }

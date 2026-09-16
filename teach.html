@@ -43,6 +43,71 @@
 <h3>The six layers<span class="anchor">six-layers</span></h3>
 <p>A coding agent on its own is a generator. Around it sit six jobs that decide whether its output is worth your attention. Boundary says what may be attempted. Context says what the task gets to know. Skills hold the know-how that is reused rather than retyped. Execution says where the work happens and what it can reach. Verification says what proof must exist. Delivery says how finished work reaches a person and who decides it ships.</p>
 <p>Naming them separately matters because they fail separately. Work that keeps arriving wrong is usually a context problem. Work that arrives plausible but broken is a verification problem. Work that damages something is a boundary problem. One word for all three leaves you tuning a prompt when the missing piece is a gate.</p>
+<figure class="diagram" data-diagram="six-layers">
+<svg viewBox="-4 -4 1010 310" role="img" aria-labelledby="d1t">
+<title id="d1t">The six layers a coding agent works inside, and the failure each one removes</title>
+<text x="0" y="16" class="label">an issue</text>
+<text x="905" y="16" class="label">a person</text>
+<path d="M60 40 H 930" class="accent" marker-end="url(#arrowa)"/>
+<defs>
+<marker id="arrowa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M0 0 L10 5 L0 10 z" fill="var(--c-accent)" stroke="none"/>
+</marker>
+</defs>
+<g>
+<rect class="box" x="0" y="60" width="152" height="118" rx="6"/>
+<text x="16" y="86" class="title">Boundary</text>
+<text x="16" y="110" class="small muted">what may be</text>
+<text x="16" y="127" class="small muted">attempted at all</text>
+<text x="16" y="160" class="small fail">a change nobody</text>
+<text x="16" y="172" class="small fail">sanctioned</text>
+</g>
+<g>
+<rect class="box" x="170" y="60" width="152" height="118" rx="6"/>
+<text x="186" y="86" class="title">Context</text>
+<text x="186" y="110" class="small muted">what this task</text>
+<text x="186" y="127" class="small muted">gets to know</text>
+<text x="186" y="160" class="small fail">work that keeps</text>
+<text x="186" y="172" class="small fail">arriving wrong</text>
+</g>
+<g>
+<rect class="box" x="340" y="60" width="152" height="118" rx="6"/>
+<text x="356" y="86" class="title">Skills</text>
+<text x="356" y="110" class="small muted">know-how reused,</text>
+<text x="356" y="127" class="small muted">not retyped</text>
+<text x="356" y="160" class="small fail">the same lesson</text>
+<text x="356" y="172" class="small fail">taught every time</text>
+</g>
+<g>
+<rect class="box" x="510" y="60" width="152" height="118" rx="6"/>
+<text x="526" y="86" class="title">Execution</text>
+<text x="526" y="110" class="small muted">where it runs, what</text>
+<text x="526" y="127" class="small muted">it can reach</text>
+<text x="526" y="160" class="small fail">two tasks in one</text>
+<text x="526" y="172" class="small fail">checkout</text>
+</g>
+<g>
+<rect class="box" x="680" y="60" width="152" height="118" rx="6"/>
+<text x="696" y="86" class="title">Verification</text>
+<text x="696" y="110" class="small muted">what must be proven</text>
+<text x="696" y="127" class="small muted">before you look</text>
+<text x="696" y="160" class="small fail">plausible code</text>
+<text x="696" y="172" class="small fail">that does not work</text>
+</g>
+<g>
+<rect class="solid" x="850" y="60" width="150" height="118" rx="6"/>
+<text x="866" y="86" class="title onsolid">Delivery</text>
+<text x="866" y="110" class="small onsolid">how it reaches</text>
+<text x="866" y="127" class="small onsolid">a person</text>
+<text x="866" y="160" class="small onsolid">and who decides</text>
+<text x="866" y="172" class="small onsolid">it ships</text>
+</g>
+<line x1="0" y1="206" x2="1000" y2="206" class="dashed"/>
+<text x="0" y="230" class="label">the failure each one removes</text>
+<text x="0" y="262" class="small muted">They fail separately, which is why one word for all of them leaves you tuning a prompt when the missing piece is a gate.</text>
+</svg>
+<figcaption>Figure 1. The six jobs around a coding agent. Each box names what it decides; the line beneath it names what goes wrong when it is missing.</figcaption>
+</figure>
 <p class="because">The layers are not a maturity model. Most teams already have two or three by accident, written down nowhere. The exercise is finding which one is absent.</p>
 </article>
 
@@ -55,6 +120,29 @@
 <article class="concept" id="c-executor-interface">
 <h3>The executor is an interface<span class="anchor">executor-interface</span></h3>
 <p>Nothing in the factory knows which agent runs the work. An executor is any command that accepts a prompt on standard input, does something to a working directory, and exits. That indirection buys three things: the loop can be tested against a recorded transcript with no model and no network, a different agent can be swapped in without touching policy, and the same task can be replayed to compare two agents on identical input.</p>
+<figure class="diagram" data-diagram="reads-vs-brings">
+<svg viewBox="-4 -4 1010 290" role="img" aria-labelledby="d6t">
+<title id="d6t">What a factory reads from a repository, against what it brings itself</title>
+<g>
+<rect class="box" x="0" y="30" width="470" height="220" rx="6"/>
+<text x="20" y="58" class="label">the repository owns</text>
+<text x="20" y="92" class="title mono">.factory/charter.md</text><text x="20" y="110" class="small muted">what may be attempted, and what is never touched</text>
+<text x="20" y="140" class="title mono">.factory/targets.json</text><text x="20" y="158" class="small muted">who owns which paths, and the commands that check them</text>
+<text x="20" y="188" class="title mono">.factory/skills/</text><text x="20" y="206" class="small muted">procedures worth reusing in this codebase</text>
+<text x="20" y="232" class="small accent">a team writes these, and an agent may not edit them</text>
+</g>
+<g>
+<rect class="solid" x="530" y="30" width="470" height="220" rx="6"/>
+<text x="550" y="58" class="label onsolid">the factory brings</text>
+<text x="550" y="92" class="title onsolid">policy, isolation, routing</text><text x="550" y="110" class="small onsolid">the same code whatever repository it reads</text>
+<text x="550" y="140" class="title onsolid">gates, verification, delivery</text><text x="550" y="158" class="small onsolid">it runs the commands it was told, and never guesses them</text>
+<text x="550" y="188" class="title onsolid">nothing about your code</text><text x="550" y="206" class="small onsolid">no service name, no language, no directory</text>
+<text x="550" y="232" class="small onsolid">point it elsewhere and it behaves differently</text>
+</g>
+<text x="0" y="278" class="small muted">A factory whose own tests know the codebase it was written against is a script for that codebase.</text>
+</svg>
+<figcaption>Figure 6. The split that makes a factory portable. Facts on the left, logic on the right, and the line between them is what a second repository tests.</figcaption>
+</figure>
 <p>It is also the honest boundary of the claim. The factory is not a model. It is the system that decides what a model is allowed to attempt and what happens to the result.</p>
 <p class="because">Run <code>make check</code> and no model is called. The same loop, the same policy, the same gates, a recorded agent.</p>
 </article>
@@ -81,6 +169,39 @@
 <article class="concept" id="c-autonomy-tier">
 <h3>Autonomy tracks consequence<span class="anchor">autonomy-tier</span></h3>
 <p>The instinct is to grant freedom by difficulty: small changes unattended, large ones reviewed. That is the wrong axis. A large migration on a project with no users is recoverable. A small edit to the code that decides what a customer is charged is not. Freedom should follow how bad the worst outcome is and how easily it is undone.</p>
+<figure class="diagram" data-diagram="org-shapes">
+<svg viewBox="-4 -4 1010 330" role="img" aria-labelledby="d5t">
+<title id="d5t">Four company shapes as four gate configurations on one codebase</title>
+<text x="0" y="14" class="label">the same six items, four operating models</text>
+<g>
+<text x="198" y="44" class="title">solo</text><text x="398" y="44" class="title">startup</text><text x="598" y="44" class="title">scaleup</text><text x="798" y="44" class="title">enterprise</text>
+</g>
+<g>
+<text x="0" y="82" class="small mono muted">runs start themselves</text>
+<rect class="solid" x="190" y="70" width="140" height="16" rx="2"/><rect class="solid" x="390" y="70" width="140" height="16" rx="2"/>
+<rect class="tint" x="590" y="70" width="140" height="16" rx="2"/><rect class="tint" x="790" y="70" width="140" height="16" rx="2"/>
+<text x="0" y="114" class="small mono muted">plans approve themselves</text>
+<rect class="solid" x="190" y="102" width="140" height="16" rx="2"/>
+<rect class="tint" x="390" y="102" width="140" height="16" rx="2"/><rect class="tint" x="590" y="102" width="140" height="16" rx="2"/><rect class="tint" x="790" y="102" width="140" height="16" rx="2"/>
+<text x="0" y="146" class="small mono muted">acceptance recorded</text>
+<rect class="tint" x="190" y="134" width="140" height="16" rx="2"/><rect class="tint" x="390" y="134" width="140" height="16" rx="2"/>
+<rect class="solid" x="590" y="134" width="140" height="16" rx="2"/><rect class="solid" x="790" y="134" width="140" height="16" rx="2"/>
+<text x="0" y="178" class="small mono muted">a second approver</text>
+<rect class="tint" x="190" y="166" width="140" height="16" rx="2"/><rect class="tint" x="390" y="166" width="140" height="16" rx="2"/><rect class="tint" x="590" y="166" width="140" height="16" rx="2"/>
+<rect class="solid" x="790" y="166" width="140" height="16" rx="2"/>
+<text x="0" y="210" class="small mono muted">paths off limits</text>
+<text x="190" y="210" class="small muted">credentials</text><text x="390" y="210" class="small muted">and money</text><text x="590" y="210" class="small muted">and config</text><text x="790" y="210" class="small muted">and anything load bearing</text>
+</g>
+<line x1="0" y1="236" x2="1000" y2="236" class="dashed"/>
+<text x="0" y="262" class="small mono muted">the money item</text>
+<text x="190" y="262" class="small wait">merges, after you look</text>
+<text x="390" y="262" class="small wait">plan reviewed first</text>
+<text x="590" y="262" class="small refuse">refused</text>
+<text x="790" y="262" class="small refuse">refused, and routed</text>
+<text x="0" y="300" class="small muted">One repository, one command to switch. The room sees the same item merge in one shape and stop dead in another inside a minute.</text>
+</svg>
+<figcaption>Figure 5. Gates accumulate left to right. Nothing about the codebase changes between these columns; only what a person insists on seeing.</figcaption>
+</figure>
 <p>So the tier is a property of the repository, and it is refined per area. In this lab the budget engine is always human-approved whatever the size of the change, and the console can be changed unattended even when the change is large.</p>
 </article>
 
@@ -243,6 +364,22 @@
 <h3>Measure where the time actually went<span class="anchor">latency-budget</span></h3>
 <p>The surprise on a first real run is that generation is rarely the slow part. Time accumulates in setup, in repeated checks, in verification that replays work already done, and in the stretch where the run is waiting on a person and nothing says so.</p>
 <p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the run that produced them.</p>
+<figure class="diagram" data-diagram="stage-waterfall">
+<svg viewBox="-4 -4 1010 250" role="img" aria-labelledby="d3t">
+<title id="d3t">Where the time in one run actually goes</title>
+<text x="0" y="14" class="label">one run, every stage timed separately</text>
+<g>
+<text x="0" y="48" class="small mono muted">claim</text><rect class="solid" x="110" y="36" width="6" height="16" rx="2"/><text x="126" y="48" class="small muted">4s</text>
+<text x="0" y="78" class="small mono muted">context</text><rect class="solid" x="110" y="66" width="18" height="16" rx="2"/><text x="138" y="78" class="small muted">31s</text>
+<text x="0" y="108" class="small mono muted">implement</text><rect class="solid" x="110" y="96" width="84" height="16" rx="2"/><text x="204" y="108" class="small muted">2m 31s</text>
+<text x="0" y="138" class="small mono muted">gates</text><rect class="solid" x="110" y="126" width="76" height="16" rx="2"/><text x="196" y="138" class="small muted">2m 16s</text>
+<text x="0" y="168" class="small mono muted">verify</text><rect class="solid" x="110" y="156" width="74" height="16" rx="2"/><text x="194" y="168" class="small muted">2m 12s</text>
+<text x="0" y="198" class="small mono wait">human</text><rect x="110" y="186" width="760" height="16" rx="2" fill="var(--c-wait)"/><text x="880" y="198" class="small wait">45m 00s</text>
+</g>
+<text x="0" y="234" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
+</svg>
+<figcaption>Figure 3. A run with each stage timed on its own. The figures on this page are read from the recorded run by a test, so none of them can drift from what actually happened.</figcaption>
+</figure>
 <p class="because">Without per-stage numbers the only available response to a slow factory is to make the model faster, which is the one thing you do not control.</p>
 </article>
 
@@ -256,6 +393,46 @@
 
 <article class="concept" id="c-delivery">
 <h3>Delivery<span class="anchor">delivery</span></h3>
+<figure class="diagram" data-diagram="issue-lifecycle">
+<svg viewBox="-4 -4 1010 380" role="img" aria-labelledby="d4t">
+<title id="d4t">An item's journey, with its three feedback loops and the one refusal</title>
+<defs>
+<marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-ink-muted)" stroke="none"/></marker>
+<marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-wait)" stroke="none"/></marker>
+<marker id="arf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-fail)" stroke="none"/></marker>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-refuse)" stroke="none"/></marker>
+</defs>
+<g>
+<rect class="box" x="0" y="120" width="120" height="48" rx="6"/><text x="16" y="149" class="title">Intake</text>
+<rect class="box" x="168" y="120" width="120" height="48" rx="6"/><text x="184" y="149" class="title">Triage</text>
+<rect class="box" x="336" y="120" width="120" height="48" rx="6"/><text x="352" y="149" class="title">Plan</text>
+<rect class="box" x="504" y="120" width="120" height="48" rx="6"/><text x="520" y="149" class="title">Build</text>
+<rect class="box" x="672" y="120" width="120" height="48" rx="6"/><text x="688" y="149" class="title">Review</text>
+<rect class="solid" x="840" y="120" width="120" height="48" rx="6"/><text x="856" y="149" class="title onsolid">Merged</text>
+</g>
+<g marker-end="url(#ar)">
+<path d="M120 144 H 162"/><path d="M288 144 H 330"/><path d="M456 144 H 498"/><path d="M624 144 H 666"/><path d="M792 144 H 834"/>
+</g>
+<path d="M228 120 V 74 H 300" class="wait" marker-end="url(#arw)"/>
+<text x="308" y="62" class="small wait">1. the agent asks, and stops</text>
+<text x="308" y="78" class="small muted">a person answers in the session, and it resumes</text>
+<path d="M300 92 H 228 V 118" class="wait" marker-end="url(#arw)"/>
+<path d="M564 168 V 214 H 420 V 168" class="fail" marker-end="url(#arf)"/>
+<text x="430" y="234" class="small fail">2. a check fails, and the reason goes back with it</text>
+<text x="430" y="250" class="small muted">the next attempt starts from the failure, not from the beginning</text>
+<path d="M732 168 V 290 H 564 V 170" class="fail" marker-end="url(#arf)"/>
+<text x="574" y="310" class="small fail">3. the reviewer sends it back</text>
+<text x="574" y="326" class="small muted">a push, then another review, before anything merges</text>
+<path d="M228 168 V 200 H 120 V 180" class="refuse" marker-end="url(#arr)"/>
+<rect x="0" y="180" width="120" height="44" rx="6" fill="none" stroke="var(--c-refuse)"/>
+<text x="16" y="200" class="title refuse">Refused</text>
+<text x="16" y="216" class="small muted">no file touched</text>
+<text x="840" y="196" class="small muted">a person merges.</text>
+<text x="840" y="212" class="small muted">never the factory.</text>
+<text x="0" y="360" class="small muted">Three ways work comes back and one way it stops. A demonstration that only shows the straight line through the middle is not a demonstration of a factory.</text>
+</svg>
+<figcaption>Figure 4. The straight line across the top is the path everyone expects. The loops below it are where the engineering is, and the box on the left is the outcome that looks like nothing happened.</figcaption>
+</figure>
 <p>The last layer is the one most demonstrations skip, and it is where trust is actually built or lost. Work has to arrive somewhere a person already looks, carrying enough evidence to be judged, and the decision to ship has to stay with someone accountable for it.</p>
 </article>
 
@@ -294,6 +471,41 @@
 <article class="concept" id="c-board-phases">
 <h3>Phases are the layers, named differently<span class="anchor">board-phases</span></h3>
 <p>A hosted factory gives you a board whose columns are stages, where entering a stage starts an agent in a declared role and leaving one runs an action. Intake, triage, planning, building, review, done. The mapping to what this repository builds by hand is close to one to one, which is the point of building it by hand first.</p>
+<figure class="diagram" data-diagram="factory-phases">
+<svg viewBox="-4 -4 1010 320" role="img" aria-labelledby="d2t">
+<title id="d2t">Mastra Factory board phases mapped onto the six layers</title>
+<text x="0" y="14" class="label">what a hosted factory calls them</text>
+<g>
+<rect class="tint" x="0" y="28" width="140" height="52" rx="6"/><text x="16" y="59" class="title">Intake</text>
+<rect class="tint" x="152" y="28" width="140" height="52" rx="6"/><text x="168" y="59" class="title">Triage</text>
+<rect class="tint" x="304" y="28" width="140" height="52" rx="6"/><text x="320" y="59" class="title">Planning</text>
+<rect class="tint" x="456" y="28" width="140" height="52" rx="6"/><text x="472" y="59" class="title">Building</text>
+<rect class="tint" x="608" y="28" width="140" height="52" rx="6"/><text x="624" y="59" class="title">Review</text>
+<rect class="tint" x="760" y="28" width="140" height="52" rx="6"/><text x="776" y="59" class="title">Done</text>
+</g>
+<g class="dashed">
+<path d="M70 80 V 210"/><path d="M222 80 V 210"/><path d="M374 80 V 210"/>
+<path d="M526 80 V 210"/><path d="M678 80 V 210"/><path d="M830 80 V 210"/>
+</g>
+<text x="0" y="122" class="label accent">the decision a person makes there</text>
+<text x="0" y="146" class="small wait">start a run</text>
+<text x="152" y="146" class="small wait">accept the task</text>
+<text x="304" y="146" class="small wait">approve the plan</text>
+<text x="456" y="146" class="small muted">nothing, it works</text>
+<text x="608" y="146" class="small wait">read the diff</text>
+<text x="760" y="146" class="small wait">merge it</text>
+<text x="0" y="194" class="label">what this repository calls them</text>
+<g>
+<rect class="box" x="0" y="210" width="292" height="52" rx="6"/><text x="16" y="233" class="title">Boundary</text><text x="16" y="251" class="small mono muted">.factory/charter.md</text>
+<rect class="box" x="304" y="210" width="140" height="52" rx="6"/><text x="320" y="233" class="title">Context</text><text x="320" y="251" class="small mono muted">router.ts</text>
+<rect class="box" x="456" y="210" width="140" height="52" rx="6"/><text x="472" y="233" class="title">Execution</text><text x="472" y="251" class="small mono muted">worktree.ts</text>
+<rect class="box" x="608" y="210" width="140" height="52" rx="6"/><text x="624" y="233" class="title">Verification</text><text x="624" y="251" class="small mono muted">gate.ts</text>
+<rect class="box" x="760" y="210" width="140" height="52" rx="6"/><text x="776" y="233" class="title">Delivery</text><text x="776" y="251" class="small mono muted">deliver.ts</text>
+</g>
+<text x="0" y="296" class="small muted">The names differ and the shape does not. Recognising that is what turns the buy decision into an engineering one.</text>
+</svg>
+<figcaption>Figure 2. A hosted factory's phases against the layers built by hand. The middle row is the part that never transfers: which decisions stay with a person is yours to state on either substrate.</figcaption>
+</figure>
 <p>Recognising the mapping is what makes the buy decision an engineering decision. You are not choosing between a product and nothing. You are choosing who maintains the parts you now understand.</p>
 </article>
 
