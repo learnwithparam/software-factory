@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { allowed, failed, note, title, verdict, waiting } from '../steps/lib/out.ts'
+import { session } from './factory-connect.ts'
 
 export const SECRETS = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
 const MASTRA = join(import.meta.dir, '..', '..', 'mastra')
@@ -143,19 +144,51 @@ const CHECKS: Check[] = [
 					return { ok: false, detail: `no account yet (${provider})`, fix: 'make factory-user' }
 				}
 
-				const signIn = await fetch(`${FACTORY_URL}/auth/api/sign-in/email`, {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify({ email: process.env.FACTORY_USER_EMAIL ?? 'lab@learnwithparam.com', password }),
-					signal: AbortSignal.timeout(10_000),
-				})
-				return {
-					ok: signIn.ok,
-					detail: signIn.ok ? `${provider}, and the stored password works` : `${provider}, but sign-in answered ${signIn.status}`,
-					fix: 'make factory-user',
+				// Through session(), not a second raw sign-in. Better Auth rate-limits
+				// the endpoint, so a doctor that signs in once per check fails its own
+				// later checks with a 429 and blames the thing it was inspecting.
+				try {
+					await session()
+					return { ok: true, detail: `${provider}, and the stored password works`, fix: 'make factory-user' }
+				} catch (error) {
+					return { ok: false, detail: `${provider}, but ${(error as Error).message}`, fix: 'make factory-user' }
 				}
 			} catch {
 				return { ok: false, detail: 'no answer', fix: 'make factory-up' }
+			}
+		},
+	},
+	{
+		what: 'the factory has a default model selected',
+		run: async () => {
+			// A project with no defaultModelId does not refuse to run. It falls back
+			// to openai, and the first triage dies with "No usable openai credential
+			// is configured" twenty minutes into a session. Storing the provider key
+			// is not the same as choosing the model, and only this check says so.
+			try {
+				const cookie = await session()
+				const listed = await fetch(`${FACTORY_URL}/web/factory/projects`, {
+					headers: { cookie, accept: 'application/json' },
+					signal: AbortSignal.timeout(10_000),
+				})
+				if (!listed.ok) return { ok: false, detail: `listing projects answered ${listed.status}`, fix: 'make factory-connect' }
+
+				const { projects } = (await listed.json()) as { projects: Array<{ name: string; defaultModelId: string | null }> }
+				if (projects.length === 0) return { ok: false, detail: 'no factory project exists yet', fix: 'make factory-connect' }
+
+				const unset = projects.filter((project) => project.defaultModelId === null)
+				return {
+					ok: unset.length === 0,
+					detail: unset.length === 0
+						? projects.map((project) => `${project.name} runs on ${project.defaultModelId}`).join(', ')
+						: `${unset.map((project) => project.name).join(', ')} would fall back to openai`,
+					fix: 'make factory-model',
+				}
+			} catch (error) {
+				// Never a bare "could not ask". A 429 from Better Auth's sign-in limit
+				// once read here as "no model selected", which sends somebody to fix a
+				// setting that was already correct.
+				return { ok: false, detail: (error as Error).message, fix: 'make factory-up' }
 			}
 		},
 	},

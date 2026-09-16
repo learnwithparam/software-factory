@@ -27,8 +27,22 @@ export interface GithubStatus {
 	installations?: unknown[]
 }
 
-/** Sign in and keep the cookie, which is what every authenticated call needs. */
+let signedIn: Promise<string> | undefined
+
+/**
+ * Sign in and keep the cookie, which is what every authenticated call needs.
+ *
+ * Memoised per process. Better Auth rate-limits sign-in, so two callers in one
+ * command earn a 429, and the second one reports whatever it was checking as
+ * broken. The doctor hit exactly that the moment it grew a second signed-in
+ * check.
+ */
 export async function session(): Promise<string> {
+	if (signedIn === undefined) signedIn = signIn()
+	return signedIn
+}
+
+async function signIn(): Promise<string> {
 	const password = readFileSync(SECRETS, 'utf8')
 		.split('\n')
 		.map((line) => /^FACTORY_USER_PASSWORD=(.*)$/.exec(line.trim())?.[1])

@@ -18,6 +18,7 @@ import { session } from './factory-connect.ts'
 
 const BASE = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
 const SECRETS = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
+const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
 /** Provider, the secret that unlocks it, and the model the sessions use. */
 const CHOICE = {
@@ -81,4 +82,50 @@ if (wanted === undefined) {
 }
 
 allowed(`${wanted} is available`)
-verdict('PASS', 'The provider is configured. Select it as the factory default in Settings, or let the next command do it.')
+
+/**
+ * Select it as the project default.
+ *
+ * Storing the key is not enough: a project with no defaultModelId falls back to
+ * openai, and the first triage dies with "No usable openai credential is
+ * configured". That failure cost a run, so this step is no longer a sentence
+ * telling somebody to click Settings.
+ */
+const projects = await fetch(`${BASE}/web/factory/projects`, { headers: { cookie, accept: 'application/json' } })
+if (!projects.ok) {
+	failed(`the server answered ${projects.status} listing projects`)
+	verdict('FAIL', 'The model was not selected.')
+	process.exit(1)
+}
+const { projects: found } = (await projects.json()) as { projects: Array<{ id: string; name: string; defaultModelId: string | null }> }
+const project = found.find((p) => p.name === REPO.split('/')[1]) ?? found[0]
+if (project === undefined) {
+	failed('no factory project exists yet')
+	verdict('NEEDS REVIEW', 'Run make factory-connect and create the factory first.')
+	process.exit(1)
+}
+
+const patched = await fetch(`${BASE}/web/factory/projects/${project.id}`, {
+	method: 'PATCH',
+	headers: { 'content-type': 'application/json', origin: BASE, cookie },
+	body: JSON.stringify({ defaultModelId: wanted }),
+	signal: AbortSignal.timeout(20_000),
+})
+if (!patched.ok) {
+	failed(`the server answered ${patched.status} selecting the model`)
+	note((await patched.text()).slice(0, 300))
+	verdict('FAIL', 'The model was not selected.')
+	process.exit(1)
+}
+
+// Read it back. A 200 is the server's claim; this is the fact.
+const confirm = await fetch(`${BASE}/web/factory/projects/${project.id}`, { headers: { cookie, accept: 'application/json' } })
+const { project: saved } = (await confirm.json()) as { project: { defaultModelId: string | null } }
+if (saved.defaultModelId !== wanted) {
+	failed(`the project still reads ${saved.defaultModelId ?? 'no model'}`)
+	verdict('FAIL', 'The model was not selected.')
+	process.exit(1)
+}
+
+table(['project', 'default model'], [[project.name, saved.defaultModelId]])
+verdict('PASS', 'The provider is configured and the factory runs on it. No Settings click needed.')
