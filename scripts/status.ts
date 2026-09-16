@@ -51,7 +51,11 @@ function shotsCaptured(): Set<string> {
 	const captured = new Set<string>()
 	for (const file of readdirSync(dir).filter((name) => name.endsWith('.ts'))) {
 		const text = readFileSync(join(dir, file), 'utf8')
-		for (const match of text.matchAll(/shot\([^,]+,\s*['"]([\w-]+)['"]/g)) captured.add(match[1] as string)
+		// shot, shotOf and shotTerminal all take the name second. Matching only
+		// `shot(` missed every terminal picture and reported none of them captured.
+		for (const match of text.matchAll(/\bshot(?:Of|Terminal)?\([^,]+,\s*['"]([\w-]+)['"]/g)) {
+			captured.add(match[1] as string)
+		}
 	}
 	return captured
 }
