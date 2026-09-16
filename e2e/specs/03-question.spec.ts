@@ -14,7 +14,7 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
@@ -40,7 +40,7 @@ test('an underspecified issue is asked about rather than guessed at', async ({ p
 	const planned = await advance(item.id, 'planning', 'accepted, to see what it asks')
 	expect(planned.decision?.status, 'planning should succeed').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-question')
 
 	// The claim: the ambiguity was surfaced, not resolved by assumption. Either
@@ -63,6 +63,6 @@ test('an underspecified issue is asked about rather than guessed at', async ({ p
 	const resumed = await advance(item.id, 'execute', 'question answered, build it')
 	expect(resumed.decision?.status, 'the build should succeed once the question is answered').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-answered')
 })

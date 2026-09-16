@@ -114,3 +114,15 @@ export async function setAutomation(page: Page, which: 'Auto-start runs' | 'Auto
 }
 
 export { expect }
+
+/**
+ * Reload and wait for the board to actually be there.
+ *
+ * domcontentloaded fires before this interface has drawn anything, so a reload
+ * followed by a screenshot photographs a spinner. Every spec reloads through
+ * here rather than calling page.reload itself.
+ */
+export async function showBoard(page: Page): Promise<void> {
+	await page.reload({ waitUntil: 'domcontentloaded' })
+	await expect(page.locator('[data-testid="board-column-intake"]')).toBeVisible({ timeout: 60_000 })
+}

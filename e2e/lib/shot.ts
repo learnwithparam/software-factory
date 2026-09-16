@@ -18,9 +18,45 @@ import type { Page } from '@playwright/test'
 export const ROOT = join(import.meta.dirname, '..', '..')
 export const SCREENS = join(ROOT, 'evidence', 'screens')
 
+/**
+ * Text that means the page has not finished, whatever else is on it.
+ *
+ * Four of the first eight pictures this suite took were the Mastra spinner or
+ * the words "Loading boards...", and every assertion around them passed. A
+ * screenshot is the one artefact a test cannot check by reading, so the check
+ * has to live here.
+ */
+const STILL_LOADING = [/Loading boards/i, /Loading\u2026/i, /Loading\.\.\./i]
+
+/** Whether a rendered page is still telling us it has not finished. */
+export function looksUnfinished(text: string): boolean {
+	return text.trim() === '' || STILL_LOADING.some((pattern) => pattern.test(text))
+}
+
+/**
+ * Photograph the page, refusing a page that is still loading.
+ *
+ * Throwing is the point. A blank picture in evidence/screens is worse than a
+ * failed run, because the run tells you now and the picture tells you in front
+ * of a room.
+ */
 export async function shot(page: Page, name: string): Promise<void> {
+	await settled(page, name)
 	mkdirSync(SCREENS, { recursive: true })
 	await page.screenshot({ path: join(SCREENS, `${name}.png`), fullPage: false })
+}
+
+/** Wait for the interface to stop saying it is loading, then prove it stopped. */
+export async function settled(page: Page, name: string, timeoutMs = 30_000): Promise<void> {
+	const deadline = Date.now() + timeoutMs
+	let text = ''
+	while (Date.now() < deadline) {
+		text = (await page.locator('body').innerText().catch(() => '')) || ''
+		if (!looksUnfinished(text)) return
+		await page.waitForTimeout(500)
+	}
+	const saw = text.trim() === '' ? 'nothing rendered at all' : `"${text.slice(0, 60).replace(/\n/g, ' ')}"`
+	throw new Error(`${name} would have photographed a loading page: ${saw}`)
 }
 
 /** A named region of a page, for when the whole viewport says too little. */

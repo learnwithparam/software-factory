@@ -19,7 +19,7 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, decisionsFor, itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
@@ -51,7 +51,7 @@ test('a change to the shared schema reaches every language that asserts it', asy
 	expect(planned.decision?.status, 'planning should succeed').toBe('succeeded')
 
 	const built = await advance(item.id, 'execute', 'plan approved')
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-gate-failed')
 	expect(built.decision?.status, 'the build should succeed, however many attempts it took').toBe('succeeded')
 

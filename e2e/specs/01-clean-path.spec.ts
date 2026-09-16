@@ -14,7 +14,7 @@
  */
 
 import { test } from '@playwright/test'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, announcePull, approveWaiting, itemForRoute, settle, startRun, stageOf, transition } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
@@ -73,20 +73,20 @@ test('an uncontroversial issue reaches a reviewed pull request', async ({ page }
 	// not thrown away, and that is worth failing over.
 	expect(DEFENSIBLE_FOR_DOCS, `a README addition classified as ${triaged.item.triageType}`)
 		.toContain(triaged.item.triageType)
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-triage')
 	await shot(page, 'factory-accept')
 
 	// Planning. Accepting is a person moving the item, not the agent deciding to.
 	const planned = await advance(item.id, 'planning', 'accepted after triage')
 	expect(planned.decision?.status, 'planning should succeed').toBe('succeeded')
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-plan-waiting')
 
 	// Building. The session claims a sandbox, checks the repository out and works.
 	const built = await advance(item.id, 'execute', 'plan approved')
 	expect(built.decision?.status, 'the build should succeed').toBe('succeeded')
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-building')
 
 	const issueNumber = built.item.metadata.githubIssueNumber as number
@@ -101,7 +101,7 @@ test('an uncontroversial issue reaches a reviewed pull request', async ({ page }
 		: await advance(built.item.id, 'done', 'pull request open, work finished')
 	expect(stageOf(finished.item), 'the work should end in done with its PR open').toBe('done')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-work-done')
 	await shot(page, 'factory-board-work')
 
@@ -114,7 +114,7 @@ test('an uncontroversial issue reaches a reviewed pull request', async ({ page }
 	const reviewed = await settle(review.id)
 	expect(reviewed.decision?.status, 'the review should succeed').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-pr-opened')
 
 	// The verdict is a line the review posts, not a status anybody set by hand.

@@ -21,7 +21,7 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { advance, itemForPull, settle } from '../lib/drive.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
@@ -49,7 +49,7 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	const reviewed = await advance(item.id, 'review', 'read it against what was asked for')
 	expect(reviewed.decision?.status, 'the review should complete').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-board-review')
 	await shot(page, 'factory-review-changes')
 
@@ -77,7 +77,7 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	const again = await advance(item.id, 'review', 'changes made, read it again')
 	expect(again.decision?.status, 'the re-review should complete').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-re-review')
 
 	expect(comments(pull), 'the fixed change should be approved').toMatch(/Verdict:\s*approve/i)

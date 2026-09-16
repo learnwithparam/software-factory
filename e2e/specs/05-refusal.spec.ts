@@ -19,7 +19,7 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
@@ -49,7 +49,7 @@ test('an issue on the money path is refused rather than attempted', async ({ pag
 	const planned = await advance(item.id, 'planning', 'accepted, to see what it says')
 	expect(planned.decision?.status, 'planning should complete').toBe('succeeded')
 
-	await page.reload({ waitUntil: 'domcontentloaded' })
+	await showBoard(page)
 	await shot(page, 'factory-refused')
 
 	// The claim that matters: nothing was written. A refusal that still opens a
