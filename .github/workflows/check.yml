@@ -36,4 +36,6 @@ jobs:
 
       - run: make check
       - run: make prove
-      - run: make score
+      # --allow-unbound distinguishes "a check failed" from "a phase is not built
+      # yet". tests/gate.test.ts removes it the moment every point is bound.
+      - run: make score SCORE_ARGS=--allow-unbound

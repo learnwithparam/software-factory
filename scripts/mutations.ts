@@ -79,6 +79,12 @@ export const MUTATIONS: Record<string, Mutation> = {
 		replace: 'export const TOTAL_POINTS = 10',
 		because: 'the scorecard can award more points than its own maximum',
 	},
+	'tests/gate.test.ts > CI stops tolerating unbound points once every point is bound': {
+		file: '.github/workflows/check.yml',
+		find: '      - run: make score --allow-unbound',
+		replace: '      - run: make score',
+		because: 'CI stops saying which of the two ways to score under a hundred it is in',
+	},
 	'tests/gate.test.ts > the prose check is wired into make check': {
 		file: 'Makefile',
 		find: '\tbun scripts/check-prose.ts\n',

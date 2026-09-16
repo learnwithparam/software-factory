@@ -65,6 +65,19 @@ it('the scorecard never declares more points than the total', () => {
 	expect(declaredPoints()).toBeLessThanOrEqual(TOTAL_POINTS)
 })
 
+it('CI stops tolerating unbound points once every point is bound', () => {
+	// A build mid-way through is allowed to score under a hundred, and CI says so
+	// with --allow-unbound. The moment the last phase lands that permission is a
+	// hole, so the test that removes it is the one that notices.
+	if (declaredPoints() < TOTAL_POINTS) {
+		expect(workflow, 'CI should tolerate unbound points while phases remain').toContain('--allow-unbound')
+		return
+	}
+	expect(workflow, 'every point is bound, so remove --allow-unbound from CI').not.toContain(
+		'--allow-unbound',
+	)
+})
+
 it('the prose check is wired into make check', () => {
 	expect(makefile).toMatch(/^check:[\s\S]*?check-prose\.ts/m)
 })

@@ -35,7 +35,7 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 	cd e2e && bun install && bun x playwright install chromium && bun x playwright test
 
 score: ## Score the build 0 to 100 from the latest check and e2e results
-	@bun scripts/score.ts
+	@bun scripts/score.ts $(SCORE_ARGS) $(filter-out $@,$(MAKECMDGOALS))
 
 demo: ## Run one step live against $(REPO): make demo STEP=02
 	@bun scripts/demo.ts $(STEP) $(filter-out $@,$(MAKECMDGOALS))

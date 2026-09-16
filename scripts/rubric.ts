@@ -26,6 +26,7 @@ export const PHASES: Record<string, readonly Check[]> = {
 		unit('tests/gate.test.ts > every scored check exists', 2),
 		unit('tests/gate.test.ts > every scored check has a proof that it fails', 2),
 		unit('tests/gate.test.ts > the scorecard never declares more points than the total', 1),
+		unit('tests/gate.test.ts > CI stops tolerating unbound points once every point is bound', 1),
 		unit('tests/gate.test.ts > the prose check is wired into make check', 1),
 		unit('tests/gate.test.ts > the tree stamp excludes prose and includes code', 1),
 	],
