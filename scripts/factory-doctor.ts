@@ -104,32 +104,55 @@ const CHECKS: Check[] = [
 	{
 		what: 'the Factory server answers',
 		run: async () => {
+			// With authentication on, an unauthenticated request to the root is
+			// supposed to be refused. A 401 means the server is up and doing its
+			// job, and treating it as a failure sends you hunting for a fault that
+			// is not there.
 			const status = await reachable(FACTORY_URL)
 			return {
-				ok: status === 200,
+				ok: status === 200 || status === 401 || status === 403,
 				detail: status === undefined ? `nothing on ${FACTORY_URL}` : `${status} from ${FACTORY_URL}`,
 				fix: 'make factory-up',
 			}
 		},
 	},
 	{
-		what: 'it knows who is signed in',
+		what: 'the local account can sign in',
 		run: async () => {
+			// Not "is somebody signed in": this runs without a browser, so nobody
+			// ever is. What matters is that the account exists and the password on
+			// disk still opens it, which is what a session will need.
 			try {
-				const response = await fetch(`${FACTORY_URL}/auth/me`, { signal: AbortSignal.timeout(3000) })
-				const type = response.headers.get('content-type') ?? ''
-				if (!type.includes('json')) {
+				const me = await fetch(`${FACTORY_URL}/auth/me`, { signal: AbortSignal.timeout(3000) })
+				if (!(me.headers.get('content-type') ?? '').includes('json')) {
 					return {
 						ok: false,
 						detail: 'the auth endpoint returns HTML, so the interface will spin forever',
-						fix: 'auth cannot be disabled: use Mastra platform sign-in or set WORKOS_API_KEY and WORKOS_CLIENT_ID',
+						fix: 'set BETTER_AUTH_SECRET so the server has a provider',
 					}
 				}
-				const body = (await response.json()) as { authenticated?: boolean; provider?: string }
+				const provider = ((await me.json()) as { provider?: string }).provider ?? 'none'
+
+				const password = readFileSync(SECRETS, 'utf8')
+					.split('\n')
+					.map((line) => /^FACTORY_USER_PASSWORD=(.*)$/.exec(line.trim())?.[1])
+					.find((value): value is string => value !== undefined)
+					?.replace(/^["'](.*)["']$/, '$1')
+
+				if (password === undefined) {
+					return { ok: false, detail: `no account yet (${provider})`, fix: 'make factory-user' }
+				}
+
+				const signIn = await fetch(`${FACTORY_URL}/auth/api/sign-in/email`, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ email: process.env.FACTORY_USER_EMAIL ?? 'lab@learnwithparam.com', password }),
+					signal: AbortSignal.timeout(10_000),
+				})
 				return {
-					ok: body.authenticated === true,
-					detail: body.authenticated === true ? `signed in through ${body.provider}` : `not signed in (${body.provider})`,
-					fix: `open ${FACTORY_URL} and sign in once; the session persists`,
+					ok: signIn.ok,
+					detail: signIn.ok ? `${provider}, and the stored password works` : `${provider}, but sign-in answered ${signIn.status}`,
+					fix: 'make factory-user',
 				}
 			} catch {
 				return { ok: false, detail: 'no answer', fix: 'make factory-up' }

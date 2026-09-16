@@ -28,7 +28,7 @@ function secrets(): Record<string, string> {
 			.split('\n')
 			.map((line) => /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(line.trim()))
 			.filter((match): match is RegExpExecArray => match !== null)
-			.map((match) => [match[1] as string, match[2] as string]),
+			.map((match) => [match[1] as string, (match[2] as string).replace(/^["'](.*)["']$/, '$1')]),
 	)
 }
 
@@ -36,7 +36,7 @@ function remember(key: string, value: string): void {
 	if (!existsSync(SECRETS)) {
 		writeFileSync(SECRETS, '# Secrets for the local Mastra Factory. Never committed, never echoed.\n')
 	}
-	appendFileSync(SECRETS, `${key}=${value}\n`)
+	appendFileSync(SECRETS, `${key}='${value.replaceAll("'", "'\\''")}'\n`)
 	chmodSync(SECRETS, 0o600)
 }
 

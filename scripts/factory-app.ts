@@ -29,10 +29,41 @@ const PUBLIC_URL = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
  * App with more permission than its job needs is the kind of thing nobody
  * notices until it matters.
  */
+/**
+ * Whether GitHub could actually deliver a webhook to us.
+ *
+ * It refuses a manifest whose hook points at a machine the public internet
+ * cannot reach, and says so plainly: *hook url is not supported because it isn't
+ * reachable over the public Internet*. On a laptop that is every time.
+ *
+ * So the hook is created inactive unless the public URL is a real host. The
+ * factory then finds work through the GitHub integration's reconcile sweep
+ * instead, which polls. Set `FACTORY_WEBHOOK_URL` to a relay or a real domain to
+ * turn delivery back on, and nothing else has to change.
+ */
+const configured = process.env.FACTORY_WEBHOOK_URL?.trim() ?? `${PUBLIC_URL}/web/github/webhook`
+const deliverable = /^https:\/\//.test(configured) && !/localhost|127\.0\.0\.1|0\.0\.0\.0/.test(configured)
+
+/**
+ * A hook url is required whether or not the hook is active.
+ *
+ * GitHub rejects a manifest with no `hook_attributes.url`, and separately
+ * rejects one pointing at a host the public internet cannot reach. A laptop
+ * fails the second, so an inactive hook still has to name somewhere.
+ *
+ * It names a path on a domain we own, and it is switched off, so nothing is
+ * ever delivered there. The App can be pointed at a real endpoint later without
+ * being recreated.
+ */
+const PARKED = 'https://learnwithparam.com/software-factory/webhook-not-configured'
+const webhook = deliverable ? configured : PARKED
+
 const manifest = {
 	name: `Software Factory Lab (${ORG})`,
 	url: 'https://github.com/learnwithparam/software-factory',
-	hook_attributes: { url: `${PUBLIC_URL}/web/github/webhook`, active: true },
+	// An inactive hook needs no url at all, and passing an unreachable one is
+	// what GitHub rejects the whole manifest for.
+	hook_attributes: { url: webhook, active: deliverable },
 	redirect_url: `http://localhost:${PORT}/created`,
 	callback_urls: [`${PUBLIC_URL}/auth/github/callback`],
 	public: false,
@@ -59,10 +90,12 @@ const form = `<!doctype html>
 <p>This creates an App on <strong>${ORG}</strong> with only the permissions the factory needs, then
 writes its credentials to your secrets file. You will be asked to install it afterwards; grant it
 access to <code>agent-run-ledger</code> only.</p>
+<p><strong>${deliverable ? 'Webhook delivery is on.' : 'Webhook delivery is off.'}</strong>
+${deliverable ? `GitHub will post to <code>${webhook}</code>.` : `GitHub refuses a hook it cannot reach, and this machine is not on the public internet, so the hook is switched off and parked at <code>${PARKED}</code>. The factory polls for work instead. Set <code>FACTORY_WEBHOOK_URL</code> to a real host or a relay and re-run this to turn delivery on.`}</p>
 <ul>
  <li>Read and write: contents, issues, pull requests</li>
  <li>Read: metadata, checks</li>
- <li>Webhook: <code>${PUBLIC_URL}/web/github/webhook</code></li>
+ <li>Webhook: ${deliverable ? `<code>${webhook}</code>` : 'switched off'}</li>
 </ul>
 <form action="https://github.com/organizations/${ORG}/settings/apps/new?state=factory-lab" method="post">
  <input type="hidden" name="manifest" value='${JSON.stringify(manifest).replaceAll("'", '&apos;')}'>
@@ -83,16 +116,18 @@ function saveSecrets(values: Record<string, string>): void {
 	if (!text.endsWith('\n')) text += '\n'
 	writeFileSync(SECRETS, text)
 	for (const [key, value] of Object.entries(values)) {
-		// A private key is multi-line; keeping it on one line with escapes is what
-		// dotenv readers understand, and what the Factory's own schema expects.
-		appendFileSync(SECRETS, `${key}=${value.replaceAll('\n', '\\n')}\n`)
+		// Every value is single-quoted. A private key is multi-line and full of
+		// spaces, and an unquoted one makes `source` try to run RSA as a command,
+		// which is how a working credential becomes a syntax error.
+		const escaped = value.replaceAll('\n', '\\n').replaceAll("'", "'\\''")
+		appendFileSync(SECRETS, `${key}='${escaped}'\n`)
 	}
 	chmodSync(SECRETS, 0o600)
 }
 
 title('GitHub App for the factory')
 step(`organisation: ${ORG}`)
-step(`webhook target: ${PUBLIC_URL}/web/github/webhook`)
+step(deliverable ? `webhook target: ${webhook}` : 'webhook: switched off, because GitHub refuses one it cannot reach')
 note('Nothing is printed. The credentials go straight into your secrets file.')
 
 const done = Promise.withResolvers<void>()
