@@ -503,7 +503,7 @@ export const MUTATIONS: Record<string, Mutation> = {
 		because: 'no work item needs a person to accept the plan any more',
 	},
 	'tests/example-repo.test.ts > has at least one item whose change reaches more than one target': {
-		file: 'example:.factory/issues/31.md',
+		file: 'example:.factory/issues/04-tool-calls-total.md',
 		find: '  - packages/contracts/schema/run.schema.json\n  - packages/contracts/src/index.ts\n  - services/ingest/run.go\n  - apps/console/app/page.tsx',
 		replace: '  - apps/console/app/page.tsx',
 		because: 'the only item that spans several areas becomes a local one',
