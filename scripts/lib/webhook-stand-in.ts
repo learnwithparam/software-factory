@@ -25,8 +25,19 @@ export interface Seeded {
 	readonly pullRequests: number
 }
 
-function gh(repo: string, args: readonly string[]): string {
-	return execFileSync('gh', [...args, '--repo', repo], { encoding: 'utf8' }).trim()
+/**
+ * gh, with the arguments given verbatim.
+ *
+ * It does not add `--repo`, because `gh api` has no such flag and fails the whole
+ * reset with a usage dump when handed one. Each call site says which repository
+ * it means, in the way that subcommand accepts.
+ */
+function gh(args: readonly string[]): string {
+	return execFileSync('gh', args, { encoding: 'utf8' }).trim()
+}
+
+function repositoryId(repo: string): number {
+	return Number(gh(['api', `repos/${repo}`, '--jq', '.id']))
 }
 
 async function create(base: string, cookie: string, projectId: string, body: unknown, what: string): Promise<void> {
@@ -56,9 +67,9 @@ interface PullRequest extends Issue {
 
 /** Every open issue, as `issues.opened` would have delivered it. */
 export async function seedIssues(base: string, cookie: string, projectId: string, repo: string): Promise<number> {
-	const repositoryId = Number(gh(repo, ['api', `repos/${repo}`, '--jq', '.id']))
+	const id = repositoryId(repo)
 	const open = JSON.parse(
-		gh(repo, ['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url']),
+		gh(['issue', 'list', '--repo', repo, '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url']),
 	) as Issue[]
 
 	for (const issue of open.sort((a, b) => a.number - b.number)) {
@@ -76,7 +87,7 @@ export async function seedIssues(base: string, cookie: string, projectId: string
 				sourceCreatedAt: issue.createdAt,
 				githubIssueNumber: issue.number,
 				autoStartCandidate: false,
-				githubRepositoryId: repositoryId,
+				githubRepositoryId: id,
 			},
 		}, `issue #${issue.number}`)
 	}
@@ -85,9 +96,9 @@ export async function seedIssues(base: string, cookie: string, projectId: string
 
 /** Every open pull request, as `pull_request.opened` would have delivered it. */
 export async function seedPullRequests(base: string, cookie: string, projectId: string, repo: string): Promise<number> {
-	const repositoryId = Number(gh(repo, ['api', `repos/${repo}`, '--jq', '.id']))
+	const id = repositoryId(repo)
 	const open = JSON.parse(
-		gh(repo, ['pr', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url,headRefName,baseRefName,isDraft']),
+		gh(['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '200', '--json', 'number,title,author,labels,assignees,createdAt,url,headRefName,baseRefName,isDraft']),
 	) as PullRequest[]
 
 	for (const pull of open.sort((a, b) => a.number - b.number)) {
@@ -109,7 +120,7 @@ export async function seedPullRequests(base: string, cookie: string, projectId: 
 				sourceCreatedAt: pull.createdAt,
 				githubPullRequestNumber: pull.number,
 				autoStartCandidate: true,
-				githubRepositoryId: repositoryId,
+				githubRepositoryId: id,
 				draft: pull.isDraft,
 				merged: false,
 				headBranch: pull.headRefName,
