@@ -7,7 +7,7 @@ SHELL := /bin/bash
 REPO ?= ../ledger
 export FACTORY_REPO := $(REPO)
 
-.PHONY: help install tokens check prove e2e score demo lab-reset clean factory-up factory-down factory-doctor factory-user factory-app
+.PHONY: help install tokens status check prove e2e score demo lab-reset clean factory-up factory-down factory-connect factory-doctor factory-user factory-app
 
 help: ## List every target
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[33m%-11s\033[0m %s\n", $$1, $$2}'
@@ -35,6 +35,9 @@ factory-up: ## Start the Mastra Factory and its backing services
 factory-down: ## Stop them, leaving no listener behind
 	@bash scripts/factory-down.sh
 
+factory-connect: ## Connect the codebase, and say what to click
+	@bun scripts/factory-connect.ts
+
 factory-doctor: ## Is this machine ready to run a session?
 	@bun scripts/factory-doctor.ts
 
@@ -48,6 +51,9 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@mkdir -p artifacts evidence/screens && rm -f artifacts/playwright.json
 	@bun scripts/tree-hash.ts > artifacts/e2e-tree.txt
 	cd e2e && bun install && bun x playwright install chromium && bun x playwright test
+
+status: ## How much of the workshop exists, against teach/manifest.json
+	@bun scripts/status.ts
 
 score: ## Score the build 0 to 100 from the latest check and e2e results
 	@bun scripts/score.ts $(SCORE_ARGS) $(filter-out $@,$(MAKECMDGOALS))

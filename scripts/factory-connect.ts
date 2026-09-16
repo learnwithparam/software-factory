@@ -1,0 +1,88 @@
+/**
+ * The one step a browser has to do, and what to click.
+ *
+ * Connecting GitHub is an OAuth flow against a real GitHub login, so it cannot
+ * be done from a script and should not be: handing a script somebody's GitHub
+ * session is exactly the kind of shortcut this workshop argues against.
+ *
+ * Everything either side of it is automated. This prints the click path, checks
+ * the result, and says which part is still missing. Students run the same
+ * command against their own organisation.
+ */
+
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { allowed, note, step, title, verdict, waiting } from '../steps/lib/out.ts'
+
+const BASE = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
+const EMAIL = process.env.FACTORY_USER_EMAIL ?? 'lab@learnwithparam.com'
+const SECRETS = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
+const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
+
+export interface GithubStatus {
+	enabled: boolean
+	connected: boolean
+	reason?: string
+	installations?: unknown[]
+}
+
+/** Sign in and keep the cookie, which is what every authenticated call needs. */
+export async function session(): Promise<string> {
+	const password = readFileSync(SECRETS, 'utf8')
+		.split('\n')
+		.map((line) => /^FACTORY_USER_PASSWORD=(.*)$/.exec(line.trim())?.[1])
+		.find((value): value is string => value !== undefined)
+		?.replace(/^["'](.*)["']$/, '$1')
+
+	if (password === undefined) throw new Error(`no FACTORY_USER_PASSWORD in ${SECRETS}. Run make factory-user.`)
+
+	const response = await fetch(`${BASE}/auth/api/sign-in/email`, {
+		method: 'POST',
+		// Better Auth refuses a request with no Origin, which is its protection
+		// against a browser being tricked into making one. A script has to say
+		// where it is pretending to be from.
+		headers: { 'content-type': 'application/json', origin: BASE },
+		body: JSON.stringify({ email: EMAIL, password }),
+		signal: AbortSignal.timeout(15_000),
+	})
+	if (!response.ok) throw new Error(`sign-in answered ${response.status}`)
+	return (response.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+}
+
+export async function githubStatus(cookie: string): Promise<GithubStatus> {
+	const response = await fetch(`${BASE}/web/github/status`, {
+		headers: { cookie, accept: 'application/json' },
+		signal: AbortSignal.timeout(10_000),
+	})
+	if (!response.ok) throw new Error(`github status answered ${response.status}`)
+	return (await response.json()) as GithubStatus
+}
+
+if (import.meta.main) {
+	title('Connecting the codebase')
+	const cookie = await session()
+	const status = await githubStatus(cookie)
+
+	if (status.connected) {
+		allowed(`GitHub is connected, ${status.installations?.length ?? 0} installation(s) visible`)
+		verdict('PASS', 'Nothing to do. Run make factory-doctor to check the rest.')
+		process.exit(0)
+	}
+
+	waiting(`not connected yet (${status.reason ?? 'unknown'})`)
+	note('The app is installed on the organisation. What is missing is the account link, which is an')
+	note('OAuth flow against a real GitHub login and therefore a browser step.')
+
+	title('What to click, once')
+	step(`1. Open ${BASE}`)
+	step(`2. Sign in as ${EMAIL}`)
+	note(`   read the password with: grep FACTORY_USER_PASSWORD ${SECRETS}`)
+	step('3. Create my first factory, then Connect GitHub, then authorise')
+	step(`4. Choose ${REPO} as the codebase`)
+	step('5. Settings, then Work Intake, then enable GitHub issues and select that repository')
+	note('Then run this again. It checks rather than trusts.')
+
+	verdict('NEEDS REVIEW', 'One browser step. Everything either side of it is automated.')
+	process.exit(1)
+}
