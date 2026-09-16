@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Design an AI-Native Software Factory for Your Organization</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Leadership workshop, one day</p>
+<h1>Design an AI-Native Software Factory for Your Organization</h1>
+<p>A working session for people who decide how engineering works. They do not write code here. They leave with an operating model, an autonomy matrix and a sequenced roadmap.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-inventory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 1:15</p><h2>What you already have, unwritten</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each team's current rules are on paper, and the variation between teams is visible to everyone in the room.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Open by asserting that they already have an operating model. It is informal, it differs by team, and nobody has compared the versions.</li>
+<li>Have each team write theirs on a card: what a machine may do unattended, what needs approval, and who grants exceptions.</li>
+<li>Put the cards side by side and let the spread speak. That gap is the reason for the day, and it is more persuasive than any slide.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing technical. Cards on a wall.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Produces one card per team and reads two others aloud.</li>
+<li>Marks every place two teams contradict each other.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Where two of your teams disagree, which one is right, and who would decide that today?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-matrix">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:30 to 3:00</p><h2>The autonomy matrix</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Their estate is sorted by consequence, with approval placed where the risk actually is.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Kill the difficulty axis early, using an example from their own estate rather than a generic one.</li>
+<li>Run the sort as a group exercise across their real services, and let the arguments happen. The arguments are the product.</li>
+<li>Push back whenever everything lands in the strictest column. A model where nothing may proceed is a model nobody will follow.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/01-boundary/demo.ts graph</pre>
+<p>Show the worked example once, as a shape to copy, then put it away.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Places every significant service in a column, with a named owner.</li>
+<li>Agrees who may move something between columns and how that gets recorded.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which service caused the longest argument? That is the one your written policy most needs to cover.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-standards">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">3:45 to 5:00</p><h2>Protecting the standard you already have</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They know which checks must run on every change and which belong before release, and where their current setup fails open.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what a machine could produce today that would pass their pipeline and still be wrong. Let the room be uncomfortable.</li>
+<li>Introduce failing closed as a governance property rather than a technical one, because a missing check is invisible in every report they receive.</li>
+<li>Explain the independent read in terms they own: an assurance step, with a cost per change they can decide to pay.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>bash steps/04-verification/gates.sh --without-tests</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees a missing check produce something that is neither a pass nor a failure.</li>
+<li>Lists the checks that will be required across every team.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How would you learn, this month, that one of your teams quietly disabled a required check?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-accountability">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">5:00 to 5:30</p><h2>Who is accountable for a change nobody wrote</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Accountability is assigned explicitly, and the capacity limit is a number rather than a feeling.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Put the question bluntly, because it is the one their board will ask them. A machine wrote it, someone approved it, and something went wrong.</li>
+<li>Settle it the same way as any other change: a named engineer approved it and owns it.</li>
+<li>Then give them the constraint that follows. Approval capacity is finite, so the pipeline must stop producing when it is full.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/01-boundary/demo.ts capacity</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Writes the accountability rule in one sentence.</li>
+<li>Sets a review capacity per team and says how it will be measured.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many changes per week can each of your teams genuinely stand behind?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="5-roadmap">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">5:30 to 6:00</p><h2>Sequencing it</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They leave with an ordered plan whose first step is small enough to happen next week.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Insist the first move is boring and cheap. Trust is built by a small thing that works, not by a programme.</li>
+<li>Have them pick the first workflow by two criteria: it happens often, and getting it wrong is recoverable.</li>
+<li>Name what they will measure before starting, so the second conversation is about numbers rather than impressions.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. The roadmap template on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Fills in the first three steps with owners and dates.</li>
+<li>Agrees the baseline they will compare against later.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What will you be able to show in six weeks, and who needs to see it?</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-six-layers" data-concept="six-layers">the six jobs</a>, <a class="concept-link" href="../teach.html#c-charter" data-concept="charter">a written policy</a>, <a class="concept-link" href="../teach.html#c-autonomy-tier" data-concept="autonomy-tier">grading autonomy</a>, <a class="concept-link" href="../teach.html#c-protected-path" data-concept="protected-path">paths off limits</a>, <a class="concept-link" href="../teach.html#c-queue-cap" data-concept="queue-cap">capacity</a>, <a class="concept-link" href="../teach.html#c-human-merge-gate" data-concept="human-merge-gate">accountability</a>, <a class="concept-link" href="../teach.html#c-latency-budget" data-concept="latency-budget">measuring</a>, <a class="concept-link" href="../teach.html#c-ownership-graph" data-concept="ownership-graph">ownership</a>.</p></div>
+</footer>
+
+</body>
+</html>

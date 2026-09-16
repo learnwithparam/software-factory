@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Software Factory: the concepts</title>
+<meta name="description" content="The one explanation of each idea in the Software Factory: what it is, the failure it removes, and how this repository proves it works.">
+<link rel="stylesheet" href="teach/teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Concept spine</p>
+<h1>The Software Factory, one idea at a time</h1>
+<p>Every explanation used in any session lives here and nowhere else. A run sheet carries the talk track and the commands for one session, and points back at these ideas by name. If you are preparing to teach, read this first and the run sheet second.</p>
+</div>
+</header>
+
+<nav class="index">
+<div class="wrap">
+<ul>
+<li><a href="#l-overview">Overview</a></li>
+<li><a href="#l-boundary">Boundary</a></li>
+<li><a href="#l-context">Context and skills</a></li>
+<li><a href="#l-execution">Execution</a></li>
+<li><a href="#l-verification">Verification</a></li>
+<li><a href="#l-loop">Self-healing</a></li>
+<li><a href="#l-delivery">Delivery</a></li>
+<li><a href="#l-platform">On a platform</a></li>
+</ul>
+</div>
+</nav>
+
+<main>
+
+<section class="layer" id="l-overview">
+<div class="wrap col">
+<p class="kicker">Overview</p>
+<h2>What a factory is, and why a better prompt is not one</h2>
+
+<article class="concept" id="c-six-layers">
+<h3>The six layers<span class="anchor">six-layers</span></h3>
+<p>A coding agent on its own is a generator. Around it sit six jobs that decide whether its output is worth your attention. Boundary says what may be attempted. Context says what the task gets to know. Skills hold the know-how that is reused rather than retyped. Execution says where the work happens and what it can reach. Verification says what proof must exist. Delivery says how finished work reaches a person and who decides it ships.</p>
+<p>Naming them separately matters because they fail separately. Work that keeps arriving wrong is usually a context problem. Work that arrives plausible but broken is a verification problem. Work that damages something is a boundary problem. One word for all three leaves you tuning a prompt when the missing piece is a gate.</p>
+<p class="because">The layers are not a maturity model. Most teams already have two or three by accident, written down nowhere. The exercise is finding which one is absent.</p>
+</article>
+
+<article class="concept" id="c-mega-prompt">
+<h3>Why the prompt keeps growing<span class="anchor">mega-prompt</span></h3>
+<p>The usual response to an agent getting something wrong is to add a sentence to the instructions. It works, so it happens again, and the instructions become a document that every task pays for and no task needs in full. Accuracy falls as the pile grows, because the sentence that matters for this task is now competing with forty that do not apply to it.</p>
+<p>Routing replaces piling. Each task receives the repository rules that govern the files it will touch, the skills its kind of work needs, and the task itself. What a task does not need, it never sees.</p>
+</article>
+
+<article class="concept" id="c-executor-interface">
+<h3>The executor is an interface<span class="anchor">executor-interface</span></h3>
+<p>Nothing in the factory knows which agent runs the work. An executor is any command that accepts a prompt on standard input, does something to a working directory, and exits. That indirection buys three things: the loop can be tested against a recorded transcript with no model and no network, a different agent can be swapped in without touching policy, and the same task can be replayed to compare two agents on identical input.</p>
+<p>It is also the honest boundary of the claim. The factory is not a model. It is the system that decides what a model is allowed to attempt and what happens to the result.</p>
+<p class="because">Run <code>make check</code> and no model is called. The same loop, the same policy, the same gates, a recorded agent.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-boundary">
+<div class="wrap col">
+<p class="kicker">Layer one</p>
+<h2>Boundary: what may be attempted without asking</h2>
+
+<article class="concept" id="c-boundary">
+<h3>Boundary<span class="anchor">boundary</span></h3>
+<p>Boundary is the answer to a question every team answers informally and inconsistently: which work can an agent finish while nobody is watching. Left implicit, the answer drifts by person and by day, and the first surprise is expensive. Written down, it becomes something a run can read before it starts, and something a reviewer can point at afterwards.</p>
+</article>
+
+<article class="concept" id="c-charter">
+<h3>The charter<span class="anchor">charter</span></h3>
+<p>One file, owned by a person, that the factory reads before every run. It states the tier, the paths that are load-bearing, the kinds of task that may proceed unattended, what counts as finished, and the conditions under which the factory stops producing. It is short on purpose. A policy nobody rereads is a policy that stops describing the team.</p>
+<p>The agent may not edit it. A proposed change to the charter is a pull request a human reads like any other, which is the only way the limits stay meaningful.</p>
+</article>
+
+<article class="concept" id="c-autonomy-tier">
+<h3>Autonomy tracks consequence<span class="anchor">autonomy-tier</span></h3>
+<p>The instinct is to grant freedom by difficulty: small changes unattended, large ones reviewed. That is the wrong axis. A large migration on a project with no users is recoverable. A small edit to the code that decides what a customer is charged is not. Freedom should follow how bad the worst outcome is and how easily it is undone.</p>
+<p>So the tier is a property of the repository, and it is refined per area. In this lab the budget engine is always human-approved whatever the size of the change, and the console can be changed unattended even when the change is large.</p>
+</article>
+
+<article class="concept" id="c-protected-path">
+<h3>Protected paths<span class="anchor">protected-path</span></h3>
+<p>A list of globs the factory will not modify on its own. Credentials and configuration, the money path, anything that governs the factory itself, and the tests that define existing behaviour. A task that needs one of them is not refused forever; it is routed to a person who decides.</p>
+<p>The useful property is that a refusal is visible. A run that stops with a reason is information. A run that quietly rewrites an assertion so its own work passes is the failure this list exists to prevent.</p>
+<p class="because">A protected path nobody has watched refuse a task is a comment. The lab keeps a task that must be refused, and scores the refusal.</p>
+</article>
+
+<article class="concept" id="c-queue-cap">
+<h3>Back-pressure is a number<span class="anchor">queue-cap</span></h3>
+<p>The constraint on a factory is not how many agents can run. It is how many decisions are waiting on a person. Generation is cheap and getting cheaper; the attention needed to understand a change, integrate it, and take responsibility for it is fixed.</p>
+<p>So the charter carries a cap on how many items may sit awaiting review, and a run refuses to start work when the queue is full. Without it the first productive afternoon ends with more pull requests than anyone will read, which is indistinguishable from having built nothing.</p>
+</article>
+
+<article class="concept" id="c-ownership-graph">
+<h3>Every path has one owner<span class="anchor">ownership-graph</span></h3>
+<p>Policy stated over globs alone gets vague as a repository grows. A graph of targets, each owning a set of paths and naming the commands that check it, makes the policy specific: this area belongs to this target, the target has this autonomy, and these are the checks that must pass for it.</p>
+<p>It also makes a gap loud. A directory that no target claims is a directory with no owner, no checks and no autonomy rule, and the build fails rather than guessing.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-context">
+<div class="wrap col">
+<p class="kicker">Layers two and three</p>
+<h2>Context and skills: what the task is told</h2>
+
+<article class="concept" id="c-context">
+<h3>Context<span class="anchor">context</span></h3>
+<p>Context is everything the task needs to know that is not the task. Where the code lives, how this repository does things, which invariants are not negotiable, what the surrounding code already looks like. Agents rarely fail for want of intelligence on a familiar codebase; they fail because nobody told them the thing everyone on the team already knows.</p>
+</article>
+
+<article class="concept" id="c-skills">
+<h3>Skills<span class="anchor">skills</span></h3>
+<p>A skill is a procedure worth reusing: how to add a migration here, how to write a test that will still make sense in a year, what a review looks for. It says what good work is and what evidence proves it, and leaves the mechanics to the agent. Kept separately from any one prompt, it improves once and every task gets the improvement.</p>
+<p>The distinction from context is worth holding. Context describes this repository. A skill describes a way of working, and often survives being copied to a different repository unchanged.</p>
+</article>
+
+<article class="concept" id="c-context-router">
+<h3>The context router<span class="anchor">context-router</span></h3>
+<p>A small piece of code that turns a task into the exact material that task should receive. It reads which files the work is expected to touch, asks the ownership graph which targets those belong to, and assembles the rules, the skills and the task description for that combination.</p>
+<p>Being code rather than prose, it can be tested. Give it a task and assert what it routed. That is the difference between believing the right context arrived and knowing it did.</p>
+</article>
+
+<article class="concept" id="c-reusable-skill">
+<h3>A skill states the outcome, not the keystrokes<span class="anchor">reusable-skill</span></h3>
+<p>The failure mode when writing one is to script every move, which produces something long, brittle, and worse than the agent's own judgement. The version that holds up names the outcome, the constraints that are not obvious, and the evidence required at the end.</p>
+</article>
+
+<article class="concept" id="c-affected-targets">
+<h3>Only what the change touches<span class="anchor">affected-targets</span></h3>
+<p>Running every check in a repository of any size is slow enough that people stop doing it. Deriving the affected set from the diff and the dependency edges keeps the loop fast, and it is the same calculation that tells the router which rules a task needs. One graph, two uses.</p>
+<p>The edge that catches people is the shared one. A change to a contract that three services are built against affects all three, and a naive file-to-target mapping will run one suite, pass, and ship a break.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-execution">
+<div class="wrap col">
+<p class="kicker">Layer four</p>
+<h2>Execution: where the work happens</h2>
+
+<article class="concept" id="c-execution">
+<h3>Execution<span class="anchor">execution</span></h3>
+<p>Giving an agent your checkout is the default because it is the path of least setup, and it is the reason most people stop trusting background work. Two tasks collide. A half-finished experiment gets committed. You switch branches under a run and it writes into the wrong one. None of that is the agent behaving badly; it is the absence of a place for it to work.</p>
+</article>
+
+<article class="concept" id="c-worktree">
+<h3>A worktree per task<span class="anchor">worktree</span></h3>
+<p>Git already solves this. A worktree is a second checkout of the same repository at a different commit, sharing one object store, created in about a second and removed as easily. Each task gets one, does its work there, and it is thrown away when the task ends.</p>
+<p>The properties that matter: your own branch is never touched, two tasks cannot interfere, a failed run leaves an inspectable directory rather than a mess in your working copy, and cleanup is a single command rather than a careful sequence.</p>
+</article>
+
+<article class="concept" id="c-branch-claim">
+<h3>The branch is the claim<span class="anchor">branch-claim</span></h3>
+<p>When more than one run can start for the same item, something has to decide which one owns it. A lock table is a service to operate. A deterministic branch name pushed to the shared remote is not: the first push wins because the remote rejects the second, and the loser stops.</p>
+<p>This is worth dwelling on when teaching, because it is the moment the design stops being a script and starts being a system. Coordination came from a tool everyone already runs, and there is nothing extra to keep alive.</p>
+</article>
+
+<article class="concept" id="c-sandbox-limits">
+<h3>Limits on files, commands and network<span class="anchor">sandbox-limits</span></h3>
+<p>Isolation answers where the work happens. Limits answer what it can reach from there. Which paths may be written, which commands may run, whether anything may leave the machine. Stated per task rather than globally, because the task that regenerates a lockfile legitimately needs the network and the task that edits a component does not.</p>
+<p>Two rules keep this from becoming theatre. The limits are declared where a person can read them, not buried in the agent's instructions where they are a suggestion. And exceeding them ends the run rather than printing a warning nobody sees.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-verification">
+<div class="wrap col">
+<p class="kicker">Layer five</p>
+<h2>Verification: what must be proven before you look</h2>
+
+<article class="concept" id="c-verification">
+<h3>Verification<span class="anchor">verification</span></h3>
+<p>Agents are good at producing code that reads correctly. Review is where that becomes expensive, because plausible wrong code costs more attention than obviously wrong code. Verification is everything that happens before a person spends any attention at all, and its job is to make sure what arrives has already survived every check a machine can run.</p>
+</article>
+
+<article class="concept" id="c-gate-verdict">
+<h3>The gate script owns the verdict<span class="anchor">gate-verdict</span></h3>
+<p>Checks run in one script that ends with a single line stating the result. Nothing is allowed to paraphrase it. An agent reporting that everything passed is a claim; the line is evidence, and the two are not interchangeable.</p>
+<p>The behaviour that earns its keep is what happens when a required check is missing. A repository with no test command must not produce a green run. It produces a misconfigured verdict and stops, because silence and success are indistinguishable otherwise and only one of them is safe.</p>
+</article>
+
+<article class="concept" id="c-holdout-test">
+<h3>Holdout tests<span class="anchor">holdout-test</span></h3>
+<p>A test the implementing agent never sees cannot be optimised against. When the agent writes the tests and then makes them pass, a green suite means the code agrees with itself. Keeping some behavioural checks out of reach turns passing back into evidence about behaviour.</p>
+<p>They are not a replacement for tests written alongside the change. They are the independent sample, and a handful covering the contract is worth more than a large suite the agent could read.</p>
+</article>
+
+<article class="concept" id="c-cold-verifier">
+<h3>The writer never grades the work<span class="anchor">cold-verifier</span></h3>
+<p>Verification is delegated to a second agent that receives the diff and the task, and explicitly not the account of how the work went. Told what was attempted, a reviewer anchors on it and starts confirming rather than checking.</p>
+<p>What this catches in practice is not syntax. It is the change that passes its tests while doing something the task never asked for: widening what gets stored, altering an unrelated behaviour, weakening an assertion to make a failure go away.</p>
+</article>
+
+<article class="concept" id="c-negative-proof">
+<h3>Revert the fix and watch the test fail<span class="anchor">negative-proof</span></h3>
+<p>The strongest check available, and no gate can make it. Take the new test, undo the change it was written for, and confirm it goes red. If it stays green the test proves nothing, and the run says so rather than shipping a passing suite that was never connected to the behaviour.</p>
+<p class="because">This one line of reasoning is the most useful thing in the whole system for most teams, and it applies with no agents involved at all.</p>
+</article>
+
+<article class="concept" id="c-evidence-rule">
+<h3>Code decides what a verdict may claim<span class="anchor">evidence-rule</span></h3>
+<p>After the agent has finished talking, ordinary code reads the artifacts the run produced and decides what the result is allowed to say. A pass whose test output cannot be found is downgraded. A recommendation with no citation of the thing it rests on is downgraded. The agent's description of the run is never consulted for any of this.</p>
+<p>Let the agent investigate freely, then let deterministic code decide what it is permitted to assert. Freedom where judgement helps, and no freedom at all in the sentence a person will act on.</p>
+</article>
+
+<article class="concept" id="c-contract-drift">
+<h3>One definition, checked from every side<span class="anchor">contract-drift</span></h3>
+<p>When a type is restated in three languages, the three restatements disagree eventually, and the disagreement is found in production. Keeping one definition and asserting each implementation against it turns that into a test failure at the moment of the change.</p>
+<p>For a factory it does something more specific. It gives the cross-stack task a real shape: edit the shared definition and three suites go red at once, in three languages, which no single-language demonstration can show.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-loop">
+<div class="wrap col">
+<p class="kicker">Layer five, continued</p>
+<h2>Self-healing: failing usefully, and stopping</h2>
+
+<article class="concept" id="c-doer-tester">
+<h3>Doer and Tester<span class="anchor">doer-tester</span></h3>
+<p>Two roles rather than one. The Doer implements. The Tester decides whether the result meets the task, and when it does not, hands back the reason attached to the failure rather than a bare rejection. The next attempt starts from that reason.</p>
+<p>Splitting the roles is what makes the second attempt cheap. One agent grading itself has already spent its reasoning on the version it produced, and tends to defend it.</p>
+</article>
+
+<article class="concept" id="c-exit-criteria">
+<h3>A loop that cannot end is not a loop<span class="anchor">exit-criteria</span></h3>
+<p>Every cycle needs three declared endings: it passed, it ran out of attempts, or it exceeded its time. Without the second and third, a task that cannot be done consumes attempts until somebody notices, and what somebody notices first is the bill.</p>
+<p>Escalation is a real outcome, not a failure of the design. The item goes back to a person with the attempts recorded and the reason the loop gave up, which is more useful than a run that is still going.</p>
+</article>
+
+<article class="concept" id="c-latency-budget">
+<h3>Measure where the time actually went<span class="anchor">latency-budget</span></h3>
+<p>The surprise on a first real run is that generation is rarely the slow part. Time accumulates in setup, in repeated checks, in verification that replays work already done, and in the stretch where the run is waiting on a person and nothing says so.</p>
+<p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the run that produced them.</p>
+<p class="because">Without per-stage numbers the only available response to a slow factory is to make the model faster, which is the one thing you do not control.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-delivery">
+<div class="wrap col">
+<p class="kicker">Layer six</p>
+<h2>Delivery: how finished work reaches a person</h2>
+
+<article class="concept" id="c-delivery">
+<h3>Delivery<span class="anchor">delivery</span></h3>
+<p>The last layer is the one most demonstrations skip, and it is where trust is actually built or lost. Work has to arrive somewhere a person already looks, carrying enough evidence to be judged, and the decision to ship has to stay with someone accountable for it.</p>
+</article>
+
+<article class="concept" id="c-work-queue">
+<h3>The queue is somewhere you already look<span class="anchor">work-queue</span></h3>
+<p>State lives in the issue tracker: labels for the stage, a structured comment for the handoff between stages, a branch for the claim. No database, no dashboard to keep alive, and nothing lost when a session ends.</p>
+<p>The reason is durability rather than convenience. A run that dies halfway leaves its state in a place the next run and a curious human can both read, and neither of them needs the conversation that produced it.</p>
+</article>
+
+<article class="concept" id="c-draft-pr">
+<h3>A pull request that arrives with its evidence<span class="anchor">draft-pr</span></h3>
+<p>The unit of delivery is a draft pull request carrying what happened: the gate verdict, the independent verdict, the negative proof, the stage timings and what it cost. A reviewer opens one thing and can see whether the work was checked before deciding whether it is right.</p>
+<p>Draft is deliberate. It signals that a machine produced this and a person has not yet stood behind it, which is exactly the state it is in.</p>
+</article>
+
+<article class="concept" id="c-human-merge-gate">
+<h3>Nothing merges itself<span class="anchor">human-merge-gate</span></h3>
+<p>No tier, no confidence score and no run of green results changes this. The pipeline stops at a reviewed pull request and a person decides. The hooks in the repository catch the obvious routes, and the enforcement that counts is a branch protection rule, because a guardrail an agent can edit is not a boundary.</p>
+<p>This is also the answer to the question every room asks. The factory does not remove the reviewer. It makes sure that by the time the reviewer arrives, the machine has already done everything a machine can do.</p>
+</article>
+
+<article class="concept" id="c-run-record">
+<h3>The run record<span class="anchor">run-record</span></h3>
+<p>One immutable file per run: what was attempted, which files changed, every verdict, the timings, the cost. Appended to, never rewritten, because the value is in comparing the tenth run to the first.</p>
+<p>It is what turns an opinion about whether this is working into a measurement, and it is what the console in this repository displays.</p>
+</article>
+
+</div>
+</section>
+
+<section class="layer" id="l-platform">
+<div class="wrap col">
+<p class="kicker">The same architecture, bought instead of built</p>
+<h2>On a platform</h2>
+
+<article class="concept" id="c-board-phases">
+<h3>Phases are the layers, named differently<span class="anchor">board-phases</span></h3>
+<p>A hosted factory gives you a board whose columns are stages, where entering a stage starts an agent in a declared role and leaving one runs an action. Intake, triage, planning, building, review, done. The mapping to what this repository builds by hand is close to one to one, which is the point of building it by hand first.</p>
+<p>Recognising the mapping is what makes the buy decision an engineering decision. You are not choosing between a product and nothing. You are choosing who maintains the parts you now understand.</p>
+</article>
+
+<article class="concept" id="c-transition-policy">
+<h3>The policy is still yours<span class="anchor">transition-policy</span></h3>
+<p>The part that never transfers is the judgement. A platform supplies the board, the sandboxes and the sessions; what may move to done without a person, which work needs recorded acceptance before any code exists, and where the money path sits are still yours to state. On a platform they are a function that allows or rejects a move.</p>
+<p>So the last step here is not a migration. It is the same charter expressed against a different substrate, which is the honest test of whether the architecture was real.</p>
+</article>
+
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap">
+<p>Run sheets for each session sit in <code>teach/</code>. The build is scored by <code>make score</code>, and the figures on these pages are read from the recorded run by a test.</p>
+</div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Route the Right Context to Every Task</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Cohort module three, two hours</p>
+<h1>Route the Right Context to Every Task</h1>
+<p>The session where the instructions file gets taken apart. Everyone leaves with a router they can test, and two skills lifted out of prompts they were rewriting by hand.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-autopsy">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:20</p><h2>An autopsy on your instructions</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has sorted their own instructions into three piles and seen how little of it any one task needs.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give them the three piles and let them do the sorting themselves: facts about this repository, ways of working, and things that apply to one task only.</li>
+<li>Ask for a show of hands on how much landed in the third pile. It is usually most of it, and seeing that is the argument.</li>
+<li>Name what each pile becomes before moving on, so the rest of the session has somewhere to put things.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>wc -l &lt;their instructions file&gt;</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Annotates their own file with three markers and reports the split.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which line in there was added after one bad result and never revisited?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-router">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:20 to 1:05</p><h2>Assembling context as a calculation</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has a function that turns a task into its material, and a test that pins what it returned.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Derive the inputs with the room rather than presenting them. What does the task say it will touch, who owns those paths, what rules apply there.</li>
+<li>Build the lab's router live and keep it small. If it needs a diagram it has become a framework.</li>
+<li>Write the test immediately after, because the point of code over prose is that it can be asserted. Give the router a task and pin what came back.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/03-context/demo.ts route 12
+<span class="prompt">$ </span>node steps/03-context/demo.ts route 31</pre>
+<p>The router is <code data-file="steps/03-context/router.ts">steps/03-context/router.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees two tasks receive visibly different material, with the reason for each inclusion.</li>
+<li>Writes a first router against their own ownership graph.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did your router include that the task did not need? Remove it and say what broke.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-skills">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:05 to 1:40</p><h2>Lifting a procedure out of a prompt</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has written one skill that states an outcome and its evidence, without scripting the keystrokes.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what they have retyped more than three times this month. That is the first skill, and they already know what it is.</li>
+<li>Show the failure mode before the good version: a long procedure that is worse than the agent's own judgement and goes stale within a month.</li>
+<li>Give the three parts and hold them to it. The outcome, the constraints that are not obvious from the code, and what proves it is done.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>ls steps/03-context/skills
+<span class="prompt">$ </span>cat steps/03-context/skills/add-a-migration.md</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads one worked example, then closes it and writes their own.</li>
+<li>Swaps with a neighbour to check the outcome is stated clearly enough to act on.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Could this skill be copied to a different repository unchanged? If not, some of it is context.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-affected">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:40 to 2:00</p><h2>The shared definition trap</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand why a naive mapping of files to areas ships a break, and have the dependency edge that fixes it.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pose it as a puzzle. One file changed, one area owns it, one suite ran, everything green, production broken. What happened?</li>
+<li>Draw out the edge: three areas are built against that definition, so all three are affected.</li>
+<li>Note the second use of the same graph. It also tells the router which rules a task needs, so this is one calculation serving two purposes.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node target/tools/affected.mjs --since HEAD~1</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Sees one edited definition select three areas and three different check commands.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Where is your shared definition, and how many places restate it today?</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-context-router" data-concept="context-router">the router</a>, <a class="concept-link" href="../teach.html#c-reusable-skill" data-concept="reusable-skill">writing a skill</a>, <a class="concept-link" href="../teach.html#c-mega-prompt" data-concept="mega-prompt">why prompts grow</a>, <a class="concept-link" href="../teach.html#c-affected-targets" data-concept="affected-targets">affected areas</a>.</p></div>
+</footer>
+
+</body>
+</html>

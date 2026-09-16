@@ -82,4 +82,40 @@ export const MUTATIONS: Record<string, Mutation> = {
 		replace: '{ "fg": "accent", "bg": "bg", "level": "AA" }',
 		because: 'the palette claims a large-text-only colour is safe for body text',
 	},
+	'tests/teach.test.ts > every session has exactly one run sheet': {
+		file: 'teach/sessions.json',
+		find: '"sessions": [',
+		replace: '"sessions": [\n    { "key": "ghost", "kind": "lesson", "title": "Unwritten", "minutes": 60, "covers": [], "steps": [] },',
+		because: 'a session is scheduled with no run sheet behind it',
+	},
+	'tests/teach.test.ts > every concept a run sheet cites is declared by the spine': {
+		file: 'teach/lesson-2-execution.html',
+		find: 'data-concept="worktree"',
+		replace: 'data-concept="worktrees-plural"',
+		because: 'a run sheet points at an explanation that was never written',
+	},
+	'tests/teach.test.ts > every concept the spine declares is taught by a session': {
+		file: 'teach/sessions.json',
+		find: '"evidence-rule", "contract-drift"',
+		replace: '"evidence-rule"',
+		because: 'an explanation exists that no session is responsible for delivering',
+	},
+	'tests/teach.test.ts > every run sheet segment is complete': {
+		file: 'teach/module-5-loop.html',
+		find: '<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which stage would you attack first',
+		replace: '<div class="part ask"><h3>Ask</h3><p>Which stage would you attack first',
+		because: 'a segment loses the question the facilitator is meant to put to the room',
+	},
+	'tests/teach.test.ts > every command and file a teach surface names exists': {
+		file: 'teach/module-1-boundary.html',
+		find: 'data-file="steps/01-boundary/CHARTER.md"',
+		replace: 'data-file="steps/01-boundary/POLICY.md"',
+		because: 'a run sheet sends the facilitator to a file that is not there',
+	},
+	'tests/teach.test.ts > no prose is duplicated across teach surfaces': {
+		file: 'teach/office-hours.html',
+		find: '<p>Contributes one line each',
+		replace: '<p>Boundary says what may be attempted. Context says what the task gets to know. Contributes one line each',
+		because: 'an explanation is restated in a run sheet instead of being pointed at',
+	},
 }

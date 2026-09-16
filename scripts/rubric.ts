@@ -35,6 +35,14 @@ export const PHASES: Record<string, readonly Check[]> = {
 		unit('tests/design.test.ts > every generated stylesheet matches the token source', 2),
 		unit('tests/design.test.ts > the accent colour is never claimed as body text', 1),
 	],
+	'3 Teach surfaces': [
+		unit('tests/teach.test.ts > every session has exactly one run sheet', 2),
+		unit('tests/teach.test.ts > every concept a run sheet cites is declared by the spine', 2),
+		unit('tests/teach.test.ts > every concept the spine declares is taught by a session', 2),
+		unit('tests/teach.test.ts > every run sheet segment is complete', 1),
+		unit('tests/teach.test.ts > every command and file a teach surface names exists', 2),
+		unit('tests/teach.test.ts > no prose is duplicated across teach surfaces', 1),
+	],
 }
 
 export const TOTAL_POINTS = 100

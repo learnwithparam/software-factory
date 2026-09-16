@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Build Your First Software Factory Execution Harness</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Lightning lesson, sixty minutes</p>
+<h1>Build Your First Software Factory Execution Harness</h1>
+<p>Hands on. Attendees follow along in their own repository and finish with an isolated place for agent work.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="0-before">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">Twenty minutes ahead</p><h2>Setup you do alone</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Worktrees can be created and removed instantly, with nothing left over from an earlier rehearsal.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div><p>Nothing. Preparation only.</p></div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>git worktree list
+<span class="prompt">$ </span>make clean
+<span class="prompt">$ </span>make demo STEP=02</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>Only your main checkout is listed before you begin.</li>
+<li>A rehearsal leaves nothing behind, so the count is the same afterwards.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Widen the terminal font now, because this session is watched closely.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="1-why">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:10</p><h2>Why your checkout is the wrong place</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The room stops seeing isolation as ceremony and starts seeing it as the fix for something that already bit them.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Collect the war stories first. Ask who has had an agent commit something half-finished, or write into the branch they had just switched to.</li>
+<li>Reframe each story as a missing place rather than a misbehaving tool.</li>
+<li>State what you are about to build and what it will cost: about a second per task, and a directory you can look inside when something goes wrong.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Terminal open, nothing typed.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>An empty prompt and their own stories on the whiteboard.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Who has lost work to a background run? What did it cost to recover?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-worktree">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:10 to 0:28</p><h2>A second checkout, built live</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has created one, written a file in it, and confirmed their own branch never moved.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Explain the object store once: one repository, several checkouts, no duplicated history and no second clone to keep current.</li>
+<li>Build it in front of them rather than opening the finished file. Create, list, write, remove.</li>
+<li>Call out the removal explicitly. A design that is hard to undo does not get adopted, and this one is a single command.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts create 142
+<span class="prompt">$ </span>git worktree list
+<span class="prompt">$ </span>git status
+<span class="prompt">$ </span>node steps/02-execution/demo.ts remove 142</pre>
+<p>The implementation is <code data-file="steps/02-execution/worktree.ts">steps/02-execution/worktree.ts</code>, and it is short enough to read on screen.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Two entries in the worktree list, then one again.</li>
+<li>A clean status in the main checkout throughout, which is the whole point.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Your build needs installed dependencies. Where do those live now, and what does that cost per task?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-claim">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:28 to 0:42</p><h2>Two runs, one item</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand how ownership is settled without anything new to operate.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pose the collision before showing the answer. Two scheduled runs wake up, both see the same item, both start.</li>
+<li>Let someone propose a lock, then price it honestly: a service, its availability, and what happens when a holder dies.</li>
+<li>Reveal the alternative and let the surprise land. The name is derived from the item, so the loser finds out by being rejected.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts race 142</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Two runs starting together on the same item.</li>
+<li>One continuing, one stopping with the rejected push printed underneath.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What else in your pipeline would be simpler if the coordination lived in a tool you already run?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-limits">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:42 to 0:54</p><h2>What it can reach from in there</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can state limits for one task in their own repository and know what happens when one is exceeded.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Separate the two questions cleanly. Isolation answered where. Limits answer what it can touch once it is there.</li>
+<li>Argue for declaring limits per task rather than globally, using the lockfile example: that task genuinely needs the network and most do not.</li>
+<li>Insist on the ending. Exceeding a limit stops the run. A warning in a log is not a limit.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts limits</pre>
+<p>Declared in <code data-file="steps/02-execution/limits.ts">steps/02-execution/limits.ts</code>, where a reviewer can read them.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A permitted write succeeding.</li>
+<li>A write outside the allowed set refused, naming the path and the rule.</li>
+<li>A command not on the list refused before it runs.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>List three commands you would never want a background run to execute. Why those three?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="5-close">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:54 to 1:00</p><h2>Take it home</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has the harness working against their own repository before they close the call.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give the one instruction to try tonight, and say it slowly enough to be written down.</li>
+<li>Warn about the dependency cost up front so it is expected rather than discovered.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Leave the worktree list and a clean status side by side on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>The repository address and the two files worth reading first.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Any repository where a second checkout would not work? Bring it to the next session.</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-worktree" data-concept="worktree">worktree per task</a>, <a class="concept-link" href="../teach.html#c-branch-claim" data-concept="branch-claim">the branch as claim</a>, <a class="concept-link" href="../teach.html#c-sandbox-limits" data-concept="sandbox-limits">limits</a>, <a class="concept-link" href="../teach.html#c-executor-interface" data-concept="executor-interface">executor interface</a>.</p></div>
+</footer>
+
+</body>
+</html>

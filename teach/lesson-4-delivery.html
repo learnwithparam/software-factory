@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Automate Pull Requests with Background Coding Agents</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Lightning lesson, sixty minutes</p>
+<h1>Automate Pull Requests with Background Coding Agents</h1>
+<p>A live run from an untouched issue to a reviewable pull request. The demonstration is the session; commentary fits around it.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="0-before">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">Thirty minutes ahead</p><h2>Reset the board</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The scratch repository is back to its seed, with the three prepared items open and none of them touched.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div><p>Nothing. This is the riskiest preparation in the series, so leave time for it.</p></div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make lab-reset
+<span class="prompt">$ </span>make demo STEP=06 -- --dry-run</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>Three open items and no pull requests.</li>
+<li>The dry run plans all three and writes nothing.</li>
+<li>A second terminal ready, because the run and the console are watched together.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Decide now what you will do if the network drops, and keep the recording as the fallback.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="1-intake">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:12</p><h2>An issue an agent can act on</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can tell the difference between an item that is ready and one that only looks ready.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Read the three prepared items aloud and ask the room to sort them before the machine does.</li>
+<li>Draw out what makes the difference: a checkable finishing condition, the files it is expected to touch, and whether the intent needs a person.</li>
+<li>Point out that triage is a separate stage for exactly this reason. Merging it into implementation is how a narrow request becomes a wide change.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/06-delivery/demo.ts triage</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Each item labelled, with the reason recorded beside it.</li>
+<li>One sent to a person, and the question it needs answered.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Open your own backlog. How many of the top five could a machine start on today?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-run">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:12 to 0:36</p><h2>Let it work</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The room watches a change get made and checked without anyone steering it.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Start it, then stop talking for a moment so the room registers that nobody is driving.</li>
+<li>Narrate each stage as it appears and keep naming which layer is responsible.</li>
+<li>Use the waiting time for the question the room always asks, which is what happens when it gets something wrong. The answer arrives in the next segment.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make demo STEP=06</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The item claimed and a worktree appearing.</li>
+<li>Context assembled, then a change, then three suites running in three languages.</li>
+<li>Both verdicts, then a draft pull request opening.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>While this runs: what would you need to see attached before you would read one of these?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-refusal">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:36 to 0:46</p><h2>The one it will not do</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The room sees a refusal treated as a successful outcome rather than an error.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set it up before running it. This item needs the pricing rules, and pricing decides what a customer pays.</li>
+<li>Run it and let the stop sit on screen without narration for a second.</li>
+<li>Explain what would have happened without the rule: a plausible change to money, verified by tests the same run wrote.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/06-delivery/demo.ts refused</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The run stopping before any file is written.</li>
+<li>The rule that stopped it, quoted from the charter, and the item routed to a person.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which directory in your repository would you put on that list first?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-review">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:46 to 0:56</p><h2>What arrives for a person</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They see that the decision is unchanged and only the preparation for it is different.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Open the pull request and read its evidence section top to bottom without editorialising.</li>
+<li>Say the sentence the room needs to hear: the reviewer is not removed, they arrive after everything a machine can check is done.</li>
+<li>Show the console and let the stage timings make the point about where time goes.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/06-delivery/demo.ts open-pr</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A draft pull request with both verdicts, the negative proof and the cost attached.</li>
+<li>The console listing the run, with its stages as a waterfall.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Is that enough to review in five minutes? What is missing for you?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="5-close">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:56 to 1:00</p><h2>Where the ceiling is</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Nobody leaves believing more agents is the next move.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Name the real limit: how many decisions can be waiting on one person, not how much can be generated.</li>
+<li>Mention that several verified requests on one base branch still have to be integrated by somebody.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Leave the pull request list on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>More than one request awaiting review, and the production stopping.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many pending decisions can you genuinely absorb in a week?</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-work-queue" data-concept="work-queue">the queue</a>, <a class="concept-link" href="../teach.html#c-draft-pr" data-concept="draft-pr">a request with its evidence</a>, <a class="concept-link" href="../teach.html#c-human-merge-gate" data-concept="human-merge-gate">the merge gate</a>, <a class="concept-link" href="../teach.html#c-run-record" data-concept="run-record">the run record</a>.</p></div>
+</footer>
+
+</body>
+</html>

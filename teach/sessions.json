@@ -1,0 +1,101 @@
+{
+  "$comment": "Every live session that draws on this repository, and the concepts each one is responsible for teaching. Dates, prices and enrolment live where they are sold and are deliberately absent here: a public lab that restates them becomes a second source of truth that goes stale. tests/teach.test.ts binds this list to the run sheets in both directions.",
+  "sessions": [
+    {
+      "key": "lesson-1-architecture",
+      "kind": "lesson",
+      "title": "Design a Software Factory for Your Coding Agents",
+      "minutes": 60,
+      "covers": ["six-layers", "boundary", "context", "skills", "execution", "verification", "delivery", "mega-prompt"],
+      "steps": ["06-delivery"]
+    },
+    {
+      "key": "lesson-2-execution",
+      "kind": "lesson",
+      "title": "Build Your First Software Factory Execution Harness",
+      "minutes": 60,
+      "covers": ["worktree", "branch-claim", "sandbox-limits", "executor-interface"],
+      "steps": ["02-execution"]
+    },
+    {
+      "key": "lesson-3-verification",
+      "kind": "lesson",
+      "title": "Enforce Code Quality with Automated Agent Verifiers",
+      "minutes": 60,
+      "covers": ["gate-verdict", "holdout-test", "cold-verifier", "negative-proof", "doer-tester"],
+      "steps": ["04-verification", "05-loop"]
+    },
+    {
+      "key": "lesson-4-delivery",
+      "kind": "lesson",
+      "title": "Automate Pull Requests with Background Coding Agents",
+      "minutes": 60,
+      "covers": ["work-queue", "draft-pr", "human-merge-gate", "run-record"],
+      "steps": ["06-delivery"]
+    },
+    {
+      "key": "module-1-boundary",
+      "kind": "module",
+      "title": "Design Your Software Factory Architecture",
+      "minutes": 120,
+      "covers": ["charter", "autonomy-tier", "protected-path", "queue-cap", "ownership-graph"],
+      "steps": ["01-boundary"]
+    },
+    {
+      "key": "module-2-execution",
+      "kind": "module",
+      "title": "Isolate Agent Work with an Execution Harness",
+      "minutes": 120,
+      "covers": ["worktree", "branch-claim", "sandbox-limits", "executor-interface"],
+      "steps": ["02-execution"]
+    },
+    {
+      "key": "module-3-context",
+      "kind": "module",
+      "title": "Route the Right Context to Every Task",
+      "minutes": 120,
+      "covers": ["context-router", "reusable-skill", "mega-prompt", "affected-targets"],
+      "steps": ["03-context"]
+    },
+    {
+      "key": "module-4-verification",
+      "kind": "module",
+      "title": "Make Agents Prove Their Work",
+      "minutes": 120,
+      "covers": ["gate-verdict", "holdout-test", "cold-verifier", "negative-proof", "evidence-rule", "contract-drift"],
+      "steps": ["04-verification"]
+    },
+    {
+      "key": "module-5-loop",
+      "kind": "module",
+      "title": "Build Self-Healing Engineering Loops",
+      "minutes": 120,
+      "covers": ["doer-tester", "exit-criteria", "latency-budget"],
+      "steps": ["05-loop"]
+    },
+    {
+      "key": "module-6-delivery",
+      "kind": "module",
+      "title": "Orchestrate and Ship Verified PRs",
+      "minutes": 120,
+      "covers": ["work-queue", "draft-pr", "human-merge-gate", "run-record", "board-phases", "transition-policy"],
+      "steps": ["06-delivery", "07-mastra"]
+    },
+    {
+      "key": "workshop-operating-model",
+      "kind": "workshop",
+      "title": "Design an AI-Native Software Factory for Your Organization",
+      "minutes": 360,
+      "covers": ["six-layers", "charter", "autonomy-tier", "protected-path", "queue-cap", "human-merge-gate", "latency-budget", "ownership-graph"],
+      "steps": ["01-boundary", "06-delivery"]
+    },
+    {
+      "key": "office-hours",
+      "kind": "office-hours",
+      "title": "Office hours and capstone demo day",
+      "minutes": 60,
+      "covers": ["run-record", "exit-criteria"],
+      "steps": []
+    }
+  ]
+}

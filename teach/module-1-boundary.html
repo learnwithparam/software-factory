@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Design Your Software Factory Architecture</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Cohort module one, two hours</p>
+<h1>Design Your Software Factory Architecture</h1>
+<p>Everyone arrives with a repository they are allowed to change. They leave with a written policy for it that a run can read, and that they could defend in a design review.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-orient">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:20</p><h2>Their repository, not mine</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has named the area of their codebase where an error would be most expensive.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set the rule for the whole cohort in the first minute: every exercise happens on their code, and the lab exists only to show a worked example.</li>
+<li>Ask them to write down the single directory they would least like a machine to edit, and why it earns that.</li>
+<li>Collect three answers aloud. The reasons differ, and hearing that is what stops the policy becoming a template they copy.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>git clone &lt;their repository&gt; &amp;&amp; cd &lt;repository&gt;
+<span class="prompt">$ </span>ls</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens their own project beside the lab.</li>
+<li>Writes one directory name and one sentence of justification in the shared document.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Would a small edit there be safer than a large one somewhere else? Say why out loud.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-tier">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:20 to 0:45</p><h2>Grading freedom by consequence</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend a tier for their repository using recoverability rather than size.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Offer the two candidate axes and let the cohort argue for a few minutes before you settle it.</li>
+<li>Use the comparison that ends the argument: a huge rewrite on a project nobody uses against a tiny edit to a payment path.</li>
+<li>Then complicate it usefully. One tier for a whole repository is too blunt once areas differ, which is why the next exercise is per area.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>cat steps/01-boundary/CHARTER.md</pre>
+<p>Read the worked example at <code data-file="steps/01-boundary/CHARTER.md">steps/01-boundary/CHARTER.md</code> and then close it.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Drafts a tier line for their own repository.</li>
+<li>Argues one case with a neighbour, which surfaces the disagreements early.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the worst thing an unattended run could do to you, and how long would undoing it take?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-graph">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:45 to 1:20</p><h2>Who owns which paths</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a graph where every directory has exactly one owner, and the build refuses when one does not.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Introduce the graph as the thing that makes policy specific rather than vague. Areas, the paths they own, and the commands that check them.</li>
+<li>Build the lab's version live, then break it by adding an unclaimed directory so the room sees the refusal.</li>
+<li>Insist on the property that matters. Guessing an owner is worse than failing, because a wrong guess is silent.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/01-boundary/demo.ts graph
+<span class="prompt">$ </span>mkdir -p target/services/orphan &amp;&amp; touch target/services/orphan/main.go
+<span class="prompt">$ </span>node steps/01-boundary/demo.ts graph</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees every area listed with its paths and its checks.</li>
+<li>Sees the second run refuse and name the directory nobody claimed.</li>
+<li>Writes the first version of their own graph.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which directory in your project was hardest to assign, and what does that tell you?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-capacity">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:20 to 1:45</p><h2>The number that stops production</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has committed to a limit on pending decisions, chosen from their own week.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask how many changes they genuinely absorb in a week, then ask them to halve it for anything they did not write.</li>
+<li>Explain what the limit protects: not the machine, the person. When it is reached, starting more work is the wrong move.</li>
+<li>Show the refusal in the lab so the number is visibly load bearing rather than advisory.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/01-boundary/demo.ts capacity</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a run decline to start because the review queue is full.</li>
+<li>Puts a number in their own charter and says it aloud.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What happens today when that number is exceeded, and who notices first?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="5-homework">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Before Wednesday</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a committed policy file in their own repository before the next session.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set the deliverable precisely: committed, not drafted, because the next session reads it.</li>
+<li>Warn about the common mistake, which is writing something so cautious that nothing can ever run.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/01-boundary/demo.ts lint-charter &lt;path to theirs&gt;</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the check against their own draft and fixes what it names.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Bring the line you are least sure about to Friday.</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-charter" data-concept="charter">the charter</a>, <a class="concept-link" href="../teach.html#c-autonomy-tier" data-concept="autonomy-tier">autonomy by consequence</a>, <a class="concept-link" href="../teach.html#c-protected-path" data-concept="protected-path">protected paths</a>, <a class="concept-link" href="../teach.html#c-queue-cap" data-concept="queue-cap">back-pressure</a>, <a class="concept-link" href="../teach.html#c-ownership-graph" data-concept="ownership-graph">the ownership graph</a>.</p></div>
+</footer>
+
+</body>
+</html>

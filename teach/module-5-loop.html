@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Build Self-Healing Engineering Loops</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Cohort module five, two hours</p>
+<h1>Build Self-Healing Engineering Loops</h1>
+<p>Recovering from a failed check without a human restarting anything, and knowing when to give up. The second half is about stopping, which is the part people skip.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-reason">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:35</p><h2>Handing back a reason, not a rejection</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>A failed check produces a next attempt that starts from what went wrong.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Show the useless version first: a failure returned as a status with no detail, and the retry that repeats the same mistake.</li>
+<li>Build the useful shape together. What failed, the output, the file, and what the task said should have been true.</li>
+<li>Be clear about why the roles are split. An agent grading its own output has already invested its reasoning in defending it.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/05-loop/demo.ts run 21</pre>
+<p>The loop is <code data-file="steps/05-loop/loop.ts">steps/05-loop/loop.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a first attempt fail, and reads the packet that goes back.</li>
+<li>Watches the second attempt pass, having been told precisely what was wrong.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your pipeline hand back today when something fails, and would it help anyone?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-stopping">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:35 to 1:10</p><h2>Three ways to end</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Nobody leaves with a loop that can run indefinitely.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what happens to their loop when the task is impossible. The honest answer is usually that nobody has tried.</li>
+<li>Name the three endings and make them choose numbers for their own project rather than copying the lab's.</li>
+<li>Reframe giving up. An item returned to a person with its attempts recorded is a result; a run still going is not.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/05-loop/demo.ts run 22 --impossible</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees attempts exhausted and the item escalated with its history intact.</li>
+<li>Sets an attempt limit and a time limit in their own configuration.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the most you would spend on one item before a person should look at it?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-budget">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:10 to 1:45</p><h2>Where the time went</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone is timing each stage separately and can see which one to attack.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask them to guess the split before showing it. The guesses are almost always wrong in the same direction.</li>
+<li>Show the recorded numbers and let the surprise do the work, then name the three usual culprits: setup repeated per attempt, checking that repeats work already done, and waiting on a person with nothing saying so.</li>
+<li>Give the actionable version. Reuse caches across workspaces, let the reviewer consume evidence rather than regenerate it, and make waiting visible.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/05-loop/demo.ts budget</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads a waterfall of stages for one completed item.</li>
+<li>Names the stage they would reduce first, and says how.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which stage would you attack first on your own project, and what evidence do you have?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-capstone">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Capstone scope</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has chosen the real item from their own backlog that they will demonstrate.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give the selection rule: small enough to finish, real enough that somebody wanted it, and touching more than one area if possible.</li>
+<li>Warn against the demonstration-shaped item. Choosing something invented for the occasion wastes the exercise.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. Backlogs open, choices written in the shared document.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Commits to one item by name and posts it where the group can see.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Is anyone's choice too large? Say it now rather than on demonstration day.</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-doer-tester" data-concept="doer-tester">two roles</a>, <a class="concept-link" href="../teach.html#c-exit-criteria" data-concept="exit-criteria">how a loop ends</a>, <a class="concept-link" href="../teach.html#c-latency-budget" data-concept="latency-budget">the time budget</a>.</p></div>
+</footer>
+
+</body>
+</html>

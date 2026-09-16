@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Isolate Agent Work with an Execution Harness</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Cohort module two, two hours</p>
+<h1>Isolate Agent Work with an Execution Harness</h1>
+<p>The build session. By the end an agent can change code in their repository while their own branch stays exactly as they left it.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-charters">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:15</p><h2>Reading each other's policies</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The homework gets read by someone other than its author, which is where the vague lines get found.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pair them and give a single instruction: find one line you could not act on without asking the author a question.</li>
+<li>Bring two examples back to the whole group and rewrite them live.</li>
+<li>Make the standard explicit. A policy is finished when a stranger could apply it the same way you would.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. Documents on screen, in pairs.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Edits at least one line based on somebody else's confusion.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which line did your partner read differently from how you meant it?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-build">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:15 to 1:00</p><h2>Building it together</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a working create and remove cycle in their own project, written by them.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Write it in front of them from an empty file rather than opening the finished version. The cohort types along.</li>
+<li>Stop at each decision and say what the alternative was: a clone instead of a worktree, a random name instead of a derived one, a global cleanup instead of a per-task one.</li>
+<li>Have everyone prove the same property on their own repository before moving on, because a harness nobody has proven is a harness nobody trusts.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts create 7
+<span class="prompt">$ </span>git -C .worktrees/fq-7 status
+<span class="prompt">$ </span>git status
+<span class="prompt">$ </span>node steps/02-execution/demo.ts remove 7</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Creates a workspace, writes into it, and confirms the main checkout is untouched.</li>
+<li>Removes it and confirms nothing is left behind.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How long did the first one take on your project, and what dominated that time?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-limits">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:00 to 1:35</p><h2>Reach, declared per task</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has limits their own reviewer could read, and has watched one stop a run.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Insist on the placement before the content. Limits go where a reviewer will see them, not inside instructions to the agent.</li>
+<li>Work through a task that legitimately needs more reach, so the rule is not simply deny everything.</li>
+<li>Show the enforcement path and be honest about where it is advisory and where it is real.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts limits
+<span class="prompt">$ </span>node steps/02-execution/demo.ts limits --violate</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a refused write name the path and the rule behind it.</li>
+<li>Writes limits for one real task in their own project.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your tasks genuinely needs the network, and how would you keep that from becoming the default?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-project">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:35 to 2:00</p><h2>This week's build</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone knows exactly what to produce and what will be checked on Monday.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>State the deliverable as something observable: a task that runs start to finish in isolation on their repository.</li>
+<li>Predict the two failures they will hit, so neither costs an evening: dependencies not installed in the new workspace, and generated files ignored by the clone.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts selftest</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the self-check against their own harness and reads what it reports.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Post your isolation time in the channel when you have it running. We compare on Monday.</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-worktree" data-concept="worktree">the worktree</a>, <a class="concept-link" href="../teach.html#c-branch-claim" data-concept="branch-claim">claiming by branch</a>, <a class="concept-link" href="../teach.html#c-sandbox-limits" data-concept="sandbox-limits">declared limits</a>, <a class="concept-link" href="../teach.html#c-executor-interface" data-concept="executor-interface">the executor</a>.</p></div>
+</footer>
+
+</body>
+</html>

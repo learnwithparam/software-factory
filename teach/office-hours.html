@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Office hours and capstone demo day</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Weekly hour, plus the final session</p>
+<h1>Office hours and capstone demo day</h1>
+<p>Unscripted by design. This sheet exists so the hour has a shape when nobody brings anything, and so the last one runs to time.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-triage">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">First ten minutes</p><h2>Collect before solving</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Every blocker in the room is written down before any of them is worked on.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask for problems in one line each and write them all up before touching any of them.</li>
+<li>Look for the repeated one. When three people are stuck the same way, that is a teaching gap rather than three bugs.</li>
+<li>Say the order out loud so nobody is waiting without knowing whether their turn is coming.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. A list on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Contributes one line each, including those who came only to listen.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Anything here that more than one of you recognises?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-known">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">As they come up</p><h2>The four that always appear</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Recurring problems get a fast answer so the hour goes to the interesting ones.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>A new workspace with no dependencies installed. Answer with caching and a preparation command rather than a longer setup step.</li>
+<li>Context that never arrives. Almost always a path the ownership graph does not claim, so run the graph check first.</li>
+<li>A check that passes when it should not. Apply the reverting proof before debugging anything else.</li>
+<li>A run that never ends. Look for the missing limit rather than the slow model.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/02-execution/demo.ts selftest
+<span class="prompt">$ </span>node steps/01-boundary/demo.ts graph</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the same two commands on their own project before describing the symptom.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did the self-check say? Read it out before we theorise.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-demoday">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">Final session only</p><h2>Demonstrations</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone shows their own item moving, and gets one useful piece of feedback from the group.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give each person a fixed slot and hold it, so the last presenter gets the same time as the first.</li>
+<li>Ask the same two questions of everyone: which layer took the longest to get right, and what did it refuse to do.</li>
+<li>Direct the feedback towards what the group can use rather than towards praise.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Their machines, their repositories. Yours stays closed.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Shows an item becoming a reviewed request on their own codebase.</li>
+<li>Names one thing they would build differently.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What will you take back to your team on Monday, in one sentence?</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-run-record" data-concept="run-record">records</a>, <a class="concept-link" href="../teach.html#c-exit-criteria" data-concept="exit-criteria">endings</a>.</p></div>
+</footer>
+
+</body>
+</html>

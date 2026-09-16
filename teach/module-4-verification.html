@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run sheet: Make Agents Prove Their Work</title>
+<link rel="stylesheet" href="teach.css">
+</head>
+<body>
+
+<header class="mast">
+<div class="wrap">
+<p class="kicker">Cohort module four, two hours</p>
+<h1>Make Agents Prove Their Work</h1>
+<p>The longest build of the course. Everyone finishes with checks that fail closed and a reviewer that reads their diffs without being told the story.</p>
+</div>
+</header>
+
+<main>
+
+<section class="segment" data-segment="1-failclosed">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:00 to 0:30</p><h2>One script, one result line</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone's checks are behind one command that says one thing, and a missing check is louder than a failing one.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Start from where they are. Most have commands scattered across a pipeline file, a readme and somebody's shell history.</li>
+<li>Gather them into one script live, then add the ending that makes it useful: a single line, exactly worded, that nothing may restate.</li>
+<li>Do the deletion demonstration on their own project, not the lab. Remove a required command and show that the result is neither green nor a failure.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>bash steps/04-verification/gates.sh
+<span class="prompt">$ </span>bash steps/04-verification/gates.sh --without-tests
+<span class="prompt">$ </span>echo $?</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Writes one script for their own repository with the same ending.</li>
+<li>Confirms three distinct exit codes for passing, failing and misconfigured.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your checks is currently optional, and who decided that?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="2-holdout">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:30 to 1:00</p><h2>Tests the writer never sees</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has a small set of behavioural checks kept out of the implementing agent's reach.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Explain the circularity plainly: when the same run writes the tests and the code, green means the code agrees with itself.</li>
+<li>Choose what to hold out together. The contract and the behaviour a user would notice, not the internals.</li>
+<li>Head off the objection before it arrives. This is a sample, not a second suite, and a handful is enough.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>ls steps/04-verification/holdout
+<span class="prompt">$ </span>node steps/04-verification/demo.ts holdout</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees the holdout set run after the change, against work that never saw it.</li>
+<li>Picks three behaviours in their own project worth holding out.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What behaviour would embarrass you most if it broke quietly? Start there.</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="3-negative">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:00 to 1:30</p><h2>The check no gate can make</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has run it against a test they already trusted, and some of them are surprised.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Have them pick a test they wrote themselves and are confident in. The confidence is the point.</li>
+<li>Walk the sequence together: undo the change it covers, run it, expect red, restore.</li>
+<li>Ask who found one that stayed green. There is usually at least one, and that discovery does more teaching than the explanation.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/04-verification/demo.ts negative-proof
+<span class="prompt">$ </span>node steps/04-verification/demo.ts negative-proof --toothless</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Applies the sequence to one of their own tests by hand.</li>
+<li>Wires it into their loop so it happens on every change rather than when remembered.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many of your tests have never once been red? What does that number mean?</p></div>
+</div>
+</section>
+
+<section class="segment" data-segment="4-evidence">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:30 to 2:00</p><h2>Deciding what a result may claim</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Their pipeline downgrades a conclusion whose evidence is missing, without consulting what the agent said.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Separate the two jobs sharply. Investigation is where judgement helps. The sentence a person will act on gets no freedom at all.</li>
+<li>Write the rules as ordinary code in front of them, reading the artifacts the run left behind.</li>
+<li>Connect it to the cross-language case: a definition changed in one place, and the proof required is three suites agreeing, not one claim that it went fine.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>node steps/04-verification/demo.ts evidence
+<span class="prompt">$ </span>node steps/04-verification/demo.ts evidence --lost-artifact</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees a confident conclusion downgraded because its proof could not be found.</li>
+<li>Writes one such rule for their own repository.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your pipeline currently believe purely because something reported it?</p></div>
+</div>
+</section>
+
+</main>
+
+<footer>
+<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-gate-verdict" data-concept="gate-verdict">the result line</a>, <a class="concept-link" href="../teach.html#c-holdout-test" data-concept="holdout-test">held-out checks</a>, <a class="concept-link" href="../teach.html#c-cold-verifier" data-concept="cold-verifier">an independent read</a>, <a class="concept-link" href="../teach.html#c-negative-proof" data-concept="negative-proof">proving the test bites</a>, <a class="concept-link" href="../teach.html#c-evidence-rule" data-concept="evidence-rule">evidence rules</a>, <a class="concept-link" href="../teach.html#c-contract-drift" data-concept="contract-drift">one definition</a>.</p></div>
+</footer>
+
+</body>
+</html>

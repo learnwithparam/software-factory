@@ -1,0 +1,138 @@
+/* The teaching surfaces. Light, technical, diagram-led.
+   Colour, type and spacing come from tokens.css, which is generated. */
+
+@import url('./tokens.css');
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+	margin: 0;
+	background: var(--c-bg);
+	color: var(--c-ink);
+	font-family: var(--font-sans);
+	font-size: var(--step-0);
+	line-height: 1.6;
+	text-wrap: pretty;
+}
+
+.wrap { max-width: 78rem; margin: 0 auto; padding: 0 var(--space-6); }
+.col { max-width: 44rem; }
+
+/* Masthead ------------------------------------------------------------- */
+
+.mast { border-bottom: 1px solid var(--c-line); padding: var(--space-8) 0 var(--space-6); }
+.mast .kicker { color: var(--c-accent); }
+.mast h1 { font-size: var(--step-4); line-height: 1.05; letter-spacing: -0.02em; margin: var(--space-2) 0 var(--space-3); }
+.mast p { color: var(--c-ink-muted); margin: 0; max-width: 44rem; }
+
+.kicker {
+	font-family: var(--font-mono);
+	font-size: var(--step--1);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	margin: 0;
+}
+
+/* Navigation ----------------------------------------------------------- */
+
+nav.index { border-bottom: 1px solid var(--c-line); background: var(--c-bg-alt); padding: var(--space-4) 0; }
+nav.index ul { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: 0; }
+nav.index a { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); text-decoration: none; }
+nav.index a:hover, nav.index a:focus-visible { color: var(--c-accent); text-decoration: underline; }
+
+/* Layer and concept sections ------------------------------------------- */
+
+.layer { border-bottom: 1px solid var(--c-line); padding: var(--space-12) 0; }
+.layer:nth-of-type(even) { background: var(--c-bg-alt); }
+.layer > .wrap > h2 { font-size: var(--step-3); letter-spacing: -0.015em; margin: var(--space-2) 0 var(--space-4); }
+
+.concept { padding: var(--space-8) 0 0; scroll-margin-top: var(--space-8); }
+.concept h3 { font-size: var(--step-1); margin: 0 0 var(--space-2); }
+.concept h3 .anchor { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin-left: var(--space-2); }
+.concept p { margin: 0 0 var(--space-3); max-width: 44rem; }
+.concept .because { border-left: 2px solid var(--c-accent); padding-left: var(--space-4); color: var(--c-ink-muted); }
+
+/* Code, commands and verdicts ------------------------------------------ */
+
+code, kbd, samp { font-family: var(--font-mono); font-size: 0.925em; }
+p code, li code, td code { background: var(--c-bg-inset); border-radius: var(--radius-sm); padding: 0.08em 0.32em; }
+
+pre.term {
+	background: var(--c-term-bg);
+	color: var(--c-term-ink);
+	border-radius: var(--radius-md);
+	padding: var(--space-4) var(--space-6);
+	overflow-x: auto;
+	font-size: var(--step--1);
+	line-height: 1.55;
+	margin: 0 0 var(--space-4);
+}
+pre.term .prompt { color: var(--c-ink-muted); user-select: none; }
+
+.verdict { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.02em; }
+.verdict.pass { color: var(--c-pass); }
+.verdict.fail { color: var(--c-fail); }
+.verdict.wait { color: var(--c-wait); }
+.verdict.refuse { color: var(--c-refuse); }
+
+.chip {
+	display: inline-block;
+	font-family: var(--font-mono);
+	font-size: var(--step--1);
+	border: 1px solid currentColor;
+	border-radius: var(--radius-sm);
+	padding: 0 0.4em;
+	line-height: 1.5;
+}
+
+/* Tables ---------------------------------------------------------------- */
+
+table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-6); font-size: var(--step--1); }
+th, td { border-bottom: 1px solid var(--c-line); padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; }
+thead th { background: var(--c-bg-inset); border-bottom-color: var(--c-ink-muted); white-space: nowrap; }
+td.k, th.k { font-family: var(--font-mono); white-space: nowrap; }
+
+/* Figures ---------------------------------------------------------------- */
+
+figure { margin: 0 0 var(--space-6); }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption { color: var(--c-ink-muted); font-size: var(--step--1); margin-top: var(--space-2); }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: var(--radius-md); }
+
+.figure-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Run sheet segments ------------------------------------------------------ */
+
+.segment { border-bottom: 1px solid var(--c-line); padding: var(--space-8) 0; }
+.segment:nth-of-type(even) { background: var(--c-bg-alt); }
+.segment .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
+.segment .head h2 { font-size: var(--step-2); margin: 0; letter-spacing: -0.01em; }
+.segment .when { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); margin: 0; }
+
+.part { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px dotted var(--c-line); }
+.part > h3 { font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink-muted); margin: 0; padding-top: 0.2em; }
+.part > div, .part > p { margin: 0; min-width: 0; }
+.part.say > div { max-width: 44rem; }
+.part.say li { margin-bottom: var(--space-2); }
+
+a.concept-link { color: var(--c-ink); text-decoration-color: var(--c-accent); text-underline-offset: 2px; }
+
+/* Footer ------------------------------------------------------------------ */
+
+footer { padding: var(--space-12) 0; color: var(--c-ink-muted); font-size: var(--step--1); }
+footer a { color: inherit; }
+
+@media (max-width: 40rem) {
+	.wrap { padding: 0 var(--space-4); }
+	.mast h1 { font-size: var(--step-3); }
+	.part { grid-template-columns: 1fr; gap: var(--space-2); }
+	nav.index ul { gap: var(--space-2); }
+}
+
+@media print {
+	nav.index { display: none; }
+	.segment, .layer { break-inside: avoid; background: none; }
+	pre.term { background: none; color: var(--c-ink); border: 1px solid var(--c-line); }
+}
