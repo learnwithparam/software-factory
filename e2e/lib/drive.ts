@@ -178,7 +178,12 @@ export async function settle(itemId: string, timeoutMs = 15 * 60 * 1000): Promis
 		await approveWaiting(itemId)
 		const decisions = await decisionsFor(itemId)
 		const busy = decisions.some((d) => d.status === 'pending' || d.status === 'proposed' || d.status === 'leased' || d.status === 'retry')
-		if (!busy) {
+
+		// Settled needs a finished decision, not merely an absence of busy ones.
+		// A poll landing in the gap between approving a decision and the
+		// dispatcher leasing it sees neither, and would call that done.
+		const finished = decisions.some((d) => d.status === 'succeeded' || d.status === 'failed')
+		if (!busy && finished) {
 			const item = (await items()).find((candidate) => candidate.id === itemId)
 			if (item === undefined) throw new Error(`work item ${itemId} vanished`)
 			return { item, decision: decisions[0] }
