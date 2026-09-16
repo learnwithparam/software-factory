@@ -7,7 +7,7 @@ SHELL := /bin/bash
 REPO ?= ../ledger
 export FACTORY_REPO := $(REPO)
 
-.PHONY: help install tokens check prove e2e score demo lab-reset clean
+.PHONY: help install tokens check prove e2e score demo lab-reset clean factory-up factory-down factory-doctor factory-app
 
 help: ## List every target
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[33m%-11s\033[0m %s\n", $$1, $$2}'
@@ -28,6 +28,18 @@ check: ## Prose, types, unit and structural tests. No model, no network
 
 prove: ## Break each scored gate on purpose and confirm it fails
 	@bun scripts/prove-gates.ts
+
+factory-up: ## Start the Mastra Factory and its backing services
+	@bash scripts/factory-up.sh
+
+factory-down: ## Stop them, leaving no listener behind
+	@bash scripts/factory-down.sh
+
+factory-doctor: ## Is this machine ready to run a session?
+	@bun scripts/factory-doctor.ts
+
+factory-app: ## Create and install the GitHub App the Factory needs
+	@bun scripts/factory-app.ts
 
 e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@mkdir -p artifacts evidence/screens && rm -f artifacts/playwright.json

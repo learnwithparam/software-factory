@@ -21,6 +21,14 @@ export interface Issue {
 	readonly paths: readonly string[]
 	readonly doneWhen: string
 	readonly body: string
+	/**
+	 * The path through the board this item is expected to take.
+	 *
+	 * Declared rather than discovered, so a run that takes a different one is a
+	 * failure with a name rather than a surprise. A repository that does not
+	 * declare routes leaves this undefined and nothing checks it.
+	 */
+	readonly route?: string
 }
 
 function parse(text: string, file: string): Issue {
@@ -40,7 +48,12 @@ function parse(text: string, file: string): Issue {
 		const at = line.indexOf(':')
 		if (at === -1) continue
 		const key = line.slice(0, at).trim()
-		const value = line.slice(at + 1).trim()
+		// A YAML scalar may be quoted so a number stays a string. Both forms mean
+		// the same thing here, and accepting only one is a trap for the author.
+		const value = line
+			.slice(at + 1)
+			.trim()
+			.replace(/^["'](.*)["']$/, '$1')
 		inPaths = key === 'paths'
 		if (!inPaths) fields[key] = value
 	}
@@ -58,6 +71,7 @@ function parse(text: string, file: string): Issue {
 		doneWhen: fields.doneWhen as string,
 		paths,
 		body: (front[2] as string).trim(),
+		...(fields.route === undefined ? {} : { route: fields.route }),
 	}
 }
 
