@@ -16,15 +16,18 @@ function schema(file: string): { properties: Record<string, unknown>; required: 
 	return JSON.parse(readFileSync(join(schemaDir, file), 'utf8'))
 }
 
-const CASES = [
+const CASES: Array<[string, readonly string[]]> = [
 	['run.schema.json', RUN_FIELDS],
 	['stage.schema.json', STAGE_FIELDS],
 	['budget.schema.json', BUDGET_FIELDS],
-] as const
+]
 
 describe('the TypeScript types match the shared schema', () => {
 	it.each(CASES)('%s has exactly the fields the schema declares', (file, fields) => {
-		expect([...fields].sort()).toEqual(Object.keys(schema(file).properties).sort())
+		// Compared as plain strings: the point is that the two lists agree, not that
+		// one of them happens to be a narrower type than the other.
+		const ours: string[] = [...fields].sort()
+		expect(ours).toEqual(Object.keys(schema(file).properties).sort())
 	})
 
 	it.each(CASES)('%s makes every field required', (file) => {
@@ -34,7 +37,8 @@ describe('the TypeScript types match the shared schema', () => {
 
 	it('the stage order covers every stage name the schema allows', () => {
 		const allowed = (schema('stage.schema.json').properties as { name: { enum: string[] } }).name.enum
-		expect([...STAGE_ORDER].sort()).toEqual([...allowed].sort())
+		const ours: string[] = [...STAGE_ORDER].sort()
+		expect(ours).toEqual([...allowed].sort())
 	})
 })
 

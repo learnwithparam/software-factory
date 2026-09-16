@@ -29,6 +29,10 @@
     "packages/contracts": {
       "name": "@ledger/contracts",
       "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "^1.3.4",
+        "typescript": "^5.9.3",
+      },
     },
   },
   "packages": {

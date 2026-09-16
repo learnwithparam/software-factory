@@ -71,7 +71,7 @@ export function table(headers: string[], rows: string[][]): void {
 	for (const row of rows) console.log(line(row, (text) => text))
 }
 
-export type VerdictState = 'PASS' | 'FAIL' | 'MISCONFIGURED' | 'REFUSED'
+export type VerdictState = 'PASS' | 'FAIL' | 'MISCONFIGURED' | 'REFUSED' | 'NEEDS REVIEW'
 
 /**
  * The one line a verdict is allowed to be.
@@ -80,6 +80,12 @@ export type VerdictState = 'PASS' | 'FAIL' | 'MISCONFIGURED' | 'REFUSED'
  * is a claim; this line is evidence, and the two are not interchangeable.
  */
 export function verdict(state: VerdictState, detail: string): void {
-	const paint = { PASS: green, FAIL: red, MISCONFIGURED: yellow, REFUSED: violet }[state]
+	const paint = {
+		PASS: green,
+		FAIL: red,
+		MISCONFIGURED: yellow,
+		REFUSED: violet,
+		'NEEDS REVIEW': yellow,
+	}[state]
 	console.log(`\n${paint(bold(`VERDICT: ${state}`))} ${detail}`)
 }

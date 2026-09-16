@@ -28,7 +28,10 @@
       ]
     },
     "allowJs": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": [
+      "bun"
+    ]
   },
   "include": [
     "next-env.d.ts",
