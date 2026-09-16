@@ -8,7 +8,7 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { MINIMUM_RATIO, contrastRatio, renderCss, tokens } from '../scripts/tokens.ts'
 import { ROOT } from '../scripts/tree-hash.ts'
 

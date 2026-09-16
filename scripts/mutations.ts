@@ -46,7 +46,7 @@ export const MUTATIONS: Record<string, Mutation> = {
 	},
 	'tests/gate.test.ts > the prose check is wired into make check': {
 		file: 'Makefile',
-		find: '\tnode scripts/check-prose.ts\n',
+		find: '\tbun scripts/check-prose.ts\n',
 		replace: '',
 		because: 'the prose rule stops being run by anything',
 	},

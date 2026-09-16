@@ -4,18 +4,15 @@
   "private": true,
   "type": "module",
   "description": "The factory: policy, harness, gates and teaching surfaces. The codebase it changes lives in target/.",
-  "engines": {
-    "node": ">=22"
-  },
+  "engines": { "bun": ">=1.3" },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "score": "node scripts/score.ts",
-    "prose": "node scripts/check-prose.ts"
+    "test": "bun test",
+    "score": "bun scripts/score.ts",
+    "prose": "bun scripts/check-prose.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.19.1",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "@types/bun": "^1.3.4",
+    "typescript": "^5.9.3"
   }
 }

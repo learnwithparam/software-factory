@@ -8,7 +8,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import {
 	PARTS,
 	SHINGLE,

@@ -6,11 +6,12 @@
  * test that exists, and that the freshness stamp distinguishes prose from code.
  */
 
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
-import { expect, it } from 'vitest'
+import { join } from 'node:path'
+import { expect, it } from 'bun:test'
+import { idOf } from '../scripts/junit.ts'
 import { MUTATIONS } from '../scripts/mutations.ts'
+import { listTests } from '../scripts/run-tests.ts'
 import { allChecks } from '../scripts/rubric.ts'
 import { ROOT, treeHash } from '../scripts/tree-hash.ts'
 
@@ -40,20 +41,13 @@ it('CI runs make check', () => {
 })
 
 it('every scored check exists', () => {
-	const unitIds = new Set<string>()
-	const stdout = execFileSync('./node_modules/.bin/vitest', ['list', '--json'], {
-		cwd: ROOT,
-		encoding: 'utf8',
-		maxBuffer: 16 * 1024 * 1024,
-	})
-	for (const entry of JSON.parse(stdout)) {
-		unitIds.add(`${relative(ROOT, entry.file)} > ${entry.name}`)
-	}
+	const declared = new Set(listTests(ROOT).map(idOf))
+	expect(declared.size, 'bun reported no tests at all').toBeGreaterThan(0)
 	const missing = allChecks()
 		.filter((check) => check.source === 'unit')
 		.map((check) => check.id)
-		.filter((id) => !unitIds.has(id))
-	expect(missing, 'the rubric names unit tests that do not exist').toEqual([])
+		.filter((id) => !declared.has(id))
+	expect(missing, 'the scorecard names unit tests that do not exist').toEqual([])
 })
 
 it('every scored check has a proof that it fails', () => {

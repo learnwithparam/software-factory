@@ -8,10 +8,20 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+	cpSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { MUTATIONS, type Mutation } from './mutations.ts'
+import { runTests } from './run-tests.ts'
 import { ROOT, trackedFiles } from './tree-hash.ts'
 
 function git(cwd: string, ...args: string[]): void {
@@ -21,7 +31,12 @@ function git(cwd: string, ...args: string[]): void {
 function sandbox(): string {
 	const dir = mkdtempSync(join(tmpdir(), 'factory-prove-'))
 	for (const file of trackedFiles()) {
-		cpSync(join(ROOT, file), join(dir, file), { recursive: true, errorOnExist: false })
+		// git lists a file it still tracks even after it is deleted on disk.
+		// Copying blind turns that ordinary state into a crash mid-proof.
+		if (!existsSync(join(ROOT, file))) continue
+		const destination = join(dir, file)
+		mkdirSync(dirname(destination), { recursive: true })
+		cpSync(join(ROOT, file), destination, { recursive: true, errorOnExist: false })
 	}
 	symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'dir')
 	// The copy must be a git repository: tree-hash.ts asks git which files exist,
@@ -34,26 +49,8 @@ function sandbox(): string {
 /** Run one test file in `dir` and report whether the named test passed. */
 function testPassed(dir: string, id: string): boolean | undefined {
 	const [file, name] = id.split(' > ')
-	const out = join(dir, 'prove.json')
-	try {
-		execFileSync(
-			join(ROOT, 'node_modules/.bin/vitest'),
-			['run', file as string, '--reporter=json', `--outputFile=${out}`],
-			{ cwd: dir, stdio: 'ignore' },
-		)
-	} catch {
-		// A failing suite exits non-zero. The report still tells us which test failed.
-	}
-	let report: any
-	try {
-		report = JSON.parse(readFileSync(out, 'utf8'))
-	} catch {
-		return undefined
-	}
-	for (const suite of report.testResults ?? []) {
-		for (const assertion of suite.assertionResults ?? []) {
-			if (assertion.fullName === name) return assertion.status === 'passed'
-		}
+	for (const result of runTests(dir, [file as string])) {
+		if (result.name === name) return result.status === 'passed'
 	}
 	return undefined
 }

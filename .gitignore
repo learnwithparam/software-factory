@@ -5,8 +5,8 @@ out/
 artifacts/
 .worktrees/
 .factory-runs/
-target/services/pricing/target/
-target/services/catalog/bin/
+target/services/budget/target/
+target/apps/console/.next/
 *.tsbuildinfo
 .env
 .env.local

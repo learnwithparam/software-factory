@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://learnwithparam.com/schema/budget.schema.json",
+  "title": "Budget",
+  "description": "What a period is allowed to cost and where it currently stands. This is the money path: the charter never lets an agent change the code that computes it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["period", "limitMinor", "spentMinor", "remainingMinor", "currency", "state"],
+  "properties": {
+    "period": { "type": "string", "description": "The window this budget covers, as YYYY-MM" },
+    "limitMinor": { "type": "integer" },
+    "spentMinor": { "type": "integer" },
+    "remainingMinor": { "type": "integer" },
+    "currency": { "type": "string", "enum": ["EUR", "USD"] },
+    "state": { "type": "string", "enum": ["under", "warning", "breached"], "description": "Where spend sits against the limit" }
+  }
+}
