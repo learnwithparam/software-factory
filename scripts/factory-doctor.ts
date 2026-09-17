@@ -193,6 +193,39 @@ const CHECKS: Check[] = [
 		},
 	},
 	{
+		what: 'the Factory server has its own project, not somebody elses checkout',
+		run: async () => {
+			// This cost an evening. Reviewing a pull request checked the ledger out
+			// in the Factory server's own working directory: it added the ledger as
+			// a remote, fetched it, and moved HEAD onto a factory/pr-* branch, so
+			// docker-compose.yml and package.json vanished and make factory-up said
+			// only "compose file is invalid: no such file or directory".
+			//
+			// Nothing is lost when it happens, because the project is all in git and
+			// git checkout main brings it back. What costs the time is not knowing
+			// that is what happened.
+			const branch = command('git', '-C', MASTRA, 'rev-parse', '--abbrev-ref', 'HEAD')
+			if (!branch.ok) return { ok: false, detail: 'the project is not a git repository', fix: 'make factory-app' }
+			if (branch.out !== 'main') {
+				return {
+					ok: false,
+					detail: `its working tree is on ${branch.out}, not main`,
+					fix: `git -C ${MASTRA} checkout main`,
+				}
+			}
+
+			const remotes = command('git', '-C', MASTRA, 'remote')
+			const foreign = remotes.out.split('\n').map((name) => name.trim()).filter((name) => name !== '' && name !== 'origin')
+			return {
+				ok: foreign.length === 0,
+				detail: foreign.length === 0
+					? 'on main, with no repository but its own'
+					: `another repository is wired into it as ${foreign.join(', ')}`,
+				fix: `git -C ${MASTRA} remote remove ${foreign[0] ?? ''}`,
+			}
+		},
+	},
+	{
 		what: 'work intake can actually read the repository',
 		run: async () => {
 			// The check that would have saved an evening. Intake stored the repository
