@@ -97,6 +97,17 @@ if (force) {
 	git(['clean', '-qfd'], repo.root)
 }
 
+// Remote branches a run left behind. A pull request that was closed took its
+// branch with it; one that was never opened did not, and factory/issue-70 sat
+// on the remote for weeks failing a check that asked whether any factory branch
+// existed.
+for (const remote of gh(['api', `repos/${slug()}/branches`, '--jq', '.[].name']).split('\n')) {
+	const name = remote.trim()
+	if (name === '' || name === 'main' || !/^factory\//.test(name)) continue
+	gh(['api', '-X', 'DELETE', `repos/${slug()}/git/refs/heads/${name}`])
+	console.log(`  removed remote branch ${name}`)
+}
+
 for (const branch of git(['branch', '--list'], repo.root).split('\n')) {
 	const name = branch.replace(/^[* ]+/, '').trim()
 	if (name === '' || name === 'main') continue

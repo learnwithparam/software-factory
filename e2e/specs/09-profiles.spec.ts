@@ -17,6 +17,13 @@
  * outcome under a given shape is the model's to decide within the rules. What
  * must hold is that the rules differ and that the permissive shape gets further
  * than the strict one.
+ *
+ * It puts the repository back in the shape it found it in. Applying a shape is a
+ * commit that gets pushed, so without that this spec leaves the ledger in
+ * whichever column ran last, and every route after it runs under a contract
+ * nobody chose. That happened: the cross-stack route triaged to "await approval"
+ * and opened no pull request, because it was running under enterprise, where the
+ * contracts target is refuse.
  */
 
 import { test } from '@playwright/test'
@@ -29,6 +36,23 @@ import { itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
 import { ROOT, shot } from '../lib/shot.ts'
 
 const SHAPES = ['solo', 'startup', 'scaleup', 'enterprise'] as const
+
+/** The ledger's governance files as this spec found them. */
+let found: string | undefined
+
+test.beforeAll(() => {
+	found = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: LEDGER, encoding: 'utf8' }).trim()
+})
+
+test.afterAll(() => {
+	if (found === undefined) return
+	const git = (args: string[]) => execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8' })
+	git(['checkout', found, '--', '.factory/charter.md', '.factory/targets.json'])
+	if (execFileSync('git', ['status', '--porcelain', '.factory'], { cwd: LEDGER, encoding: 'utf8' }).trim() === '') return
+	git(['add', '.factory/charter.md', '.factory/targets.json'])
+	git(['commit', '-q', '-m', 'Put the shape back the way the profiles spec found it'])
+	git(['push', '-q', 'origin', 'HEAD'])
+})
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
 function autonomyFor(shape: string, target: string): string {
@@ -83,7 +107,14 @@ for (const shape of SHAPES) {
 		// The money path is never written by an agent under any shape, because
 		// nothing merges unattended on any tier. What differs is how far the run
 		// gets before a person is needed, and that is what the screenshots show.
+		//
+		// This issue's branch, not any factory branch. The first version asked
+		// whether the repository contained one at all and failed on factory/issue-70,
+		// left behind by a run whose pull request was never opened, weeks of issue
+		// numbers ago.
+		const issue = item.metadata.githubIssueNumber as number
 		const branches = run('gh', ['api', `repos/${REPO}/branches`, '--jq', '.[].name'])
-		expect(branches, `${shape} should not have landed a branch during triage`).not.toContain('factory/issue-')
+		expect(branches, `${shape} should not have landed a branch for issue ${issue} during triage`)
+			.not.toContain(`factory/issue-${issue}`)
 	})
 }
