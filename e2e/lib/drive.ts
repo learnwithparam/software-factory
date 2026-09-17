@@ -175,7 +175,36 @@ export interface Settled {
  * poll that only watched would sit there until the timeout.
  */
 export async function settle(itemId: string, timeoutMs = 15 * 60 * 1000): Promise<Settled> {
+	return settleAfter(itemId, 0, timeoutMs)
+}
+
+/**
+ * Wait for work that starts *after* a moment, then settle.
+ *
+ * settle() alone cannot tell a stage that has finished from one that has not
+ * begun: both look like "no decision is busy". That is harmless when a
+ * transition creates the decision synchronously, and wrong the moment work is
+ * started by an event, because the poll lands in the gap before the event has
+ * been turned into a decision and reports the previous stage's success as this
+ * one's.
+ *
+ * It cost the re-review. The push was announced, settle returned in five
+ * seconds on decisions from the review before it, and the rejection was still
+ * the only verdict on the pull request.
+ */
+export async function settleAfter(itemId: string, since: number, timeoutMs = 15 * 60 * 1000): Promise<Settled> {
 	const deadline = Date.now() + timeoutMs
+	if (since > 0) {
+		while (Date.now() < deadline) {
+			const fresh = (await decisionsFor(itemId)).some((d) => Date.parse(d.createdAt) >= since)
+			if (fresh) break
+			await new Promise((resolve) => setTimeout(resolve, 5_000))
+		}
+	}
+	return settleNow(itemId, deadline)
+}
+
+async function settleNow(itemId: string, deadline: number): Promise<Settled> {
 	while (Date.now() < deadline) {
 		await approveWaiting(itemId)
 		const decisions = await decisionsFor(itemId)
@@ -192,7 +221,7 @@ export async function settle(itemId: string, timeoutMs = 15 * 60 * 1000): Promis
 		}
 		await new Promise((resolve) => setTimeout(resolve, 5_000))
 	}
-	throw new Error(`work item ${itemId} did not settle within ${Math.round(timeoutMs / 1000)}s`)
+	throw new Error(`work item ${itemId} did not settle before its deadline`)
 }
 
 /**
@@ -308,4 +337,21 @@ export function latestVerdict(text: string): 'approve' | 'changes' | undefined {
 export async function announcePush(number: number, repo: string): Promise<void> {
 	const { announcePush: push, installationFor } = await import('../../scripts/lib/webhook-stand-in.ts')
 	await push(repo, number, await installationFor(await cookie()))
+}
+
+/**
+ * The verdict as the review recorded it on the pull request itself.
+ *
+ * The skill reconciles a label after publishing: approve adds
+ * `status:auto-approved` and removes `status:changes-requested`, and a rejection
+ * does the reverse. That is a single current value, where comments are an
+ * append-only history in which the first rejection stays for ever, so this is
+ * the honest question to ask after a re-review.
+ */
+export function labelledVerdict(repo: string, pull: number): 'approve' | 'changes' | undefined {
+	const out = execFileSync('gh', ['pr', 'view', String(pull), '--repo', repo, '--json', 'labels', '--jq', '.labels[].name'], { encoding: 'utf8' })
+	const labels = out.split('\n').map((line) => line.trim())
+	if (labels.includes('status:auto-approved')) return 'approve'
+	if (labels.includes('status:changes-requested')) return 'changes'
+	return undefined
 }

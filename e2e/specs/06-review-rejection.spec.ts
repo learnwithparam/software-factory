@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
-import { advance, announcePush, itemForPull, latestVerdict, reviewText, settle, verdictOf } from '../lib/drive.ts'
+import { advance, announcePush, itemForPull, labelledVerdict, latestVerdict, reviewText, settleAfter, verdictOf } from '../lib/drive.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
@@ -66,6 +66,7 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 
 	const verdict = comments(pull)
 	expect(verdictOf(verdict), 'this change should not be approved as it stands').toBe('changes')
+	expect(labelledVerdict(REPO, pull), 'and the pull request should carry that verdict as a label').toBe('changes')
 
 	// Both faults, named. A rejection that catches only the wide storage has
 	// missed the one that matters, because a weakened assertion is why every
@@ -104,8 +105,9 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// A push is what starts a re-review. Asking an item already in review to
 	// move to review is not a transition this board has, so it silently does
 	// nothing and the rejection stays the only verdict on the pull request.
+	const pushedAt = Date.now()
 	await announcePush(pull, REPO)
-	const again = await settle(item.id)
+	const again = await settleAfter(item.id, pushedAt)
 	expect(again.decision?.status, 'the re-review should complete').toBe('succeeded')
 
 	await showBoard(page)
@@ -114,5 +116,9 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// The latest verdict, not any verdict. The rejection is still on the pull
 	// request and always will be, so reading the first one found means the
 	// re-review can never be seen to have changed anything.
-	expect(latestVerdict(comments(pull)), 'the fixed change should be approved').toBe('approve')
+	// The label, because it is a single current value the review reconciles on
+	// every pass, while comments are an append-only history in which the first
+	// rejection stays for ever.
+	expect(labelledVerdict(REPO, pull), 'the fixed change should be approved').toBe('approve')
+	expect(latestVerdict(comments(pull)), 'and the latest comment should say so too').toBe('approve')
 })
