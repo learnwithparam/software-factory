@@ -31,21 +31,29 @@ Never report a negative remaining balance
 #321
 Open
 Param-Harrison
-wants to merge 1 commit into
+wants to merge 2 commits into
 main
 from
 gate/remaining-clamped
 +1
 -1
 Lines changed: 1 addition & 1 deletion
-Conversation1
- (1)
-Commits1
- (1)
+Conversation2
+ (2)
+Commits2
+ (2)
 Checks0
  (0)
 Files changed1
  (1)
+Open
+Never report a negative remaining balance
+#321
+Param-Harrison
+wants to merge 2 commits into
+main
+from
+gate/remaining-clamped
 Conversation
 Param-Harrison
 commented
@@ -114,6 +122,90 @@ None.
 Review runtime: openrouter/deepseek/deepseek-v4-flash, reasoning setting: off.
 
  Param-Harrison added the status:changes-requested label 
+Clamp the remaining figure where it is displayed, not where it is com… …
+7b57e34
+Param-Harrison
+commented
+Contributor
+Author
+
+Verdict: approve
+
+Prior pass disposition
+
+All 4 prior findings are addressed by commit 7b57e34d ("Clamp the remaining figure where it is displayed, not where it is computed"):
+
+overspend_is_reported_rather_than_clamped test — Addressed. The model layer retains remaining_minor: limit_minor - spent_minor, so the test's assertion of -23_000 remains valid. Test passes unchanged.
+
+spent_plus_remaining_always_equals_the_limit invariant test — Addressed. The model layer no longer clamps, so spent + remaining == limit holds for every test case again. Test passes unchanged.
+
+Doc comment lib.rs:98-99 ("Overspend is reported as a negative remainder…") — Addressed. The model behavior is unchanged, so the doc comment is still accurate. No edit needed.
+
+Module-level invariant comment lib.rs:5-6 ("spent + remaining == limit is an invariant") — Addressed. The invariant is restored. No edit needed.
+
+All prior findings: addressed.
+
+Findings
+
+None from this pass. The push introduces no new defects (see Phase 3 in Verification).
+
+Issue and intent
+
+No closing issue referenced. This is a maintenance/bug-fix PR: the console page should not display a negative "remaining" figure when a budget overspends. The prior pass's request-changes verdict has been overturned because the push adopted a fundamentally different (and correct) approach — clamping at the display layer rather than the data model.
+
+Current classification: bug fix / maintenance. Label state: status:changes-requested.
+
+Verification
+
+Commands executed against current head (7b57e34):
+
+All commands run with env -u GH_TOKEN -u GITHUB_TOKEN to strip credentials:
+
+Command	Result
+cargo test (services/budget)	15 passed (11 budget + 4 contract)
+bun test (apps/console)	12 passed
+bun test (packages/contracts)	13 passed
+Total	40 tests, 40 passed
+
+Phase 3 — Push analysis (incremental diff df3c281..7b57e34):
+
+Reverted services/budget/src/lib.rs line remaining_minor: (limit_minor - spent_minor).max(0) back to remaining_minor: limit_minor - spent_minor
+Added apps/console/app/page.tsx line: Math.max(0, budget.budget.remainingMinor) in the display template
+
+No build/test/install script changes detected. No new dependencies. No network calls, credential reads, or writes outside the repo. Security clear for execution.
+
+Regressions tested (prior-head vs current-head): No regressions. The model-layer revert means all prior behavior is exactly restored. The new display clamp is a one-line additive change with no removal of prior code paths.
+
+Base-versus-current-head evidence: The change is a display-only clamp. formatMinor(0, 'EUR') is verified by the contracts test suite to produce '€0.00'. The formatMinor function (index.ts:67-72) handles sign before symbol; Math.max(0, negative) produces 0 which exercises the pre-tested zero-case.
+
+Pre-execution security inspection: Clear — no package.json script changes, no lockfile changes, no CI workflow changes. The diff touches only a single TSX template string.
+
+Merge conflicts: The PR reports MERGEABLE with UNKNOWN merge state (no CI). No conflicts identified.
+
+No pending bot reviews detected — no checks on the head branch, no reviews posted.
+
+Other-reviewer disposition
+
+No other reviews or substantive comments posted since the prior pass.
+
+Adversarial check
+
+The strongest case for request changes: "The CLI (services/budget/src/main.rs) still outputs the raw remainingMinor as JSON, which consumers could display as a negative number." This does not block approval because: (1) the CLI output correctly reports the model state, and the state field communicates the breach; (2) the PR's stated goal is the console display, not every consumer; (3) the CLI is a machine interface where consumers can apply their own display logic. Other downstream consumers seeing negative remaining is not a defect — it is correct data that the consumer must decide how to display. The PR's scope is appropriately bounded.
+
+Requested changes
+
+None.
+
+Assumptions
+The author's choice to clamp at the display layer (console) rather than the data model is the correct approach: it preserves the spent + remaining == limit invariant and keeps the budget data model honest.
+The BudgetChip component showing state: Breached already communicates overspend to the user, so clamping remainingMinor at 0 in the display does not hide the breach.
+The author deliberately chose not to change the CLI output — the PR body only describes the console, and the commit message says "displayed, not where it is computed."
+Open questions
+
+None.
+
+Review runtime: openrouter/deepseek/deepseek-v4-flash, reasoning setting: off.
+
 Sign up for free to join this conversation on GitHub. Already have an account? Sign in to comment
 Reviewers
 No reviews
