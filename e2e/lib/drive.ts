@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { BASE, EMAIL } from './factory.ts'
+import { reach } from '../../scripts/lib/reach.ts'
 
 export type Role = 'triage' | 'plan' | 'work' | 'review'
 export type DecisionStatus = 'pending' | 'proposed' | 'leased' | 'succeeded' | 'failed' | 'dismissed' | 'superseded' | 'retry'
@@ -65,7 +66,7 @@ let signedIn: Promise<string> | undefined
 /** One sign-in per process. Better Auth rate-limits it, and localhost shares one bucket. */
 async function cookie(): Promise<string> {
 	signedIn ??= (async () => {
-		const response = await fetch(`${BASE}/auth/api/sign-in/email`, {
+		const response = await reach(`${BASE}/auth/api/sign-in/email`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', origin: BASE },
 			body: JSON.stringify({ email: EMAIL, password: secret('FACTORY_USER_PASSWORD') }),
@@ -76,32 +77,8 @@ async function cookie(): Promise<string> {
 	return signedIn
 }
 
-/**
- * Ask the server, and try again when the connection drops rather than the
- * server answering.
- *
- * A local Factory running sandboxes beside a browser occasionally stops
- * answering for a second, and Node reports that as a bare "TypeError: fetch
- * failed". Twice that ended a run six minutes in, with the work itself fine.
- *
- * Only the connection is retried. An HTTP status is the server's answer and
- * gets reported, because retrying a 422 just asks the same wrong question again.
- */
-async function reach(path: string, init: RequestInit): Promise<Response> {
-	let last: unknown
-	for (let attempt = 0; attempt < 4; attempt += 1) {
-		try {
-			return await fetch(`${BASE}${path}`, init)
-		} catch (error) {
-			last = error
-			await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt))
-		}
-	}
-	throw new Error(`${init.method ?? 'GET'} ${path} never reached the server: ${(last as Error).message}`)
-}
-
 async function api<T>(path: string, init: RequestInit = {}, tolerate: readonly number[] = []): Promise<T | undefined> {
-	const response = await reach(path, {
+	const response = await reach(`${BASE}${path}`, {
 		...init,
 		headers: { 'content-type': 'application/json', origin: BASE, cookie: await cookie(), ...init.headers },
 	})

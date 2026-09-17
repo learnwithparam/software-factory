@@ -28,6 +28,7 @@
  */
 
 import { createHmac, randomUUID } from 'node:crypto'
+import { reach } from './reach.ts'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -60,7 +61,7 @@ async function deliver(event: 'issues' | 'pull_request', installation: number, p
 	const body = JSON.stringify({ ...payload, installation: { id: installation }, sender: sender() })
 	const signature = createHmac('sha256', secret()).update(body).digest('hex')
 
-	const response = await fetch(`${BASE}/web/github/webhook`, {
+	const response = await reach(`${BASE}/web/github/webhook`, {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/json',
@@ -145,7 +146,7 @@ export async function seedPullRequests(repo: string, installation: number): Prom
  * done that handshake.
  */
 export async function installationFor(cookie: string): Promise<number> {
-	const response = await fetch(`${BASE}/web/github/status`, { headers: { cookie, accept: 'application/json' } })
+	const response = await reach(`${BASE}/web/github/status`, { headers: { cookie, accept: 'application/json' } })
 	if (!response.ok) throw new Error(`github status answered ${response.status}`)
 	const { installations } = (await response.json()) as { installations?: Array<{ installationId: number }> }
 	const first = installations?.[0]
