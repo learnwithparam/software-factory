@@ -376,15 +376,16 @@
 <p>The surprise on a first real run is that generation is rarely the slow part. Time accumulates in setup, in repeated checks, in verification that replays work already done, and in the stretch where the run is waiting on a person and nothing says so.</p>
 <p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the run that produced them.</p>
 <figure class="diagram" data-diagram="stage-waterfall">
-<svg viewBox="-4 -4 1010 178" role="img" aria-labelledby="d3t">
+<svg viewBox="-4 -4 1010 208" role="img" aria-labelledby="d3t">
 <title id="d3t">Where the time in one run actually goes</title>
 <text x="0" y="14" class="label">one run, every stage timed separately</text>
 <g>
-<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="760" height="16" rx="2"/><text x="880" y="48" class="small muted" data-figure="stage.triage">4m 31s</text>
-<text x="0" y="78" class="small mono muted">plan</text><rect class="solid" x="110" y="66" width="4" height="16" rx="2"/><text x="124" y="78" class="small muted" data-figure="stage.plan">1s</text>
-<text x="0" y="108" class="small mono wait">human</text><rect x="110" y="96" width="73" height="16" rx="2" fill="var(--c-wait)"/><text x="193" y="108" class="small wait" data-figure="humanWait">26s</text>
+<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="760" height="16" rx="2"/><text x="880" y="48" class="small muted" data-figure="stage.triage">5m 44s</text>
+<text x="0" y="78" class="small mono muted">plan</text><rect class="solid" x="110" y="66" width="489" height="16" rx="2"/><text x="609" y="78" class="small muted" data-figure="stage.plan">3m 41s</text>
+<text x="0" y="108" class="small mono muted">implement</text><rect class="solid" x="110" y="96" width="289" height="16" rx="2"/><text x="409" y="108" class="small muted" data-figure="stage.implement">2m 11s</text>
+<text x="0" y="138" class="small mono wait">human</text><rect x="110" y="126" width="234" height="16" rx="2" fill="var(--c-wait)"/><text x="354" y="138" class="small wait" data-figure="humanWait">1m 46s</text>
 </g>
-<text x="0" y="158" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
+<text x="0" y="188" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
 </svg>
 <figcaption>Figure 3. A run with each stage timed on its own, drawn from <code>evidence/factory-run.json</code> on openrouter/deepseek/deepseek-v4-flash. Every figure here is the median of what the factory recorded, so none of them can drift from what actually happened.</figcaption>
 </figure>

@@ -1,0 +1,98 @@
+BETA
+⌘ K
+agent-run-ledger
+Overview
+Supervisor
+Work
+Review
+Activity
+Audit log
+Work Sessions
+Issue #425: Add a Contributing section to the README
+Issue #431: Keep runs for longer than the console can show
+Issue #414: Keep runs for longer than the console can show
+Issue #1: Add a Contributing section to the README
+Issue #408: Add a Contributing section to the README
+Show 56 more
+Review Sessions
+PR #321: Never report a negative remaining balance
+PR #320: Never report a negative remaining balance
+PR #319: Warn earlier when spend is heading for the limit
+PR #318: Describe the run schema
+PR #317: Add toolCalls to the Run schema
+Show 17 more
+User Sessions
+
+No sessions yet
+
+Needs attention
+38
+Workshop
+Settings
+Search cards
+All teammates
+All relevance
+All labels
+Auto-start runs
+Auto-approve plans
+Intake
+5
+Triage
+1
+Planning
+1
+0
+Building
+0
+Review
+0
+Done
+0
+Canceled
+#430 · Param-Harrison · 4m
+Issue:
+Review the pull request that adds a saved view to the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#429 · Param-Harrison · 4m
+Issue:
+Warn earlier when spend is heading for the limit
+Suggested: Investigate
+Investigate
+Param-Harrison
+#428 · Param-Harrison · 4m
+Issue:
+Record how many tool calls a whole run made
+Suggested: Investigate
+Investigate
+Param-Harrison
+#427 · Param-Harrison · 4m
+Issue:
+Show what a thousand tokens costs on each run
+Suggested: Investigate
+Investigate
+Param-Harrison
+#426 · Param-Harrison · 4m
+Issue:
+A limit of zero is refused instead of returning nothing
+Suggested: Investigate
+Investigate
+Param-Harrison
+#425 · Param-Harrison · 4m
+Issue:
+Add a Contributing section to the README
+Open session
+Workshop
+
+W
+
+#431 · Param-Harrison · 4m
+Issue:
+Keep runs for longer than the console can show
+effort:medium
+impact:medium
+Open session
+Workshop
+
+W
