@@ -1,0 +1,34 @@
+{
+	"takenAt": "2026-09-17T05:14:52.563Z",
+	"model": "openrouter/deepseek/deepseek-v4-flash",
+	"decisions": 25,
+	"retried": 2,
+	"stages": [
+		{
+			"role": "triage",
+			"runs": 2,
+			"medianMs": 177709,
+			"label": "2m 58s"
+		},
+		{
+			"role": "plan",
+			"runs": 1,
+			"medianMs": 1393,
+			"label": "1s"
+		},
+		{
+			"role": "work",
+			"runs": 1,
+			"medianMs": 202320,
+			"label": "3m 22s"
+		},
+		{
+			"role": "review",
+			"runs": 2,
+			"medianMs": 251612,
+			"label": "4m 12s"
+		}
+	],
+	"humanWaitMs": 5569,
+	"humanWaitLabel": "6s"
+}

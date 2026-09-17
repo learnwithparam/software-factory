@@ -55,6 +55,8 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@bun scripts/lib/one-run.ts
 	@bun scripts/tree-hash.ts > artifacts/e2e-tree.txt
 	cd e2e && bun install && bun x playwright install chromium && bun x playwright test
+	@bun scripts/run-report.ts
+	@bun scripts/waterfall.ts
 	@bun scripts/review-page.ts
 
 status: ## How much of the workshop exists, against teach/manifest.json
