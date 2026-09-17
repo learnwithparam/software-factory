@@ -167,6 +167,12 @@ export const MUTATIONS: Record<string, Mutation> = {
 			'<p>Boundary says what may be attempted. Context says what the task gets to know. Contributes one line each',
 		because: 'an explanation is restated in a run sheet instead of being pointed at',
 	},
+	'tests/teach.test.ts > no surface states how many issues or items there are': {
+		file: 'profiles/README.md',
+		find: 'The same issues, the same factory',
+		replace: 'The same six issues, the same factory',
+		because: 'a count the repository can grow is written into teaching copy, where it goes stale in silence',
+	},
 
 	// 4 Reading a repository
 	'tests/repo.test.ts > a repository is described entirely by its own .factory directory': {

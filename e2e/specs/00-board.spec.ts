@@ -2,18 +2,26 @@
  * The board, before anything has run.
  *
  * This is the picture Lightning 1 opens on and the one every other spec depends
- * on being true: six items waiting, nothing started, and the two switches that
- * decide how much of what follows happens without a person.
+ * on being true: every declared issue waiting, nothing started, and the two
+ * switches that decide how much of what follows happens without a person.
+ *
+ * The expected number is read from the repository rather than written here. It
+ * was written here, as six, and a seventh issue turned the first assertion of
+ * the suite red without anything being wrong.
  */
 
 import { test } from '@playwright/test'
+import { issuesIn } from '../../steps/lib/issues.ts'
 import { column, count, expect, openBoard, PHASES } from '../lib/factory.ts'
+import { LEDGER } from '../lib/ledger.ts'
 import { shot } from '../lib/shot.ts'
 
-test('six items are waiting and nothing has started', async ({ page }) => {
+test('every declared issue is waiting and nothing has started', async ({ page }) => {
 	await openBoard(page)
 
-	expect(await count(page, 'intake')).toBe(6)
+	const declared = issuesIn(LEDGER).length
+	expect(declared, 'the ledger should declare the issues the lab seeds').toBeGreaterThan(0)
+	expect(await count(page, 'intake'), 'every issue .factory/issues declares should be waiting').toBe(declared)
 	for (const phase of ['triage', 'planning', 'execute', 'review'] as const) {
 		expect(await count(page, phase), `${phase} should be empty before a run`).toBe(0)
 	}

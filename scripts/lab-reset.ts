@@ -115,6 +115,8 @@ for (const branch of git(['branch', '--list'], repo.root).split('\n')) {
 	console.log(`  removed branch ${name}`)
 }
 
+restoreShape()
+
 await clearBoard()
 
 const issues = issuesIn(repo.root)
@@ -134,6 +136,35 @@ await seedBoard()
 
 console.log(`\n${issues.length} issues open, ${gh(['pr', 'list', '--json', 'number', '--jq', 'length'])} pull requests open.`)
 
+
+/**
+ * Put the governance files back into the shape the lab starts in.
+ *
+ * The profiles spec switches the charter through all four shapes and restores
+ * it on the way out, so a run that is interrupted leaves the ledger in
+ * whichever shape it had reached. This one was found by killing a sequence
+ * mid-run and finding the `startup` charter in place, where the money path is
+ * `propose`: every other route reads the `solo` charter, and under the wrong
+ * one the money item refuses while the session says it builds.
+ *
+ * Restoring it belongs here rather than only in the spec, because this is the
+ * command a person runs when the board is in a state nobody can account for.
+ */
+function restoreShape(): void {
+	const shape = process.env.FACTORY_SHAPE ?? 'solo'
+	const result = Bun.spawnSync(['bun', 'scripts/profile.ts', shape], { cwd: import.meta.dir + '/..' })
+	const said = `${new TextDecoder().decode(result.stdout)}${new TextDecoder().decode(result.stderr)}`.trim()
+
+	// Read the file, not the exit code. profile.ts exits non-zero when the
+	// server refuses the switches, and the charter is still the thing every
+	// route reads.
+	const charter = readFileSync(join(repo.root, '.factory', 'charter.md'), 'utf8')
+	if (!charter.includes(`the \`${shape}\` shape`)) {
+		console.error(`the charter is not in the ${shape} shape after make profile NAME=${shape}:\n${said}`)
+		process.exit(1)
+	}
+	console.log(`  charter and targets in the ${shape} shape${result.exitCode === 0 ? '' : ', though the board did not take its switches'}`)
+}
 
 /**
  * Delete every work item the Factory holds, so intake starts from nothing.

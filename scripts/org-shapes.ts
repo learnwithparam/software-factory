@@ -77,7 +77,7 @@ export function orgShapes(): string {
 	return `${OPEN}
 <svg viewBox="-4 -4 1010 330" role="img" aria-labelledby="d5t">
 <title id="d5t">Four company shapes as four gate configurations on one codebase</title>
-<text x="0" y="14" class="label">the same six items, four operating models</text>
+<text x="0" y="14" class="label">the same work, four operating models</text>
 <g>
 ${headers}
 </g>

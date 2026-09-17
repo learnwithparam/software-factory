@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { allowed, failed, note, title, verdict, waiting } from '../steps/lib/out.ts'
+import { issuesIn } from '../steps/lib/issues.ts'
 import { session } from './factory-connect.ts'
 
 export const SECRETS = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
@@ -271,12 +272,16 @@ const CHECKS: Check[] = [
 		},
 	},
 	{
-		what: 'the repository it works on has its six issues open',
+		what: 'the repository it works on has every declared issue open',
 		run: async () => {
+			// Counted from .factory/issues, not written here. Written here as six,
+			// this check went red the day a seventh issue was added and stayed red
+			// while nothing was wrong.
+			const declared = issuesIn(join(import.meta.dirname, '..', '..', 'ledger')).length
 			const open = command('gh', 'issue', 'list', '--repo', 'learnwithparam/agent-run-ledger', '--state', 'open', '--json', 'number', '--jq', 'length')
 			return {
-				ok: open.ok && Number(open.out) === 6,
-				detail: open.ok ? `${open.out} open` : 'gh could not read the repository',
+				ok: open.ok && declared > 0 && Number(open.out) === declared,
+				detail: open.ok ? `${open.out} open of ${declared} declared` : 'gh could not read the repository',
 				fix: 'make lab-reset',
 			}
 		},

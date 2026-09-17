@@ -20,11 +20,14 @@ export const BASE = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
 export const EMAIL = process.env.FACTORY_USER_EMAIL ?? 'lab@learnwithparam.com'
 export const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
+/** Where global-setup.ts leaves the one session the whole run shares. */
+export const AUTH = join(import.meta.dirname, '..', '..', 'artifacts', 'auth.json')
+
 /** The board's phases, in the order work moves through them. */
 export const PHASES = ['intake', 'triage', 'planning', 'execute', 'review', 'done', 'canceled'] as const
 export type Phase = (typeof PHASES)[number]
 
-function secret(name: string): string {
+export function secret(name: string): string {
 	const path = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
 	const value = readFileSync(path, 'utf8')
 		.split('\n')
@@ -36,20 +39,23 @@ function secret(name: string): string {
 }
 
 /**
- * Sign in through the API and load the board already authenticated.
+ * Load the board, already authenticated.
  *
- * Better Auth refuses a request with no Origin, which is its protection against
- * a browser being tricked into making one, so a script has to say where it is
- * pretending to be from.
+ * The session comes from global-setup.ts through `use.storageState`, so this
+ * signs in nothing. It used to sign in on every call, which the full sequence
+ * turned into nine sign-ins inside ten seconds and one shared Better Auth
+ * bucket answering 429.
  */
 export async function openBoard(page: Page): Promise<void> {
-	const response = await page.request.post(`${BASE}/auth/api/sign-in/email`, {
-		headers: { origin: BASE },
-		data: { email: EMAIL, password: secret('FACTORY_USER_PASSWORD') },
-	})
-	if (!response.ok()) throw new Error(`sign-in answered ${response.status()}`)
-
 	await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+
+	// An unauthenticated board is an indistinguishable empty board, and the wait
+	// below then spends sixty seconds on a column that will never be drawn and
+	// reports a timeout. The board has no password field; the sign-in form does.
+	if ((await page.locator('input[type="password"]').count()) > 0) {
+		throw new Error(`${BASE} is showing its sign-in form, so no session reached the browser: check artifacts/auth.json and global-setup.ts`)
+	}
+
 	await settleBoard(page)
 }
 

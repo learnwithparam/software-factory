@@ -119,3 +119,37 @@ it('no prose is duplicated across teach surfaces', () => {
 	}
 	expect(duplicates.slice(0, 5)).toEqual([])
 })
+
+it('no surface states how many issues or items there are', () => {
+	// The ledger grew a seventh issue and four places went stale at once: the
+	// board spec, the doctor's own check, a run sheet caption and the manifest
+	// all said six. Nothing was wrong, and `make e2e` opened on a red assertion
+	// while `make factory-doctor` reported a repository in the wrong state.
+	//
+	// The rule is deliberately not "does not say six". Written that way, this
+	// test passed while profiles/README.md still said six, because it only ever
+	// looked for the count of the day. Any count of two or more is a claim about
+	// how many, and the repository can change it. Every place that wants the
+	// number reads .factory/issues, so there is nothing left to drift.
+	//
+	// One and zero are exempt: "one item at a time" and "zero issues open"
+	// describe a shape rather than a quantity, and neither goes stale.
+	const words = ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+	const counted = new RegExp(`\\b([2-9]|[1-9][0-9]+|${words.join('|')})\\s+(issues?|items?)\\b`, 'i')
+
+	const surfaces = [
+		...teachFiles(),
+		'profiles/README.md',
+		'teach/manifest.json',
+		'scripts/factory-doctor.ts',
+		...readdirSync(join(ROOT, 'e2e/specs')).map((name) => `e2e/specs/${name}`),
+	]
+
+	const stated = surfaces
+		.filter((file) => existsSync(join(ROOT, file)))
+		.map((file) => ({ file, hit: counted.exec(readFileSync(join(ROOT, file), 'utf8'))?.[0] }))
+		.filter((found) => found.hit !== undefined)
+		.map((found) => `${found.file} says "${found.hit}": count .factory/issues instead`)
+
+	expect(stated, 'a count the repository can change, written down outside it').toEqual([])
+})

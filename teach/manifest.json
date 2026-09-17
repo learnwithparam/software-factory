@@ -46,7 +46,7 @@
 		{
 			"name": "factory-intake",
 			"spec": "01-clean-path",
-			"shows": "Six issues waiting on the Intake board",
+			"shows": "Every issue the ledger declares, waiting on the Intake board",
 			"mustShow": "Investigate"
 		},
 		{
@@ -174,7 +174,7 @@
 		{
 			"name": "github-issues",
 			"spec": "01-clean-path",
-			"shows": "The six issues as they exist on GitHub",
+			"shows": "The declared issues as they exist on GitHub",
 			"mustShow": "Add a Contributing section"
 		},
 		{

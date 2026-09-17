@@ -1,6 +1,6 @@
 # Four company shapes, one repository
 
-The same six issues, the same factory, the same model. What changes is the contract the repository
+The same issues, the same factory, the same model. What changes is the contract the repository
 hands it, and the whole argument of the workshop is that this is the only thing that should change.
 
 The demonstration is issue five, which asks for the spend warning threshold to move earlier. It is
