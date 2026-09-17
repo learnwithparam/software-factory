@@ -9,11 +9,11 @@ Activity
 Audit log
 Work Sessions
 Issue #1: Add a Contributing section to the README
+Issue #88: Add a Contributing section to the README
 Issue #70: Warn earlier when spend is heading for the limit
 Issue #58: Add a Contributing section to the README
 Issue #50: Add a Contributing section to the README
-Issue #44: Add a Contributing section to the README
-Show 1 more
+Show 2 more
 Review Sessions
 PR #65: Add Contributing section to the README
 PR #57: docs: add Contributing section to README
@@ -23,7 +23,7 @@ User Sessions
 No sessions yet
 
 Needs attention
-2
+4
 Workshop
 Settings
 Search cards
@@ -46,37 +46,37 @@ Review
 Done
 0
 Canceled
-#92 · Param-Harrison · 2m
-Issue:
-Warn earlier when spend is heading for the limit
-Suggested: Investigate
-Investigate
-Param-Harrison
-#93 · Param-Harrison · 2m
+#101 · Param-Harrison · just now
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#91 · Param-Harrison · 2m
+#100 · Param-Harrison · just now
+Issue:
+Warn earlier when spend is heading for the limit
+Suggested: Investigate
+Investigate
+Param-Harrison
+#99 · Param-Harrison · just now
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#90 · Param-Harrison · 2m
+#98 · Param-Harrison · just now
 Issue:
 Show what each run cost in the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#89 · Param-Harrison · 2m
+#97 · Param-Harrison · just now
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#88 · Param-Harrison · 3m
+#96 · Param-Harrison · just now
 Issue:
 Add a Contributing section to the README
 Suggested: Investigate

@@ -52,6 +52,7 @@ factory-app: ## Create and install the GitHub App the Factory needs
 
 e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@mkdir -p artifacts evidence/screens && rm -f artifacts/playwright.json
+	@bun scripts/lib/one-run.ts
 	@bun scripts/tree-hash.ts > artifacts/e2e-tree.txt
 	cd e2e && bun install && bun x playwright install chromium && bun x playwright test
 	@bun scripts/review-page.ts
