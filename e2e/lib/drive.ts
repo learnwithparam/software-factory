@@ -110,6 +110,30 @@ export async function projectId(): Promise<string> {
 	return cached
 }
 
+/**
+ * Set the two automation switches, and read the server back.
+ *
+ * The profiles spec leaves them wherever the last shape put them, because its
+ * cleanup restores the charter files and the switches live on the board rather
+ * than in the repository. Solo is the only shape that turns auto-start on and
+ * it happens to run first, so the suite landed correctly by accident of
+ * ordering. Reordering SHAPES would have broken the two specs that follow.
+ */
+export async function setAutomation(autoRunEnabled: boolean, autoApprovePlans: boolean): Promise<void> {
+	await need(`/web/factory/projects/${await projectId()}`, {
+		method: 'PATCH',
+		body: JSON.stringify({ autoRunEnabled, autoApprovePlans }),
+	})
+
+	// A 200 is the server's claim. This is the fact.
+	const { project } = await need<{ project: { autoRunEnabled: boolean; autoApprovePlans: boolean } }>(
+		`/web/factory/projects/${await projectId()}`,
+	)
+	if (project.autoRunEnabled !== autoRunEnabled || project.autoApprovePlans !== autoApprovePlans) {
+		throw new Error(`the board did not keep the switches: asked for ${autoRunEnabled}/${autoApprovePlans}, it holds ${project.autoRunEnabled}/${project.autoApprovePlans}`)
+	}
+}
+
 export async function items(): Promise<WorkItem[]> {
 	const { workItems } = await need<{ workItems: WorkItem[] }>(`/web/factory/projects/${await projectId()}/work-items`)
 	return workItems

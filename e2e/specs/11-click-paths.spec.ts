@@ -17,7 +17,7 @@ import { test } from '@playwright/test'
 import { column, expect, openBoard, PHASES, showBoard } from '../lib/factory.ts'
 import { NAV, SWITCHES } from '../lib/controls.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { itemForRoute, stageOf } from '../lib/drive.ts'
+import { itemForRoute, setAutomation, stageOf } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 
 test('every control the run sheets name is on the page', async ({ page }) => {
@@ -44,8 +44,14 @@ test('a person starts a run by clicking, not by calling the API', async ({ page 
 	test.setTimeout(20 * 60 * 1000)
 
 	await openBoard(page)
+
+	// Named rather than assumed. This spec clicks Investigate, so nothing may
+	// have started the item first, and the profiles spec that runs before it
+	// leaves the automation switches wherever its last shape put them.
+	await setAutomation(false, false)
+
 	const before = await itemForRoute(LEDGER, 'clean')
-	expect(stageOf(before), 'the clean issue should be resting').toBe('intake')
+	expect(stageOf(before), 'the clean issue should be resting, so auto-start must be off before this spec').toBe('intake')
 
 	const startedAt = Date.now()
 	const card = page.locator('[data-testid="work-item-card"]').filter({ hasText: before.title }).first()

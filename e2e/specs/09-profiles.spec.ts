@@ -32,7 +32,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
+import { itemForRoute, setAutomation, settle, stageOf, startRun } from '../lib/drive.ts'
 import { ROOT, shot } from '../lib/shot.ts'
 
 const SHAPES = ['solo', 'startup', 'scaleup', 'enterprise'] as const
@@ -58,7 +58,12 @@ test.beforeAll(() => {
 	found = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: LEDGER, encoding: 'utf8' }).trim()
 })
 
-test.afterAll(() => {
+test.afterAll(async () => {
+	// Both switches off is the state the suite starts from and 00-board asserts.
+	// The charter files are restored below; the switches live on the board, so
+	// restoring only the files left the last shape's automation in place.
+	await setAutomation(false, false)
+
 	if (found === undefined) return
 	const git = (args: string[]) => execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8' })
 	git(['checkout', found, '--', '.factory/charter.md', '.factory/targets.json'])
