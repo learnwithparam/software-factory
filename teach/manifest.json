@@ -105,13 +105,13 @@
 		},
 		{
 			"name": "factory-gate-failed",
-			"spec": "04-cross-stack",
+			"spec": "04b-gate-recovery",
 			"shows": "A check failing in one of three languages",
 			"mustShow": "Building"
 		},
 		{
 			"name": "factory-retry",
-			"spec": "04-cross-stack",
+			"spec": "04b-gate-recovery",
 			"shows": "The second attempt, starting from the reason",
 			"mustShow": "Building"
 		},
@@ -238,7 +238,8 @@
 		"06-review-rejection",
 		"07-console",
 		"08-built",
-		"09-profiles"
+		"09-profiles",
+		"04b-gate-recovery"
 	],
 	"profiles": [
 		"solo",

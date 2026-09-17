@@ -309,10 +309,16 @@ export function reviewText(repo: string, pull: number): string {
  * "request changes" and "CHANGES REQUESTED" are the same answer, and which one
  * appears is not a property worth failing a fifteen minute run over.
  */
+const VERDICT = /(?:verdict|re-?review|review)\s*:\s*\**\s*(request changes|changes requested|approve)/gi
+
 export function verdictOf(text: string): 'approve' | 'changes' | undefined {
-	if (/verdict:\s*\**\s*(request changes|changes requested)/i.test(text)) return 'changes'
-	if (/verdict:\s*\**\s*approve/i.test(text)) return 'approve'
-	return undefined
+	// Four spellings seen in practice: "Verdict: approve", "Verdict: request
+	// changes", "## Review: APPROVE" and "## Re-review: request changes". Which
+	// one a pass reaches for is not a property worth failing a run over; whether
+	// it approved or sent the work back is.
+	const first = [...text.matchAll(VERDICT)][0]?.[1]?.toLowerCase()
+	if (first === undefined) return undefined
+	return first === 'approve' ? 'approve' : 'changes'
 }
 
 /**
@@ -324,8 +330,7 @@ export function verdictOf(text: string): 'approve' | 'changes' | undefined {
  * anything.
  */
 export function latestVerdict(text: string): 'approve' | 'changes' | undefined {
-	const found = [...text.matchAll(/verdict:\s*\**\s*(request changes|changes requested|approve)/gi)]
-	const last = found.at(-1)?.[1]?.toLowerCase()
+	const last = [...text.matchAll(VERDICT)].at(-1)?.[1]?.toLowerCase()
 	if (last === undefined) return undefined
 	return last === 'approve' ? 'approve' : 'changes'
 }
