@@ -9,24 +9,24 @@ Activity
 Audit log
 Work Sessions
 Issue #1: Add a Contributing section to the README
-Factory triage: README Contributing
-Issue #109: Show what a thousand tokens costs on each run
-Issue #99: Record how many tool calls a whole run made
-Issue #98: Show what each run cost in the console
-Show 8 more
+Issue #285: Warn earlier when spend is heading for the limit
+Issue #278: Warn earlier when spend is heading for the limit
+Issue #272: Review the pull request that adds a saved view to the console
+Issue #271: Warn earlier when spend is heading for the limit
+Show 39 more
 Review Sessions
+PR #273: Remember the view the reader was on
+PR #237: Remember the view the reader was on
+PR #194: Remember the view the reader was on
+PR #171 factory review
 PR #163: Remember the view the reader was on
-PR #156: Remember the view the reader was on
-PR #149 saved-view review
-PR #142: Remember the view the reader was on
-PR #135: Remember the view the reader was on
-Show 8 more
+Show 12 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-9
+21
 Workshop
 Settings
 Search cards
@@ -37,53 +37,55 @@ Auto-start runs
 Auto-approve plans
 Intake
 5
-0
 Triage
+1
 0
 Planning
 0
 Building
+0
 Review
-1
 0
 Done
 0
 Canceled
-#168 · Param-Harrison · 6m
-Issue:
-Warn earlier when spend is heading for the limit
-Suggested: Investigate
-Investigate
-Param-Harrison
-#169 · Param-Harrison · 6m
+#286 · Param-Harrison · 4m
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#167 · Param-Harrison · 6m
+#284 · Param-Harrison · 4m
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#166 · Param-Harrison · 6m
+#283 · Param-Harrison · 4m
 Issue:
 Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#165 · Param-Harrison · 6m
+#282 · Param-Harrison · 4m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#164 · Param-Harrison · 6m
+#281 · Param-Harrison · 4m
 Issue:
 Add a Contributing section to the README
+Suggested: Investigate
+Investigate
+Param-Harrison
+#285 · Param-Harrison · 4m
+Issue:
+Warn earlier when spend is heading for the limit
 effort:low
-impact:low
+impact:medium
+Feature request · needs your approval
+Accept
 Open session
 Workshop
 

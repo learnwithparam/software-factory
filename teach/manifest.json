@@ -106,14 +106,14 @@
 		{
 			"name": "factory-gate-failed",
 			"spec": "04b-gate-recovery",
-			"shows": "A check failing in one of three languages",
-			"mustShow": "Building"
+			"shows": "A check failing, with the reason it gives",
+			"mustShow": "request changes"
 		},
 		{
 			"name": "factory-retry",
 			"spec": "04b-gate-recovery",
-			"shows": "The second attempt, starting from the reason",
-			"mustShow": "Building"
+			"shows": "The second attempt, after the reason was acted on",
+			"mustShow": "approve"
 		},
 		{
 			"name": "factory-refused",

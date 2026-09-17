@@ -9,22 +9,24 @@ Activity
 Audit log
 Work Sessions
 Issue #1: Add a Contributing section to the README
-Issue #88: Add a Contributing section to the README
-Issue #70: Warn earlier when spend is heading for the limit
-Issue #58: Add a Contributing section to the README
-Issue #50: Add a Contributing section to the README
-Show 3 more
+Issue #109: Show what a thousand tokens costs on each run
+Issue #99: Record how many tool calls a whole run made
+Issue #98: Show what each run cost in the console
+Issue #97: A limit of zero is refused instead of returning nothing
+Show 8 more
 Review Sessions
-PR #65: Add Contributing section to the README
-PR #57: docs: add Contributing section to README
-PR #19: Add a Contributing section to the README
-PR #103 Contributing section review
+PR #163: Remember the view the reader was on
+PR #156: Remember the view the reader was on
+PR #149 saved-view review
+PR #142: Remember the view the reader was on
+PR #135: Remember the view the reader was on
+Show 9 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-5
+9
 Workshop
 Settings
 Search cards
@@ -47,38 +49,38 @@ Done
 1
 0
 Canceled
-#101 · Param-Harrison · 14m
-Issue:
-Review the pull request that adds a saved view to the console
-Suggested: Investigate
-Investigate
-Param-Harrison
-#100 · Param-Harrison · 14m
+#168 · Param-Harrison · 15m
 Issue:
 Warn earlier when spend is heading for the limit
 Suggested: Investigate
 Investigate
 Param-Harrison
-#99 · Param-Harrison · 14m
+#169 · Param-Harrison · 15m
+Issue:
+Review the pull request that adds a saved view to the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#167 · Param-Harrison · 15m
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#98 · Param-Harrison · 14m
+#166 · Param-Harrison · 15m
 Issue:
-Show what each run cost in the console
+Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#97 · Param-Harrison · 14m
+#165 · Param-Harrison · 15m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#96 · Param-Harrison · 14m
-PR #103
+#164 · Param-Harrison · 15m
+PR #171
 Issue:
 Add a Contributing section to the README
 effort:low

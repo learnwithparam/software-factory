@@ -23,7 +23,7 @@ import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, openBoard, showBoard } from '../lib/factory.ts'
+import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, announcePull, announcePush, itemForPull, latestVerdict, reviewText, stageOf, waitForVerdict } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
@@ -82,7 +82,12 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	// says no without naming the check leaves the next attempt guessing.
 	expect(latestVerdict(red), 'a stale checksum should send the change back').toBe('changes')
 	expect(red, 'the reason should name the check that failed').toMatch(/checksum/i)
-	await showBoard(page)
+
+	// The pull request, not the board. A board shows an item in Building whatever
+	// its checks did; the failure and the reason it carries are in the
+	// conversation, and a picture of the board captioned "a check failing" is a
+	// picture of something else.
+	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
 	await shot(page, 'factory-gate-failed')
 
 	// The second attempt does what the reason said.
@@ -97,7 +102,9 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	const green = await waitForVerdict(REPO, pull.number, fixedAt, item.id)
 	expect(latestVerdict(green), 'the fixed change should clear the gate it failed').toBe('approve')
 
-	await showBoard(page)
+	// The same conversation after the second attempt, so the two pictures are the
+	// same page before and after the reason was acted on.
+	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
 	await shot(page, 'factory-retry')
 
 	expect(reviewText(REPO, pull.number), 'both passes stay on the record').toMatch(/checksum/i)

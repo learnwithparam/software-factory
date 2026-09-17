@@ -29,9 +29,9 @@ is meant to show and the phrase the page had to be saying when it was taken, so 
 loading spinner or an empty board is reported rather than displayed as evidence.</p>
 
 <div class="tally">
-<div><b>25</b> show what they claim</div>
-<div><b>1</b> taken but unproven</div>
-<div><b>7</b> not taken</div>
+<div><b>31</b> show what they claim</div>
+<div><b>0</b> taken but unproven</div>
+<div><b>2</b> not taken</div>
 </div>
 
 <section>
@@ -101,20 +101,20 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 		<p class="claim">Asserted on screen: <code>Investigate</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="github-issues">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="github-issues">
+	<img src="evidence/screens/github-issues.png" alt="The six issues as they exist on GitHub" loading="lazy">
 	<figcaption>
 		<h3>The six issues as they exist on GitHub</h3>
-		<p class="meta"><code>github-issues</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">not taken</span></p>
-		<p class="claim">No page text is asserted for this one.</p>
+		<p class="meta"><code>github-issues</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">shows what it claims</span></p>
+		<p class="claim">Asserted on screen: <code>Add a Contributing section</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="github-pr-evidence">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="github-pr-evidence">
+	<img src="evidence/screens/github-pr-evidence.png" alt="A pull request carrying its evidence" loading="lazy">
 	<figcaption>
 		<h3>A pull request carrying its evidence</h3>
-		<p class="meta"><code>github-pr-evidence</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">not taken</span></p>
-		<p class="claim">No page text is asserted for this one.</p>
+		<p class="meta"><code>github-pr-evidence</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">shows what it claims</span></p>
+		<p class="claim">Asserted on screen: <code>Files changed</code></p>
 	</figcaption>
 </figure>
 </div>
@@ -154,34 +154,13 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 </div>
 </section>
 <section>
-<h2>04-cross-stack</h2>
-<div class="shots">
-<figure class="shot proven" id="factory-gate-failed">
-	<img src="evidence/screens/factory-gate-failed.png" alt="A check failing in one of three languages" loading="lazy">
-	<figcaption>
-		<h3>A check failing in one of three languages</h3>
-		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04-cross-stack</code> &middot; <span class="verdict">shows what it claims</span></p>
-		<p class="claim">Asserted on screen: <code>Building</code></p>
-	</figcaption>
-</figure>
-<figure class="shot missing" id="factory-retry">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
-	<figcaption>
-		<h3>The second attempt, starting from the reason</h3>
-		<p class="meta"><code>factory-retry</code> &middot; taken by <code>04-cross-stack</code> &middot; <span class="verdict">not taken</span></p>
-		<p class="claim">Asserted on screen: <code>Building</code></p>
-	</figcaption>
-</figure>
-</div>
-</section>
-<section>
 <h2>05-refusal</h2>
 <div class="shots">
-<figure class="shot unproven" id="factory-refused">
+<figure class="shot proven" id="factory-refused">
 	<img src="evidence/screens/factory-refused.png" alt="A run stopping on the money path, before touching a file" loading="lazy">
 	<figcaption>
 		<h3>A run stopping on the money path, before touching a file</h3>
-		<p class="meta"><code>factory-refused</code> &middot; taken by <code>05-refusal</code> &middot; <span class="verdict">no page text beside it</span></p>
+		<p class="meta"><code>factory-refused</code> &middot; taken by <code>05-refusal</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Planning</code></p>
 	</figcaption>
 </figure>
@@ -309,36 +288,57 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 		<p class="claim">Asserted on screen: <code>Auto-start runs</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="profile-solo">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="profile-solo">
+	<img src="evidence/screens/profile-solo.png" alt="The money item under a solo shape" loading="lazy">
 	<figcaption>
 		<h3>The money item under a solo shape</h3>
-		<p class="meta"><code>profile-solo</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>profile-solo</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">No page text is asserted for this one.</p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="profile-startup">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="profile-startup">
+	<img src="evidence/screens/profile-startup.png" alt="The same item under a startup shape" loading="lazy">
 	<figcaption>
 		<h3>The same item under a startup shape</h3>
-		<p class="meta"><code>profile-startup</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>profile-startup</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">No page text is asserted for this one.</p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="profile-scaleup">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="profile-scaleup">
+	<img src="evidence/screens/profile-scaleup.png" alt="The same item under a scaleup shape" loading="lazy">
 	<figcaption>
 		<h3>The same item under a scaleup shape</h3>
-		<p class="meta"><code>profile-scaleup</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>profile-scaleup</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">No page text is asserted for this one.</p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="profile-enterprise">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="profile-enterprise">
+	<img src="evidence/screens/profile-enterprise.png" alt="The same item under an enterprise shape" loading="lazy">
 	<figcaption>
 		<h3>The same item under an enterprise shape</h3>
-		<p class="meta"><code>profile-enterprise</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>profile-enterprise</code> &middot; taken by <code>09-profiles</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">No page text is asserted for this one.</p>
+	</figcaption>
+</figure>
+</div>
+</section>
+<section>
+<h2>04b-gate-recovery</h2>
+<div class="shots">
+<figure class="shot missing" id="factory-gate-failed">
+	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+	<figcaption>
+		<h3>A check failing, with the reason it gives</h3>
+		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04b-gate-recovery</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="claim">Asserted on screen: <code>request changes</code></p>
+	</figcaption>
+</figure>
+<figure class="shot missing" id="factory-retry">
+	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+	<figcaption>
+		<h3>The second attempt, after the reason was acted on</h3>
+		<p class="meta"><code>factory-retry</code> &middot; taken by <code>04b-gate-recovery</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="claim">Asserted on screen: <code>approve</code></p>
 	</figcaption>
 </figure>
 </div>

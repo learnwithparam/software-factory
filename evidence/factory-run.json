@@ -1,34 +1,34 @@
 {
-	"takenAt": "2026-09-17T05:14:52.563Z",
+	"takenAt": "2026-09-17T11:57:12.408Z",
 	"model": "openrouter/deepseek/deepseek-v4-flash",
 	"decisions": 25,
-	"retried": 2,
+	"retried": 1,
 	"stages": [
 		{
 			"role": "triage",
 			"runs": 2,
-			"medianMs": 177709,
-			"label": "2m 58s"
+			"medianMs": 284634,
+			"label": "4m 45s"
 		},
 		{
 			"role": "plan",
 			"runs": 1,
-			"medianMs": 1393,
+			"medianMs": 1093,
 			"label": "1s"
 		},
 		{
 			"role": "work",
 			"runs": 1,
-			"medianMs": 202320,
-			"label": "3m 22s"
+			"medianMs": 416101,
+			"label": "6m 56s"
 		},
 		{
 			"role": "review",
-			"runs": 2,
-			"medianMs": 251612,
-			"label": "4m 12s"
+			"runs": 4,
+			"medianMs": 193596,
+			"label": "3m 14s"
 		}
 	],
-	"humanWaitMs": 5569,
-	"humanWaitLabel": "6s"
+	"humanWaitMs": 8113,
+	"humanWaitLabel": "8s"
 }

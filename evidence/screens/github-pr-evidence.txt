@@ -1,0 +1,81 @@
+Skip to content
+Navigation Menu
+Platform
+Solutions
+Resources
+Open Source
+Enterprise
+Pricing
+Search
+/
+Sign in
+Sign up
+learnwithparam
+/
+agent-run-ledger
+Public
+Notifications
+Fork 0
+ Star 0
+Code
+Issues
+6
+Pull requests
+2
+Actions
+Projects
+Security and quality
+Insights
+docs: add Contributing section to README #171
+New issue
+ Open
+Param-Harrison wants to merge 1 commit into main from factory/issue-164  
++10 −0 
+ Conversation 1
+ Commits 1
+ Checks 0
+ Files changed 1
+Changes from all commits 
+File filter 
+Conversations 
+Jump to 
+ 
+  
+10 changes: 10 additions & 0 deletions
+10  
+README.md
+Original file line number	Diff line number	Diff line change
+	@@ -43,6 +43,16 @@ and the factory runs only the ones a change reaches.
+		(cd apps/console && bun test)
+		```
+		
+
+		## Contributing
+		
+
+		Changes are welcome. To propose one:
+		
+
+		1. **Fork** this repository and create a branch for your change.
+		2. **Set up** — `bun install` from the project root.
+		3. **Make your change**, keeping it focused. Before you invest time, check [`.factory/targets.json`](.factory/README.md) — some paths are `refuse` (a person must touch them) and others are `propose` (a person must approve the plan first).
+		4. **Run the checks** for every area your change reaches (see [Checks](#checks) above).
+		5. **Open a pull request** describing what changed and why. A maintainer reviews it before it merges.
+		
+
+		## License
+		
+
+		[MIT](LICENSE)
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
