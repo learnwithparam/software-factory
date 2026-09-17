@@ -137,11 +137,15 @@ export async function openSession(page: Page, title: string): Promise<void> {
 	// [aria-label="<title>"] on a card that plainly showed the title. Every click
 	// path in the run sheets was written from reading the interface rather than
 	// driving it, and this is the first one to be driven.
-	// Reload first. The board is a snapshot from whenever it was loaded, and this
-	// suite moves items through the API, so a card that has reached planning is
-	// still drawn in intake offering Investigate. Two runs timed out waiting for a
-	// button that was one refresh away.
-	await showBoard(page)
+	// Go back to the board, not reload whatever is on screen. After one session is
+	// open the page is on the session, and reloading it stays there, so the second
+	// call waits for a card that is not on the page at all.
+	//
+	// And it has to be a fresh load either way: the board is a snapshot from when
+	// it was drawn, and this suite moves items through the API, so a card that has
+	// reached planning is still drawn in intake offering Investigate.
+	await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+	await settleBoard(page)
 	const target = page.locator('[data-testid="work-item-card"]').filter({ hasText: title }).first()
 	await target.scrollIntoViewIfNeeded()
 	await target.getByRole('button', { name: 'Open session' }).click({ timeout: 30_000 })
