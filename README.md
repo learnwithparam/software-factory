@@ -95,3 +95,12 @@ The design borrows openly, and each of these is worth reading on its own:
 ## License
 
 [MIT](LICENSE)
+
+## What is proven, and what is not
+
+[KNOWN.md](KNOWN.md) is the honest list: which instruments pass on a clean
+clone, which claims are proven against the real model, and the three that are
+not. Read it before the first live session. The largest gap is that all thirteen
+end-to-end specs have passed individually and never as one sequence, which is
+ninety minutes of `make e2e` and the only way to find the state one spec leaves
+for the next.
