@@ -40,7 +40,7 @@ function git(args: string[]): string {
 	}
 }
 
-const BRANCH = 'gate/threshold-moved'
+const BRANCH = 'gate/remaining-clamped'
 
 /**
  * A small pull request of its own, rather than the cross-stack one.
@@ -61,17 +61,29 @@ const BRANCH = 'gate/threshold-moved'
  * protected block, the reviewer may not edit it, and the failing test can only
  * go back to a person. The ownership graph decides what a reviewer may repair,
  * not only what an agent may build, and that is worth a slide of its own.
+ *
+ * The second wrong break was moving the warning threshold, and the pull request
+ * body explained that the tests asserting eighty would fail. The review read
+ * that, matched it to the issue which asks for exactly that change, and approved
+ * with the failures marked expected. It was right to. A break that announces
+ * itself as intentional is authorised, not broken.
+ *
+ * So this one looks like a tidy-up and quietly violates the invariant the money
+ * path exists to hold: spent plus remaining equals the limit. Nobody authorises
+ * that, no issue asks for it, and the reviewer may not repair it.
  */
 function openTheBreak(): number {
 	git(['fetch', '-q', 'origin', 'main'])
 	git(['checkout', '-q', '-B', BRANCH, 'origin/main'])
 
-	// Move the warning threshold, which the budget tests assert exactly. The path
-	// is protected, so the reviewer can read the failure and not repair it.
-	const money = MONEY
-	writeFileSync(money, readFileSync(money, 'utf8').replace('const WARNING_PERCENT: i64 = 80;', 'const WARNING_PERCENT: i64 = 70;'))
+	// Break the invariant the money path exists to hold, in the shape of a tidy
+	// up. Remaining is no longer what is left.
+	writeFileSync(MONEY, readFileSync(MONEY, 'utf8').replace(
+		'remaining_minor: limit_minor - spent_minor,',
+		'remaining_minor: (limit_minor - spent_minor).max(0),',
+	))
 
-	git(['commit', '-qam', 'Warn at seventy percent instead of eighty'])
+	git(['commit', '-qam', 'Never report a negative remaining balance'])
 	git(['push', '-qf', '-u', 'origin', BRANCH])
 	git(['checkout', '-q', 'main'])
 
@@ -80,13 +92,13 @@ function openTheBreak(): number {
 
 	const url = execFileSync('gh', [
 		'pr', 'create', '--repo', REPO, '--head', BRANCH, '--base', 'main',
-		'--title', 'Warn earlier when spend is heading for the limit',
-		'--body', 'Moves the warning threshold from eighty percent to seventy. The budget tests assert eighty exactly, so this fails them, and the money path is protected so nobody but a person may fix it.',
+		'--title', 'Never report a negative remaining balance',
+		'--body', 'A run that overspends currently reports a negative remaining figure, which reads badly in the console. Clamps it at zero.',
 	], { encoding: 'utf8' }).trim()
 	return Number(url.split('/').pop())
 }
 
-test('a stale check sends the change back, and the second attempt clears it', async ({ page }) => {
+test('a broken invariant sends the change back, and the second attempt clears it', async ({ page }) => {
 	test.setTimeout(45 * 60 * 1000)
 
 	await openBoard(page)
@@ -97,8 +109,8 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	await advance(item.id, 'review', 'read a change that forgot its checksum')
 
 	const red = await waitForVerdict(REPO, number, openedAt, item.id)
-	expect(latestVerdict(red), 'a stale checksum should send the change back').toBe('changes')
-	expect(red, 'the reason should name the suite that failed').toMatch(/budget|cargo|warning|threshold/i)
+	expect(latestVerdict(red), 'a broken money invariant should send the change back').toBe('changes')
+	expect(red, 'the reason should name the invariant that broke').toMatch(/invariant|remaining|spent|budget/i)
 
 	// The pull request, not the board, and scrolled to the verdict. A board shows
 	// an item in a column whatever its checks did.
@@ -106,10 +118,13 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	await shotAt(page, 'request changes', 'factory-gate-failed')
 
 	// The second attempt does what the reason said: a person, who may touch the
-	// money path, puts the threshold back.
+	// money path, puts the invariant back.
 	git(['checkout', '-q', BRANCH])
-	writeFileSync(MONEY, readFileSync(MONEY, 'utf8').replace('const WARNING_PERCENT: i64 = 70;', 'const WARNING_PERCENT: i64 = 80;'))
-	git(['commit', '-qam', 'Put the threshold back, the way the review asked'])
+	writeFileSync(MONEY, readFileSync(MONEY, 'utf8').replace(
+		'remaining_minor: (limit_minor - spent_minor).max(0),',
+		'remaining_minor: limit_minor - spent_minor,',
+	))
+	git(['commit', '-qam', 'Put the invariant back, the way the review asked'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
