@@ -50,7 +50,37 @@ export async function openBoard(page: Page): Promise<void> {
 	if (!response.ok()) throw new Error(`sign-in answered ${response.status()}`)
 
 	await page.goto(BASE, { waitUntil: 'domcontentloaded' })
-	await expect(page.locator('[data-testid="board-column-intake"]')).toBeVisible({ timeout: 60_000 })
+	await settleBoard(page)
+}
+
+/**
+ * Wait for the board to stop drawing.
+ *
+ * The columns become visible long before their cards do, and a count taken in
+ * that gap reads zero: six issues on the board and a spec insisting there are
+ * none. Waiting for a fixed period would trade one flake for another, so this
+ * waits for the number of cards to stop changing.
+ *
+ * Stability rather than a selector, because the skeletons are an implementation
+ * detail and this file exists so that a UI change is one fix rather than nine.
+ */
+export async function settleBoard(page: Page, timeoutMs = 60_000): Promise<void> {
+	await expect(page.locator('[data-testid="board-column-intake"]')).toBeVisible({ timeout: timeoutMs })
+
+	const cards = page.locator('[data-testid="work-item-card"]')
+	const deadline = Date.now() + timeoutMs
+	let last = -1
+	let stable = 0
+	while (Date.now() < deadline) {
+		const now = await cards.count()
+		stable = now === last ? stable + 1 : 0
+		last = now
+		// Three readings the same. Two is enough for a board that never had cards
+		// and not enough for one still painting them in.
+		if (stable >= 3) return
+		await page.waitForTimeout(500)
+	}
+	throw new Error(`the board was still drawing after ${Math.round(timeoutMs / 1000)}s`)
 }
 
 export function column(page: Page, phase: Phase) {
@@ -124,5 +154,5 @@ export { expect }
  */
 export async function showBoard(page: Page): Promise<void> {
 	await page.reload({ waitUntil: 'domcontentloaded' })
-	await expect(page.locator('[data-testid="board-column-intake"]')).toBeVisible({ timeout: 60_000 })
+	await settleBoard(page)
 }

@@ -29,7 +29,7 @@ import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 import { session } from './factory-connect.ts'
-import { seedIssues, seedPullRequests } from './lib/webhook-stand-in.ts'
+import { installationFor, seedIssues, seedPullRequests } from './lib/webhook-stand-in.ts'
 import { BODY, BRANCH, TITLE, changes } from '../fixtures/saved-view.ts'
 
 const force = process.argv.includes('--force')
@@ -158,32 +158,21 @@ async function clearBoard(): Promise<void> {
 }
 
 /**
- * Put the new issues on the board, the way `issues.opened` would have.
+ * Deliver the webhooks GitHub would have sent, so the board fills itself.
  *
- * Any pull request still open is seeded too, so a reset that runs mid-run leaves
- * the review board agreeing with GitHub rather than holding yesterday's.
+ * Not a write to the work-items table: the Intake column is drawn from what
+ * intake delivered, so rows inserted behind it leave the board empty while the
+ * API happily lists them.
  */
 async function seedBoard(): Promise<void> {
-	const base = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
-	let cookie: string
 	try {
-		cookie = await session()
-	} catch {
-		console.log('  factory not reachable, board not seeded')
-		return
+		const installation = await installationFor(await session())
+		const issues = await seedIssues(slug(), installation)
+		const pulls = await seedPullRequests(slug(), installation)
+		console.log(`  delivered ${issues} issue and ${pulls} pull request webhooks`)
+	} catch (error) {
+		console.log(`  board not seeded: ${(error as Error).message}`)
 	}
-
-	const listed = await fetch(`${base}/web/factory/projects`, { headers: { cookie, accept: 'application/json' } })
-	const { projects } = (await listed.json()) as { projects: Array<{ id: string; name: string }> }
-	const project = projects.find((candidate) => candidate.name === slug().split('/')[1]) ?? projects[0]
-	if (project === undefined) {
-		console.log('  no factory project, board not seeded')
-		return
-	}
-
-	const issues = await seedIssues(base, cookie, project.id, slug())
-	const pulls = await seedPullRequests(base, cookie, project.id, slug())
-	console.log(`  seeded ${issues} issues and ${pulls} pull requests onto ${project.name}`)
 }
 
 /**
