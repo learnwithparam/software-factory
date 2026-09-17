@@ -38,10 +38,12 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 
 	await openBoard(page)
 	const item = await itemForRoute(LEDGER, 'plan-revision')
-	expect(stageOf(item), 'the vague issue should start in intake').toBe('intake')
 	const issue = item.metadata.githubIssueNumber as number
 
-	await startRun(item, 'triage', 'factory-triage')
+	// Start it only if nobody has. A previous run of this spec leaves the item in
+	// triage, and insisting it begins in intake fails on the state its
+	// predecessor left rather than on anything this route is about.
+	if (stageOf(item) === 'intake') await startRun(item, 'triage', 'factory-triage')
 	const triaged = await settleAfter(item.id, 0)
 
 	// What triage produced, not what its last decision record says. Starting a run
