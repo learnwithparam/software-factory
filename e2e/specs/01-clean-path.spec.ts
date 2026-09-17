@@ -124,4 +124,13 @@ test('an uncontroversial issue reaches a reviewed pull request', async ({ page }
 	// change or the reviewer is wrong, and both are worth a failure. Route six is
 	// where a rejection is the thing being demonstrated.
 	expect(verdictOf(reviewText(REPO, pull.number)), 'the review should state a verdict').toBe('approve')
+
+	// The same run seen from GitHub rather than from the board. Sessions open on
+	// the issues the room can read themselves, and close on the pull request
+	// carrying its evidence, so both belong in the material.
+	await page.goto(`https://github.com/${REPO}/issues`, { waitUntil: 'domcontentloaded' })
+	await shot(page, 'github-issues')
+
+	await page.goto(`https://github.com/${REPO}/pull/${pull.number}/files`, { waitUntil: 'domcontentloaded' })
+	await shot(page, 'github-pr-evidence')
 })

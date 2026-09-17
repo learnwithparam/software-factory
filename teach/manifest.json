@@ -174,12 +174,14 @@
 		{
 			"name": "github-issues",
 			"spec": "01-clean-path",
-			"shows": "The six issues as they exist on GitHub"
+			"shows": "The six issues as they exist on GitHub",
+			"mustShow": "Add a Contributing section"
 		},
 		{
 			"name": "github-pr-evidence",
 			"spec": "01-clean-path",
-			"shows": "A pull request carrying its evidence"
+			"shows": "A pull request carrying its evidence",
+			"mustShow": "Files changed"
 		},
 		{
 			"name": "console-runs",
