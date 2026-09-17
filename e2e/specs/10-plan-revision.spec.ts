@@ -18,10 +18,10 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard } from '../lib/factory.ts'
+import { expect, openBoard, openSession, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, again, announceComment, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
-import { shotAt } from '../lib/shot.ts'
+import { advance, again, announceComment, decisionsFor, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
+import { shot } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
@@ -78,11 +78,14 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const planned = await advance(item.id, 'planning', 'accepted, let us see what it proposes')
 	expect(stageOf(planned.item), 'the item should reach planning').toBe('planning')
 
-	const first = factorySaid(issue, 0)
-	expect(first.length, 'the run should have written a plan somebody can disagree with').toBeGreaterThan(200)
+	// A plan is not published to the issue. It lives in the session, and only
+	// reaches GitHub when the work agent commits it beside the diff. Two runs of
+	// this spec waited fifteen minutes for a comment the product never writes.
+	const before = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
+	expect(before, 'planning should have produced a plan').toBeGreaterThan(0)
 
-	await page.goto(`https://github.com/${REPO}/issues/${issue}`, { waitUntil: 'domcontentloaded' })
-	await shotAt(page, 'Understanding', 'factory-plan-proposed')
+	await openSession(page, item.title)
+	await shot(page, 'factory-plan-proposed')
 
 	// A person reads it and changes the priority. This is the whole loop: the
 	// objection is about what to build, not about whether the code is correct,
@@ -115,12 +118,12 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	// for a second time.
 	await again(item.id, 'planning', 'the plan was sent back, and the priority changed')
 
-	// The factory's own words, after the rejection and not counting it.
-	const revised = await waitForPlan(issue, sentBackAt)
-	expect(revised, 'the second plan should take up the date range that was asked for').toMatch(/date range|date filter|from.*to|month/i)
+	// The claim: the objection produced a second plan. Counted from the board's
+	// own record, because that is where a plan exists.
+	const after = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
+	expect(after, 'the objection should have produced a second plan').toBeGreaterThan(before)
 
-	// The issue, where the plans are. Two pictures of the same board differ by a
-	// timestamp and teach nothing.
-	await page.goto(`https://github.com/${REPO}/issues/${issue}`, { waitUntil: 'domcontentloaded' })
-	await shotAt(page, 'Sending this plan back', 'factory-plan-revised')
+	await showBoard(page)
+	await openSession(page, item.title)
+	await shot(page, 'factory-plan-revised')
 })

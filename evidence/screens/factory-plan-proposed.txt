@@ -1,0 +1,164 @@
+Skip to content
+Navigation Menu
+Platform
+Solutions
+Resources
+Open Source
+Enterprise
+Pricing
+Search
+/
+Sign in
+Sign up
+learnwithparam
+/
+agent-run-ledger
+Public
+Notifications
+Fork 0
+ Star 0
+Code
+Issues
+7
+Pull requests
+1
+Actions
+Projects
+Security and quality
+Insights
+Keep runs for longer than the console can show
+ #362
+New issue
+Open
+Open
+Keep runs for longer than the console can show
+#362
+Description
+Param-Harrison
+opened 
+Contributor
+
+The console lists the most recent runs and there is no way to look further back. A month-end review
+needs more than the last page, and right now the only answer is to query the service directly.
+
+Give the reader a way to see older runs.
+
+Acceptance criteria:
+
+The reader can reach runs beyond the first page.
+The ingest service stays the one place that decides what a run is.
+Nothing is deleted or expired as part of this change.
+Done when
+
+The plan a person accepted is the plan that was built, and the pull request matches it rather than the first draft.
+
+Files this is expected to touch
+services/ingest/store.go
+apps/console/app/page.tsx
+
+Seeded from .factory/issues by make lab-reset. Route: plan-revision.
+
+Activity
+learnwithparam-factory commented 
+learnwithparam-factory
+bot
+	
+Type	feature request — the console needs a way for readers to reach runs beyond the first page of results
+Route	Await approval
+Severity	🟡 medium — a normal workflow (month-end review) is degraded: the console caps at 50 runs with no navigation to older ones
+Confidence	high — the issue is well-specified by the repo owner, the constraint ("nothing deleted or expired") is clear, and the missing capability is self-evident from the code
+Effort	medium — two prior implementations (offset pagination in #346, date-range filter in #355) were closed without merging, so the accepted approach is not settled
+Impact	medium — month-end review without a workaround requires querying the ingest service directly; readers with fewer than 50 runs see no gap
+Next step	Maintainer to approve one approach (offset pagination, date-range filter, or a different design) so the plan can be built and the PR can match it
+Understanding
+
+This is a feature request, not a bug. The console (apps/console/app/page.tsx) calls listRuns(50) → GET /runs?limit=50 → the ingest service's in-memory Store.Runs() returns all runs newest-first, then the HTTP handler (services/ingest/http.go:19-35) slices the first N (default 50, max 200). There is no offset, cursor, or date-range parameter on the API, and the console page has no pagination controls or date filter form.
+
+The constraint "Nothing is deleted or expired" means the fix is a read-side change only — add a query parameter to GET /runs and UI to use it.
+
+Two prior implementations exist, both closed without merging:
+
+PR Add offset-based pagination to the run list #346 — offset-based pagination (?offset=, ?limit=, Previous/Next links)
+PR Keep runs for longer than the console can show — date range filter, not pagination #355 — date range filter (?startedAfter=, ?startedBefore=, date input form)
+
+The factory issue file (.factory/issues/07-retention-window.md) carries route: plan-revision and the issue body says "The plan a person accepted is the plan that was built" — meaning a person should decide which approach to build before code is written.
+
+No related open issues or duplicates found. Issues #353, #344, #336, #328 are all closed with similar titles.
+
+File paths expected to change:
+
+services/ingest/run.go (the Store — note the factory issue says store.go but that file doesn't exist; the store lives in run.go)
+services/ingest/http.go (the HTTP handler)
+apps/console/lib/ledger.ts (the TypeScript client)
+apps/console/app/page.tsx (the Next.js page)
+
+Not reproduced — this is a feature gap, not a bug. The current behavior (50-run cap with no navigation) is working as designed; the missing capability is the feature.
+
+Assumptions
+The services/ingest/store.go path in the factory issue is a stale reference; the actual store code is in run.go and the triage handoff corrects this
+PRs Add offset-based pagination to the run list #346 and Keep runs for longer than the console can show — date range filter, not pagination #355 were closed without merging because their approach was not the one a person accepted (closedBy: null, no merge, no comments)
+The repo owner (Param-Harrison, the issue author) is the maintainer whose approval matters; the issue is well-specified and requires no clarification
+No data model changes (schema, contracts) are needed since runs are already stored with all required fields
+Open questions
+Which approach does the maintainer want? Offset pagination (?offset=,?limit=), a date range filter (?startedAfter=,?startedBefore=), or something else entirely?
+Should the metrics header (total runs, spend, budget, tokens) reflect all runs or just the visible page?
+Reproduction
+
+Not applicable — feature gap, not a bug.
+
+Param-Harrison
+added 
+status: auto-triaged
+Issue has been triaged
+ 
+status: needs approval
+Awaiting maintainer approval
+ 
+effort:medium
+Medium implementation effort
+ 
+impact:medium
+Medium user/business impact
+ 
+learnwithparam-factory
+removed 
+status: needs approval
+Awaiting maintainer approval
+ 
+Sign up for free
+ to join this conversation on GitHub. Already have an account? Sign in to comment
+Metadata
+Assignees
+No one assigned
+Labels
+effort:medium
+Medium implementation effort
+impact:medium
+Medium user/business impact
+status: auto-triaged
+Issue has been triaged
+Type
+No type
+Projects
+No projects
+Milestone
+No milestone
+Relationships
+None yet
+Development
+No branches or pull requests
+Participants
+Issue actions
+Open in GitHub Copilot app
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Community
+Docs
+Contact
+Manage cookies
+Do not share my personal information
