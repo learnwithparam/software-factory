@@ -11,15 +11,24 @@
  * lock is a claim about the world that goes stale the moment a run is killed,
  * and the first version of this wrote its own process id and then exited, which
  * made it a lock that never held anything.
+ *
+ * Scoped to this repository. The first version asked whether any Playwright was
+ * running anywhere and blocked on somebody else's visual suite in another
+ * project, which shares nothing with this one: Playwright clears test-results
+ * inside its own directory, so a run elsewhere cannot touch these artefacts. A
+ * guard that stops work it has no reason to stop is a guard people learn to
+ * bypass.
  */
 
 import { execFileSync } from 'node:child_process'
+import { ROOT } from '../tree-hash.ts'
 
 /** Process ids of any Playwright run other than this one's own tree. */
 export function runningElsewhere(): number[] {
 	let out = ''
 	try {
-		out = execFileSync('pgrep', ['-f', 'playwright.*test'], { encoding: 'utf8' })
+		// The repository path, so another project's suite is not this one's problem.
+		out = execFileSync('pgrep', ['-lf', `${ROOT}.*playwright.*test`], { encoding: 'utf8' })
 	} catch {
 		// pgrep exits non-zero when nothing matches, which is the common case.
 		return []
@@ -27,7 +36,7 @@ export function runningElsewhere(): number[] {
 	const mine = new Set([process.pid, process.ppid])
 	return out
 		.split('\n')
-		.map((line) => Number(line.trim()))
+		.map((line) => Number(line.trim().split(/\s+/)[0]))
 		.filter((pid) => Number.isFinite(pid) && pid > 0 && !mine.has(pid))
 }
 
