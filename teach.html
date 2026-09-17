@@ -179,29 +179,22 @@
 </g>
 <g>
 <text x="0" y="82" class="small mono muted">runs start themselves</text>
-<rect class="solid" x="190" y="70" width="140" height="16" rx="2"/><rect class="solid" x="390" y="70" width="140" height="16" rx="2"/>
-<rect class="tint" x="590" y="70" width="140" height="16" rx="2"/><rect class="tint" x="790" y="70" width="140" height="16" rx="2"/>
+<rect class="solid" x="190" y="70" width="140" height="16" rx="2"/><rect class="tint" x="390" y="70" width="140" height="16" rx="2"/><rect class="tint" x="590" y="70" width="140" height="16" rx="2"/><rect class="tint" x="790" y="70" width="140" height="16" rx="2"/>
 <text x="0" y="114" class="small mono muted">plans approve themselves</text>
-<rect class="solid" x="190" y="102" width="140" height="16" rx="2"/>
-<rect class="tint" x="390" y="102" width="140" height="16" rx="2"/><rect class="tint" x="590" y="102" width="140" height="16" rx="2"/><rect class="tint" x="790" y="102" width="140" height="16" rx="2"/>
-<text x="0" y="146" class="small mono muted">acceptance recorded</text>
-<rect class="tint" x="190" y="134" width="140" height="16" rx="2"/><rect class="tint" x="390" y="134" width="140" height="16" rx="2"/>
-<rect class="solid" x="590" y="134" width="140" height="16" rx="2"/><rect class="solid" x="790" y="134" width="140" height="16" rx="2"/>
-<text x="0" y="178" class="small mono muted">a second approver</text>
-<rect class="tint" x="190" y="166" width="140" height="16" rx="2"/><rect class="tint" x="390" y="166" width="140" height="16" rx="2"/><rect class="tint" x="590" y="166" width="140" height="16" rx="2"/>
-<rect class="solid" x="790" y="166" width="140" height="16" rx="2"/>
-<text x="0" y="210" class="small mono muted">paths off limits</text>
-<text x="190" y="210" class="small muted">credentials</text><text x="390" y="210" class="small muted">and money</text><text x="590" y="210" class="small muted">and config</text><text x="790" y="210" class="small muted">and anything load bearing</text>
+<rect class="solid" x="190" y="102" width="140" height="16" rx="2"/><rect class="tint" x="390" y="102" width="140" height="16" rx="2"/><rect class="tint" x="590" y="102" width="140" height="16" rx="2"/><rect class="tint" x="790" y="102" width="140" height="16" rx="2"/>
+<text x="0" y="146" class="small mono muted">the money path is off limits</text>
+<rect class="tint" x="190" y="134" width="140" height="16" rx="2"/><rect class="tint" x="390" y="134" width="140" height="16" rx="2"/><rect class="solid" x="590" y="134" width="140" height="16" rx="2"/><rect class="solid" x="790" y="134" width="140" height="16" rx="2"/>
+<text x="0" y="178" class="small mono muted">the contract needs a plan</text>
+<rect class="tint" x="190" y="166" width="140" height="16" rx="2"/><rect class="solid" x="390" y="166" width="140" height="16" rx="2"/><rect class="solid" x="590" y="166" width="140" height="16" rx="2"/><rect class="solid" x="790" y="166" width="140" height="16" rx="2"/>
+<text x="0" y="210" class="small mono muted">the queue stops at</text>
+<text x="190" y="210" class="small muted">1 waiting</text><text x="390" y="210" class="small muted">3 waiting</text><text x="590" y="210" class="small muted">5 waiting</text><text x="790" y="210" class="small muted">2 waiting</text>
 </g>
 <line x1="0" y1="236" x2="1000" y2="236" class="dashed"/>
 <text x="0" y="262" class="small mono muted">the money item</text>
-<text x="190" y="262" class="small wait">merges, after you look</text>
-<text x="390" y="262" class="small wait">plan reviewed first</text>
-<text x="590" y="262" class="small refuse">refused</text>
-<text x="790" y="262" class="small refuse">refused, and routed</text>
-<text x="0" y="300" class="small muted">One repository, one command to switch. The room sees the same item merge in one shape and stop dead in another inside a minute.</text>
+<text x="190" y="262" class="small wait">a pull request, unattended</text><text x="390" y="262" class="small wait">a plan, waiting on a person</text><text x="590" y="262" class="small refuse">refused, routed to its team</text><text x="790" y="262" class="small refuse">refused at the boundary</text>
+<text x="0" y="300" class="small muted">One repository, one command to switch. The room sees the same item open a pull request in one shape and stop dead in another inside a minute.</text>
 </svg>
-<figcaption>Figure 5. Gates accumulate left to right. Nothing about the codebase changes between these columns; only what a person insists on seeing.</figcaption>
+<figcaption>Figure 5. Read from <code>profiles/*/board.json</code>, <code>targets.json</code> and each charter, so the slide and <code>make profile</code> cannot disagree. Nothing about the codebase changes between these columns; only what a person insists on seeing.</figcaption>
 </figure>
 <p>So the tier is a property of the repository, and it is refined per area. In this lab the budget engine is always human-approved whatever the size of the change, and the console can be changed unattended even when the change is large.</p>
 </article>
