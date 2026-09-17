@@ -23,7 +23,7 @@
  * somebody's afternoon to fix it.
  */
 
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
@@ -34,6 +34,26 @@ import { BRANCH, TITLE, body as proposalBody, changes } from '../fixtures/saved-
 
 const force = process.argv.includes('--force')
 const repo = loadRepo()
+
+/**
+ * Which known governance state this reset establishes.
+ *
+ * Unset means the baseline graph the six routes are written against. The
+ * profiles spec sets FACTORY_SHAPE, because it applies a shape and then resets
+ * the board, and a reset that always restored the baseline erased the shape
+ * between `make profile` and the run meant to demonstrate it.
+ *
+ * Resolved here rather than inside restoreShape, so a name that matches no
+ * profile is refused before a single issue is closed.
+ */
+const SHAPE = process.env.FACTORY_SHAPE
+const GRAPH = SHAPE === undefined
+	? join(import.meta.dir, '..', 'fixtures', 'ledger-baseline')
+	: join(import.meta.dir, '..', 'profiles', SHAPE)
+if (!existsSync(join(GRAPH, 'targets.json'))) {
+	console.error(`FACTORY_SHAPE=${SHAPE} names no profile: ${GRAPH} has no targets.json`)
+	process.exit(1)
+}
 
 function gh(args: string[]): string {
 	const result = Bun.spawnSync(['gh', ...args], { cwd: repo.root })
@@ -138,32 +158,45 @@ console.log(`\n${issues.length} issues open, ${gh(['pr', 'list', '--json', 'numb
 
 
 /**
- * Put the governance files back into the shape the lab starts in.
+ * Put the governance files back to the graph the routes are written against.
  *
- * The profiles spec switches the charter through all four shapes and restores
- * it on the way out, so a run that is interrupted leaves the ledger in
- * whichever shape it had reached. This one was found by killing a sequence
- * mid-run and finding the `startup` charter in place, where the money path is
- * `propose`: every other route reads the `solo` charter, and under the wrong
- * one the money item refuses while the session says it builds.
+ * The profiles spec switches the charter through all four company shapes and
+ * restores it on the way out, so a run that is interrupted leaves the ledger in
+ * whichever shape it had reached. Killing a sequence mid-run left the `startup`
+ * charter in place, where the money path proposes rather than builds.
+ *
+ * The baseline is not one of the four shapes, which is the part that is easy to
+ * get wrong: this restored `profiles/solo` first, and solo puts every target on
+ * `build`, so route five would have built the money path instead of refusing
+ * it and route four would have lost the plan gate that the ownership graph
+ * exists to impose. fixtures/ledger-baseline/README.md says which route needs
+ * which level.
  *
  * Restoring it belongs here rather than only in the spec, because this is the
  * command a person runs when the board is in a state nobody can account for.
+ * It commits and pushes, because a run clones from the remote.
  */
 function restoreShape(): void {
-	const shape = process.env.FACTORY_SHAPE ?? 'solo'
-	const result = Bun.spawnSync(['bun', 'scripts/profile.ts', shape], { cwd: import.meta.dir + '/..' })
-	const said = `${new TextDecoder().decode(result.stdout)}${new TextDecoder().decode(result.stderr)}`.trim()
-
-	// Read the file, not the exit code. profile.ts exits non-zero when the
-	// server refuses the switches, and the charter is still the thing every
-	// route reads.
-	const charter = readFileSync(join(repo.root, '.factory', 'charter.md'), 'utf8')
-	if (!charter.includes(`the \`${shape}\` shape`)) {
-		console.error(`the charter is not in the ${shape} shape after make profile NAME=${shape}:\n${said}`)
-		process.exit(1)
+	const from = GRAPH
+	const changed: string[] = []
+	for (const name of ['charter.md', 'targets.json']) {
+		const to = join(repo.root, '.factory', name)
+		const wanted = readFileSync(join(from, name), 'utf8')
+		if (readFileSync(to, 'utf8') === wanted) continue
+		writeFileSync(to, wanted)
+		changed.push(`.factory/${name}`)
 	}
-	console.log(`  charter and targets in the ${shape} shape${result.exitCode === 0 ? '' : ', though the board did not take its switches'}`)
+
+	const which = SHAPE === undefined ? 'baseline' : `${SHAPE} shape`
+	if (changed.length === 0) {
+		console.log(`  charter and targets already hold the ${which} graph`)
+		return
+	}
+
+	git(['add', ...changed], repo.root)
+	git(['commit', '-q', '-m', `Operate on the ${which} graph`], repo.root)
+	git(['push', '-q', 'origin', 'HEAD'], repo.root)
+	console.log(`  restored ${changed.join(' and ')} to the ${which} graph, and pushed`)
 }
 
 /**

@@ -82,8 +82,8 @@ function autonomyFor(shape: string, target: string): string {
 	return found
 }
 
-function run(command: string, args: string[]): string {
-	return execFileSync(command, args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+function run(command: string, args: string[], env: Record<string, string> = {}): string {
+	return execFileSync(command, args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, env: { ...process.env, ...env } })
 }
 
 test('the four shapes disagree about the money path, and say so in writing', async () => {
@@ -110,7 +110,17 @@ for (const shape of SHAPES) {
 		test.setTimeout(25 * 60 * 1000)
 
 		run('make', ['profile', `NAME=${shape}`])
-		run('make', ['lab-reset'])
+		// The reset has to keep the shape. Without FACTORY_SHAPE it restores the
+		// baseline graph, which put the money path back on `build` between the
+		// profile being applied and the run that is supposed to demonstrate it.
+		run('make', ['lab-reset'], { FACTORY_SHAPE: shape })
+
+		// Read the repository, not the profile directory. The assertions below
+		// read profiles/<shape>/, and a reset that quietly reverted the charter
+		// would leave them agreeing with each other about a file the factory is
+		// not using.
+		const charter = readFileSync(join(LEDGER, '.factory', 'charter.md'), 'utf8')
+		expect(charter, `the example should be in the ${shape} shape after the reset`).toContain(`the \`${shape}\` shape`)
 
 		await openBoard(page)
 		let item = await itemForRoute(LEDGER, 'refused')

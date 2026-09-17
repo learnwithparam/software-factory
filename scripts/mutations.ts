@@ -528,6 +528,12 @@ export const MUTATIONS: Record<string, Mutation> = {
 		],
 		because: 'the example stops protecting the graph that defines every other rule',
 	},
+	'tests/example-repo.test.ts > holds the baseline graph, not one of the four company shapes': {
+		file: 'fixtures/ledger-baseline/targets.json',
+		find: '"autonomy": "propose"',
+		replace: '"autonomy": "build"',
+		because: 'the baseline the lab restores no longer matches the example, so a run starts on a graph nobody chose',
+	},
 	'tests/example-repo.test.ts > carries a work item of every shape a session needs': {
 		file: 'example:.factory/targets.json',
 		find: '"autonomy": "propose"',

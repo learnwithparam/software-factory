@@ -1,5 +1,10 @@
 /**
- * What the run actually took, written down so a page cannot disagree with it.
+ * What the runs actually took, written down so a page cannot disagree with it.
+ *
+ * Every decision the project holds, not only the last sequence. A median over
+ * one run of each route is a sample of one, and the figures are captioned as
+ * medians across every recorded run because that is what they are. Nothing
+ * here filters by time, deliberately.
  *
  * teach.html says every figure it quotes is read from this record by a test.
  * That sentence was false when it was written: the stage waterfall carried

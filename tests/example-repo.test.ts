@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { runGate } from '../steps/04-verification/gate.ts'
 import { decide } from '../steps/01-boundary/policy.ts'
@@ -20,6 +20,9 @@ import { issuesIn } from '../steps/lib/issues.ts'
 import { filesIn, isConfigured, loadRepo, unowned } from '../steps/lib/repo.ts'
 
 const EXAMPLE = process.env.FACTORY_EXAMPLE ?? join(import.meta.dir, '..', '..', 'ledger')
+
+/** The graph the routes are written against. fixtures/ledger-baseline/README.md says why. */
+const BASELINE = join(import.meta.dir, '..', 'fixtures', 'ledger-baseline')
 const present = existsSync(EXAMPLE) && isConfigured(EXAMPLE)
 
 describe.if(present)('the example repository', () => {
@@ -61,6 +64,21 @@ describe.if(present)('the example repository', () => {
 		expect(decisions.some((decision) => decision.allowed && decision.autonomy === 'build')).toBe(true)
 		expect(decisions.some((decision) => decision.allowed && decision.autonomy === 'propose')).toBe(true)
 		expect(decisions.some((decision) => !decision.allowed)).toBe(true)
+	})
+
+	it('holds the baseline graph, not one of the four company shapes', () => {
+		// make lab-reset writes these two files into the example, because a run
+		// clones from the remote. It restored profiles/solo first, and solo puts
+		// every target on `build`: route five would have built the money path
+		// instead of refusing it, and route four would have lost the plan gate.
+		//
+		// Failing here means the example is holding a shape a run left behind.
+		// make lab-reset puts it back.
+		const differ = ['charter.md', 'targets.json'].filter(
+			(name) =>
+				readFileSync(join(BASELINE, name), 'utf8') !== readFileSync(join(repo.root, '.factory', name), 'utf8'),
+		)
+		expect(differ, 'the example is not holding the baseline graph: make lab-reset').toEqual([])
 	})
 
 	it('has at least one item whose change reaches more than one target', () => {

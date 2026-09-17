@@ -1,0 +1,84 @@
+{
+  "$comment": "Who owns which paths in this repository, what checks them, and how much freedom an agent has there. The factory supplies the matching; this file supplies the facts. A path no target claims fails the build rather than being guessed at.",
+  "targets": {
+    "contracts": {
+      "paths": [
+        "packages/contracts/**"
+      ],
+      "dependsOn": [],
+      "autonomy": "propose",
+      "why": "One definition three services are built against. A change here is never local, so it is proposed and never landed unattended.",
+      "cwd": "packages/contracts",
+      "commands": {
+        "test": "bun test",
+        "typecheck": "bun x tsc --noEmit"
+      }
+    },
+    "ingest": {
+      "paths": [
+        "services/ingest/**"
+      ],
+      "dependsOn": [
+        "contracts"
+      ],
+      "autonomy": "build",
+      "why": "Stores runs and stages. Wrong data is visible and recoverable, so an agent may finish work here on its own.",
+      "cwd": "services/ingest",
+      "commands": {
+        "test": "go test ./...",
+        "typecheck": "go vet ./...",
+        "format": "gofmt -l ."
+      }
+    },
+    "budget": {
+      "paths": [
+        "services/budget/**"
+      ],
+      "dependsOn": [
+        "contracts"
+      ],
+      "autonomy": "refuse",
+      "why": "The money path. It decides what a period is allowed to cost and when spend has breached. A plausible wrong answer here is expensive and slow to notice, so no agent lands a change without a person.",
+      "cwd": "services/budget",
+      "commands": {
+        "test": "cargo test --quiet",
+        "typecheck": "cargo check --quiet"
+      }
+    },
+    "console": {
+      "paths": [
+        "apps/console/**"
+      ],
+      "dependsOn": [
+        "contracts"
+      ],
+      "autonomy": "build",
+      "why": "Display only. It computes nothing, so the worst outcome is a page that reads badly, which a reviewer sees immediately.",
+      "cwd": "apps/console",
+      "commands": {
+        "test": "bun test",
+        "typecheck": "bun x tsc --noEmit",
+        "build": "bun run build"
+      }
+    },
+    "repo": {
+      "paths": [
+        "package.json",
+        "bun.lock",
+        "bunfig.toml",
+        ".gitignore",
+        ".factory/**",
+        "README.md",
+        "AGENTS.md",
+        "LICENSE"
+      ],
+      "dependsOn": [],
+      "autonomy": "refuse",
+      "why": "Workspace wiring and the factory configuration decide what every other rule means. An agent editing these could widen its own permissions, so it may not.",
+      "cwd": ".",
+      "commands": {
+        "test": "bun test packages apps"
+      }
+    }
+  }
+}

@@ -374,7 +374,7 @@
 <article class="concept" id="c-latency-budget">
 <h3>Measure where the time actually went<span class="anchor">latency-budget</span></h3>
 <p>The surprise on a first real run is that generation is rarely the slow part. Time accumulates in setup, in repeated checks, in verification that replays work already done, and in the stretch where the run is waiting on a person and nothing says so.</p>
-<p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the run that produced them.</p>
+<p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the runs that produced them.</p>
 <p class="because">The button that opens a session is not always called the same thing. A resting card
 offers Investigate, a card the factory is working offers Build, and Open session appears once a
 session exists and is idle. Follow the card, not the label: whichever button is on it is the one
@@ -392,7 +392,7 @@ one that was not there.</p>
 </g>
 <text x="0" y="188" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
 </svg>
-<figcaption>Figure 3. A run with each stage timed on its own, drawn from <code>evidence/factory-run.json</code> on openrouter/deepseek/deepseek-v4-flash. Every figure here is the median of what the factory recorded, so none of them can drift from what actually happened.</figcaption>
+<figcaption>Figure 3. Each stage timed on its own, drawn from <code>evidence/factory-run.json</code> on openrouter/deepseek/deepseek-v4-flash. Every figure here is a median across every run the factory has recorded, not one sample, so none of them can drift from what actually happened.</figcaption>
 </figure>
 <p class="because">Without per-stage numbers the only available response to a slow factory is to make the model faster, which is the one thing you do not control.</p>
 </article>
