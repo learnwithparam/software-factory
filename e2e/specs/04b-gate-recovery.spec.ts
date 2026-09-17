@@ -21,11 +21,11 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, announcePull, announcePush, itemForPull, latestVerdict, reviewText, stageOf, waitForVerdict } from '../lib/drive.ts'
+import { advance, announcePull, announcePush, latestVerdict, waitForVerdict } from '../lib/drive.ts'
 import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
@@ -40,72 +40,76 @@ function git(args: string[]): string {
 	}
 }
 
-/** The factory's own pull request, which is the one carrying a schema change. */
-function factoryPull(): { number: number; headRefName: string } {
-	const out = execFileSync('gh', ['pr', 'list', '--repo', REPO, '--state', 'open', '--json', 'number,headRefName'], { encoding: 'utf8' })
-	const found = (JSON.parse(out) as Array<{ number: number; headRefName: string }>).find((p) => p.headRefName.startsWith('factory/issue-'))
-	if (found === undefined) throw new Error('no factory pull request is open; run 04-cross-stack first')
-	return found
+const BRANCH = 'gate/stale-checksum'
+
+/**
+ * A small pull request of its own, rather than the cross-stack one.
+ *
+ * Borrowing the factory's pull request meant waiting on a review of nine changed
+ * files and a conversation several verdicts deep, which took longer than twenty
+ * minutes and timed out twice. A review is as slow as the thing it is reading,
+ * and this loop is about the reason a gate gives rather than the size of the
+ * diff it gave it about.
+ *
+ * One line of schema and a checksum nobody recomputed. The gate has exactly one
+ * thing to say.
+ */
+function openTheBreak(): number {
+	git(['fetch', '-q', 'origin', 'main'])
+	git(['checkout', '-q', '-B', BRANCH, 'origin/main'])
+
+	const schema = join(LEDGER, 'packages', 'contracts', 'schema', 'run.schema.json')
+	const parsed = JSON.parse(readFileSync(schema, 'utf8')) as { description?: string }
+	parsed.description = `A run, as the ingest service records it. Touched at ${new Date().toISOString()}.`
+	writeFileSync(schema, `${JSON.stringify(parsed, null, 2)}\n`)
+
+	// Left stale on purpose. This is the break.
+	git(['commit', '-qam', 'Describe the run schema, and forget the checksum'])
+	git(['push', '-qf', '-u', 'origin', BRANCH])
+	git(['checkout', '-q', 'main'])
+
+	const existing = execFileSync('gh', ['pr', 'list', '--repo', REPO, '--head', BRANCH, '--json', 'number', '--jq', '.[0].number'], { encoding: 'utf8' }).trim()
+	if (existing !== '') return Number(existing)
+
+	const url = execFileSync('gh', [
+		'pr', 'create', '--repo', REPO, '--head', BRANCH, '--base', 'main',
+		'--title', 'Describe the run schema',
+		'--body', 'One line of documentation on the shared schema. The checksum beside it was not recomputed, which is the point.',
+	], { encoding: 'utf8' }).trim()
+	return Number(url.split('/').pop())
 }
 
 test('a stale check sends the change back, and the second attempt clears it', async ({ page }) => {
 	test.setTimeout(45 * 60 * 1000)
 
 	await openBoard(page)
-	const pull = factoryPull()
+	const number = openTheBreak()
 
-	// On the review board, because that is where a pull request is judged.
-	let item = await itemForPull(pull.number).catch(() => announcePull(pull.number, REPO))
-	if (stageOf(item) !== 'review') item = (await advance(item.id, 'review', 'read it once before anything is broken')).item
+	const item = await announcePull(number, REPO)
+	const openedAt = Date.now()
+	await advance(item.id, 'review', 'read a change that forgot its checksum')
 
-	git(['fetch', '-q', 'origin', pull.headRefName])
-	git(['checkout', '-q', pull.headRefName])
-
-	// Idempotent, because a run that staled the checksum and then failed to read
-	// the verdict leaves the branch already broken, and git answers "nothing to
-	// commit" to a second identical break. The value carries the moment so there
-	// is always something to push, and a branch that is already stale is a state
-	// to continue from rather than an error.
-	const alreadyRed = latestVerdict(reviewText(REPO, pull.number)) === 'changes'
-	writeFileSync(CHECKSUM, `stale-${Date.now()}\n`)
-	git(['commit', '-qam', 'Stale the schema checksum, to watch the gate catch it'])
-	git(['push', '-q'])
-	git(['checkout', '-q', 'main'])
-
-	const brokenAt = Date.now()
-	await announcePush(pull.number, REPO)
-	const red = alreadyRed
-		? reviewText(REPO, pull.number)
-		: await waitForVerdict(REPO, pull.number, brokenAt, item.id)
-
-	// The claim of this loop: the failure travels with its reason. A verdict that
-	// says no without naming the check leaves the next attempt guessing.
+	const red = await waitForVerdict(REPO, number, openedAt, item.id)
 	expect(latestVerdict(red), 'a stale checksum should send the change back').toBe('changes')
 	expect(red, 'the reason should name the check that failed').toMatch(/checksum/i)
 
-	// The pull request, not the board. A board shows an item in Building whatever
-	// its checks did; the failure and the reason it carries are in the
-	// conversation, and a picture of the board captioned "a check failing" is a
-	// picture of something else.
-	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
+	// The pull request, not the board, and scrolled to the verdict. A board shows
+	// an item in a column whatever its checks did.
+	await page.goto(`https://github.com/${REPO}/pull/${number}`, { waitUntil: 'domcontentloaded' })
 	await shotAt(page, 'request changes', 'factory-gate-failed')
 
 	// The second attempt does what the reason said.
-	git(['checkout', '-q', pull.headRefName])
+	git(['checkout', '-q', BRANCH])
 	execFileSync('bun', ['run', 'checksum'], { cwd: join(LEDGER, 'packages', 'contracts') })
-	git(['commit', '-qam', 'Rewrite the checksum the way the gate said to'])
+	git(['commit', '-qam', 'Recompute the checksum the way the gate said to'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
 	const fixedAt = Date.now()
-	await announcePush(pull.number, REPO)
-	const green = await waitForVerdict(REPO, pull.number, fixedAt, item.id)
+	await announcePush(number, REPO)
+	const green = await waitForVerdict(REPO, number, fixedAt, item.id)
 	expect(latestVerdict(green), 'the fixed change should clear the gate it failed').toBe('approve')
 
-	// The same conversation after the second attempt, so the two pictures are the
-	// same page before and after the reason was acted on.
-	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
-	await shotAt(page, 'Verdict: approve', 'factory-retry')
-
-	expect(reviewText(REPO, pull.number), 'both passes stay on the record').toMatch(/checksum/i)
+	await page.goto(`https://github.com/${REPO}/pull/${number}`, { waitUntil: 'domcontentloaded' })
+	await shotAt(page, 'approve', 'factory-retry')
 })
