@@ -85,6 +85,21 @@ export async function settled(page: Page, name: string, timeoutMs = 30_000): Pro
 	throw new Error(`${name} would have photographed a loading page: ${saw}`)
 }
 
+/**
+ * Bring a phrase into view, then photograph the viewport around it.
+ *
+ * shot() checks the page text and the camera sees the viewport, and those are
+ * not the same thing. A pull request whose failing verdict sits below the fold
+ * passes every assertion and photographs its own description, with a green
+ * label in the corner.
+ */
+export async function shotAt(page: Page, phrase: string, name: string): Promise<void> {
+	const target = page.getByText(phrase, { exact: false }).first()
+	await target.scrollIntoViewIfNeeded()
+	await page.waitForTimeout(400)
+	await shot(page, name)
+}
+
 /** A named region of a page, for when the whole viewport says too little. */
 export async function shotOf(page: Page, selector: string, name: string): Promise<void> {
 	mkdirSync(SCREENS, { recursive: true })

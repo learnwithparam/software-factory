@@ -26,7 +26,7 @@ import { join } from 'node:path'
 import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, announcePull, announcePush, itemForPull, latestVerdict, reviewText, stageOf, waitForVerdict } from '../lib/drive.ts'
-import { shot } from '../lib/shot.ts'
+import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 const CHECKSUM = join(LEDGER, 'packages', 'contracts', 'schema', 'run.checksum')
@@ -88,7 +88,7 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	// conversation, and a picture of the board captioned "a check failing" is a
 	// picture of something else.
 	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
-	await shot(page, 'factory-gate-failed')
+	await shotAt(page, 'request changes', 'factory-gate-failed')
 
 	// The second attempt does what the reason said.
 	git(['checkout', '-q', pull.headRefName])
@@ -105,7 +105,7 @@ test('a stale check sends the change back, and the second attempt clears it', as
 	// The same conversation after the second attempt, so the two pictures are the
 	// same page before and after the reason was acted on.
 	await page.goto(`https://github.com/${REPO}/pull/${pull.number}`, { waitUntil: 'domcontentloaded' })
-	await shot(page, 'factory-retry')
+	await shotAt(page, 'Verdict: approve', 'factory-retry')
 
 	expect(reviewText(REPO, pull.number), 'both passes stay on the record').toMatch(/checksum/i)
 })
