@@ -18,7 +18,13 @@ install: ## Install the factory's own dependencies
 tokens: ## Regenerate every surface stylesheet from design/tokens.json
 	@bun scripts/build-tokens.ts
 
-check: ## Prose, types, unit and structural tests. No model, no network
+# The end-to-end project keeps its own dependencies, and the root install does
+# not reach them. A fresh clone could not run its own gate: make check
+# typechecks e2e and tsc could not find @playwright/test.
+e2e/node_modules:
+	cd e2e && bun install
+
+check: e2e/node_modules ## Prose, types, unit and structural tests. No model, no network
 	@mkdir -p artifacts && rm -f artifacts/junit.xml
 	@bun scripts/tree-hash.ts --all > artifacts/check-tree.txt
 	bun scripts/check-prose.ts
