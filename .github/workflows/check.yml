@@ -36,6 +36,7 @@ jobs:
 
       - run: make check
       - run: make prove
-      # --allow-unbound distinguishes "a check failed" from "a phase is not built
-      # yet". tests/gate.test.ts removes it the moment every point is bound.
-      - run: make score SCORE_ARGS=--allow-unbound
+      # Every point is bound to a named test now, so an unbound point is a
+      # mistake rather than a phase nobody has built. tests/gate.test.ts is what
+      # took the flag away, and it fails if anybody puts it back.
+      - run: make score

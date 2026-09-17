@@ -13,6 +13,7 @@
  * decision succeeds.
  */
 
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -256,7 +257,6 @@ export async function announcePull(number: number, repo: string): Promise<WorkIt
  * happened as missing, so this reads both and the inline threads as well.
  */
 export function reviewText(repo: string, pull: number): string {
-	const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
 	const read = (path: string): string => {
 		try {
 			return execFileSync('gh', ['api', path, '--jq', '.[].body'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })

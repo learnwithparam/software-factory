@@ -69,7 +69,16 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// was asked for. Then the same reviewer reads it again.
 	// LEDGER, not a relative path: this runs with e2e/ as its working directory,
 	// so "../ledger" pointed inside the factory and git answered ENOENT.
-	const git = (args: string[]) => execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8' })
+	const git = (args: string[]): string => {
+		try {
+			return execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+		} catch (error) {
+			// execFileSync throws with the command line and swallows stderr, which
+			// turns "nothing to commit" into "Command failed: git commit".
+			const said = (error as { stderr?: Buffer | string; stdout?: Buffer | string })
+			throw new Error(`git ${args.join(' ')} failed: ${String(said.stderr ?? '')}${String(said.stdout ?? '')}`.trim())
+		}
+	}
 	git(['fetch', '-q', 'origin', BRANCH])
 	git(['checkout', '-q', BRANCH])
 	git(['checkout', '-q', 'origin/main', '--', 'apps/console/lib/ledger.test.ts'])

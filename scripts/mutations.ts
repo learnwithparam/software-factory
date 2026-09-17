@@ -81,9 +81,13 @@ export const MUTATIONS: Record<string, Mutation> = {
 	},
 	'tests/gate.test.ts > CI stops tolerating unbound points once every point is bound': {
 		file: '.github/workflows/check.yml',
-		find: '      - run: make score SCORE_ARGS=--allow-unbound',
-		replace: '      - run: make score',
-		because: 'CI stops saying which of the two ways to score under a hundred it is in',
+		find: '      - run: make score\n',
+		replace: '      - run: make score SCORE_ARGS=--allow-unbound\n',
+		// This mutation had to be turned around the day the last point was bound.
+		// While phases were missing, the break was taking the flag away; now that
+		// every point is bound, the break is putting it back, because the
+		// permission it grants has become a hole rather than an allowance.
+		because: 'CI goes back to tolerating an unbound point, which now means a mistake rather than a phase nobody has built',
 	},
 	'tests/gate.test.ts > the prose check is wired into make check': {
 		file: 'Makefile',
@@ -462,6 +466,28 @@ export const MUTATIONS: Record<string, Mutation> = {
 		find: "				reason: 'Merging is never automated. A named engineer approves every change.',",
 		replace: "				reason: 'Please do not merge without checking.',",
 		because: 'the one rule that never moves is softened on one substrate',
+	},
+
+	// 13 Evidence
+	'tests/screenshot-guard.test.ts > is refused when the interface says it is loading': {
+		file: 'e2e/lib/shot.ts',
+		find: 'const STILL_LOADING = [/Loading boards/i, /Loading\\u2026/i, /Loading\\.\\.\\./i]',
+		replace: 'const STILL_LOADING: RegExp[] = []',
+		because: 'a picture of a spinner becomes admissible evidence again',
+	},
+
+	'tests/review-page.test.ts > accounts for every screenshot the manifest names': {
+		file: 'review.html',
+		find: 'id="factory-intake"',
+		replace: 'id="factory-intake-removed"',
+		because: 'the review page silently stops listing one of the pictures it is meant to account for',
+	},
+
+	'tests/figures.test.ts > shows exactly what the record says': {
+		file: 'evidence/factory-run.json',
+		find: '"humanWaitLabel"',
+		replace: '"humanWaitLabelMoved"',
+		because: 'the record stops carrying a figure the page is quoting, so the page is quoting nothing',
 	},
 
 	// 12 Example repository

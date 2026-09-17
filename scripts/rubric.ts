@@ -115,6 +115,11 @@ export const PHASES: Record<string, readonly Check[]> = {
 		unit('tests/example-repo.test.ts > has at least one item whose change reaches more than one target', 1),
 		unit('tests/example-repo.test.ts > passes its own gate for a change to a target the factory may build', 2),
 	],
+	'13 Evidence': [
+		unit('tests/screenshot-guard.test.ts > is refused when the interface says it is loading', 1),
+		unit('tests/review-page.test.ts > accounts for every screenshot the manifest names', 1),
+		unit('tests/figures.test.ts > shows exactly what the record says', 1),
+	],
 }
 
 export const TOTAL_POINTS = 100

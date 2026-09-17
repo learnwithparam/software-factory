@@ -1,0 +1,94 @@
+BETA
+⌘ K
+agent-run-ledger
+Overview
+Supervisor
+Work
+Review
+Activity
+Audit log
+Work Sessions
+Issue #1: Add a Contributing section to the README
+Issue #97: A limit of zero is refused instead of returning nothing
+Issue #88: Add a Contributing section to the README
+Issue #70: Warn earlier when spend is heading for the limit
+Issue #58: Add a Contributing section to the README
+Show 4 more
+Review Sessions
+PR #65: Add Contributing section to the README
+PR #57: docs: add Contributing section to README
+PR #19: Add a Contributing section to the README
+PR #103 Contributing section review
+User Sessions
+
+No sessions yet
+
+Needs attention
+6
+Workshop
+Settings
+Search cards
+All teammates
+All relevance
+All labels
+Auto-start runs
+Auto-approve plans
+Intake
+4
+0
+Triage
+0
+Planning
+Building
+1
+0
+Review
+Done
+1
+0
+Canceled
+#101 · Param-Harrison · 22m
+Issue:
+Review the pull request that adds a saved view to the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#100 · Param-Harrison · 22m
+Issue:
+Warn earlier when spend is heading for the limit
+Suggested: Investigate
+Investigate
+Param-Harrison
+#99 · Param-Harrison · 22m
+Issue:
+Record how many tool calls a whole run made
+Suggested: Investigate
+Investigate
+Param-Harrison
+#98 · Param-Harrison · 22m
+Issue:
+Show what each run cost in the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#97 · Param-Harrison · 22m
+Issue:
+A limit of zero is refused instead of returning nothing
+effort:low
+impact:low
+Build
+Open session
+Workshop
+
+W
+
+#96 · Param-Harrison · 22m
+PR #103
+Issue:
+Add a Contributing section to the README
+effort:low
+impact:low
+Open session
+Workshop
+
+W
