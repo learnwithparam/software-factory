@@ -76,8 +76,32 @@ async function cookie(): Promise<string> {
 	return signedIn
 }
 
+/**
+ * Ask the server, and try again when the connection drops rather than the
+ * server answering.
+ *
+ * A local Factory running sandboxes beside a browser occasionally stops
+ * answering for a second, and Node reports that as a bare "TypeError: fetch
+ * failed". Twice that ended a run six minutes in, with the work itself fine.
+ *
+ * Only the connection is retried. An HTTP status is the server's answer and
+ * gets reported, because retrying a 422 just asks the same wrong question again.
+ */
+async function reach(path: string, init: RequestInit): Promise<Response> {
+	let last: unknown
+	for (let attempt = 0; attempt < 4; attempt += 1) {
+		try {
+			return await fetch(`${BASE}${path}`, init)
+		} catch (error) {
+			last = error
+			await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt))
+		}
+	}
+	throw new Error(`${init.method ?? 'GET'} ${path} never reached the server: ${(last as Error).message}`)
+}
+
 async function api<T>(path: string, init: RequestInit = {}, tolerate: readonly number[] = []): Promise<T | undefined> {
-	const response = await fetch(`${BASE}${path}`, {
+	const response = await reach(path, {
 		...init,
 		headers: { 'content-type': 'application/json', origin: BASE, cookie: await cookie(), ...init.headers },
 	})
