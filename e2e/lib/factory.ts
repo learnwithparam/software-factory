@@ -131,10 +131,15 @@ export async function act(page: Page, title: string, action: string): Promise<vo
 }
 
 export async function openSession(page: Page, title: string): Promise<void> {
-	// The button, not the card. Clicking the card selects it and leaves the board
-	// on screen, so two pictures of "the plan in its session" came out as two
-	// pictures of the board differing by a timestamp.
-	await act(page, title, 'Open session')
+	// The button, not the card: clicking the card selects it and leaves the board
+	// on screen. And found by the text a person reads rather than by aria-label,
+	// because the first click this suite ever attempted timed out waiting for
+	// [aria-label="<title>"] on a card that plainly showed the title. Every click
+	// path in the run sheets was written from reading the interface rather than
+	// driving it, and this is the first one to be driven.
+	const target = page.locator('[data-testid="work-item-card"]').filter({ hasText: title }).first()
+	await target.scrollIntoViewIfNeeded()
+	await target.getByRole('button', { name: 'Open session' }).click({ timeout: 30_000 })
 	await page.waitForTimeout(3_000)
 }
 
