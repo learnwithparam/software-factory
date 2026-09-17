@@ -15,11 +15,11 @@ Issue #98: Show what each run cost in the console
 Issue #97: A limit of zero is refused instead of returning nothing
 Show 7 more
 Review Sessions
+PR #163: Remember the view the reader was on
 PR #156: Remember the view the reader was on
 PR #149 saved-view review
 PR #142: Remember the view the reader was on
 PR #135: Remember the view the reader was on
-PR #128: Remember the view the reader was on
 Show 8 more
 User Sessions
 
@@ -49,37 +49,37 @@ Review
 Done
 0
 Canceled
-#162 · Param-Harrison · 7m
+#162 · Param-Harrison · 11m
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#160 · Param-Harrison · 7m
+#160 · Param-Harrison · 11m
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#161 · Param-Harrison · 7m
+#161 · Param-Harrison · 11m
 Issue:
 Warn earlier when spend is heading for the limit
 Suggested: Investigate
 Investigate
 Param-Harrison
-#159 · Param-Harrison · 7m
+#159 · Param-Harrison · 11m
 Issue:
 Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#158 · Param-Harrison · 7m
+#158 · Param-Harrison · 11m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#157 · Param-Harrison · 7m
+#157 · Param-Harrison · 11m
 Issue:
 Add a Contributing section to the README
 Suggested: Investigate

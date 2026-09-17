@@ -29,9 +29,9 @@ is meant to show and the phrase the page had to be saying when it was taken, so 
 loading spinner or an empty board is reported rather than displayed as evidence.</p>
 
 <div class="tally">
-<div><b>17</b> show what they claim</div>
-<div><b>2</b> taken but unproven</div>
-<div><b>14</b> not taken</div>
+<div><b>25</b> show what they claim</div>
+<div><b>1</b> taken but unproven</div>
+<div><b>7</b> not taken</div>
 </div>
 
 <section>
@@ -77,11 +77,11 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 		<p class="claim">Asserted on screen: <code>Building</code></p>
 	</figcaption>
 </figure>
-<figure class="shot unproven" id="factory-pr-opened">
+<figure class="shot proven" id="factory-pr-opened">
 	<img src="evidence/screens/factory-pr-opened.png" alt="The pull request the run opened" loading="lazy">
 	<figcaption>
 		<h3>The pull request the run opened</h3>
-		<p class="meta"><code>factory-pr-opened</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">no page text beside it</span></p>
+		<p class="meta"><code>factory-pr-opened</code> &middot; taken by <code>01-clean-path</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Review</code></p>
 	</figcaption>
 </figure>
@@ -122,11 +122,11 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 <section>
 <h2>02-bug-fast-track</h2>
 <div class="shots">
-<figure class="shot missing" id="factory-bug-triage">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-bug-triage">
+	<img src="evidence/screens/factory-bug-triage.png" alt="A bug classified, skipping the acceptance a feature needs" loading="lazy">
 	<figcaption>
 		<h3>A bug classified, skipping the acceptance a feature needs</h3>
-		<p class="meta"><code>factory-bug-triage</code> &middot; taken by <code>02-bug-fast-track</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-bug-triage</code> &middot; taken by <code>02-bug-fast-track</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Triage</code></p>
 	</figcaption>
 </figure>
@@ -135,19 +135,19 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 <section>
 <h2>03-question</h2>
 <div class="shots">
-<figure class="shot missing" id="factory-question">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-question">
+	<img src="evidence/screens/factory-question.png" alt="The agent stopping to ask, rather than guessing" loading="lazy">
 	<figcaption>
 		<h3>The agent stopping to ask, rather than guessing</h3>
-		<p class="meta"><code>factory-question</code> &middot; taken by <code>03-question</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-question</code> &middot; taken by <code>03-question</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Planning</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="factory-answered">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-answered">
+	<img src="evidence/screens/factory-answered.png" alt="The answer given, and the work resuming" loading="lazy">
 	<figcaption>
 		<h3>The answer given, and the work resuming</h3>
-		<p class="meta"><code>factory-answered</code> &middot; taken by <code>03-question</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-answered</code> &middot; taken by <code>03-question</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Building</code></p>
 	</figcaption>
 </figure>
@@ -156,11 +156,11 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 <section>
 <h2>04-cross-stack</h2>
 <div class="shots">
-<figure class="shot missing" id="factory-gate-failed">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-gate-failed">
+	<img src="evidence/screens/factory-gate-failed.png" alt="A check failing in one of three languages" loading="lazy">
 	<figcaption>
 		<h3>A check failing in one of three languages</h3>
-		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04-cross-stack</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04-cross-stack</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Building</code></p>
 	</figcaption>
 </figure>
@@ -190,27 +190,27 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 <section>
 <h2>06-review-rejection</h2>
 <div class="shots">
-<figure class="shot missing" id="factory-review-changes">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-review-changes">
+	<img src="evidence/screens/factory-review-changes.png" alt="A reviewer sending work back with findings" loading="lazy">
 	<figcaption>
 		<h3>A reviewer sending work back with findings</h3>
-		<p class="meta"><code>factory-review-changes</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-review-changes</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Review</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="factory-re-review">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-re-review">
+	<img src="evidence/screens/factory-re-review.png" alt="The re-review passing after the fix" loading="lazy">
 	<figcaption>
 		<h3>The re-review passing after the fix</h3>
-		<p class="meta"><code>factory-re-review</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-re-review</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Review</code></p>
 	</figcaption>
 </figure>
-<figure class="shot missing" id="factory-board-review">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-board-review">
+	<img src="evidence/screens/factory-board-review.png" alt="The Review board, which tracks pull requests separately" loading="lazy">
 	<figcaption>
 		<h3>The Review board, which tracks pull requests separately</h3>
-		<p class="meta"><code>factory-board-review</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-board-review</code> &middot; taken by <code>06-review-rejection</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>Review</code></p>
 	</figcaption>
 </figure>
