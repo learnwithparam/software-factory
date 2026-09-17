@@ -111,7 +111,7 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// Wait for the verdict, not for a decision. The decisions a review creates
 	// succeed within seconds and the agent then works for minutes, so a run that
 	// waits on them calls the re-review finished before it has read anything.
-	const second = await waitForVerdict(REPO, pull, pushedAt)
+	const second = await waitForVerdict(REPO, pull, pushedAt, item.id)
 	expect(verdictOf(second), 'the re-review should approve the fixed change').toBe('approve')
 
 	await showBoard(page)

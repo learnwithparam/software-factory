@@ -368,7 +368,7 @@ export function labelledVerdict(repo: string, pull: number): 'approve' | 'change
  * So this waits for the artefact the route is actually about: a verdict on the
  * pull request that was not there before.
  */
-export async function waitForVerdict(repo: string, pull: number, since: number, timeoutMs = 20 * 60 * 1000): Promise<string> {
+export async function waitForVerdict(repo: string, pull: number, since: number, itemId: string, timeoutMs = 20 * 60 * 1000): Promise<string> {
 	const deadline = Date.now() + timeoutMs
 	const newer = (): string => {
 		const out = execFileSync(
@@ -380,6 +380,12 @@ export async function waitForVerdict(repo: string, pull: number, since: number, 
 	}
 
 	while (Date.now() < deadline) {
+		// Approve while waiting. A push raises the re-review as a decision in
+		// `proposed`, because this project runs with auto-start off, so waiting for
+		// the verdict without approving the gate waits for an operator who is this
+		// loop. Twenty minutes of polling for a review nobody had let start.
+		await approveWaiting(itemId)
+
 		const said = newer()
 		if (verdictOf(said) !== undefined) return said
 		await new Promise((resolve) => setTimeout(resolve, 15_000))
