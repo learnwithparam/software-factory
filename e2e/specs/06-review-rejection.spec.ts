@@ -47,6 +47,14 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 
 	await openBoard(page)
 	const pull = theProposal()
+
+	// The fixture has to still be broken. This spec repairs the branch and pushes
+	// it, so running it twice without make lab-reset leaves a pull request that is
+	// already correct: the review then approves it, git finds nothing to commit,
+	// and the failure blames the repair rather than the missing reset.
+	const diff = execFileSync('gh', ['api', `repos/${REPO}/pulls/${pull}/files`, '--jq', '.[].patch'], { encoding: 'utf8' })
+	expect(diff, 'the fixture is already repaired; run make lab-reset before this spec').toContain('toBeGreaterThanOrEqual(0)')
+
 	const item = await itemForPull(pull)
 
 	const reviewed = await advance(item.id, 'review', 'read it against what was asked for')
