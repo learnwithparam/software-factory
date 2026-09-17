@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
-import { advance, itemForPull, reviewText, settle, verdictOf } from '../lib/drive.ts'
+import { advance, announcePush, itemForPull, latestVerdict, reviewText, settle, verdictOf } from '../lib/drive.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
@@ -101,11 +101,18 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
-	const again = await advance(item.id, 'review', 'changes made, read it again')
+	// A push is what starts a re-review. Asking an item already in review to
+	// move to review is not a transition this board has, so it silently does
+	// nothing and the rejection stays the only verdict on the pull request.
+	await announcePush(pull, REPO)
+	const again = await settle(item.id)
 	expect(again.decision?.status, 'the re-review should complete').toBe('succeeded')
 
 	await showBoard(page)
 	await shot(page, 'factory-re-review')
 
-	expect(verdictOf(comments(pull)), 'the fixed change should be approved').toBe('approve')
+	// The latest verdict, not any verdict. The rejection is still on the pull
+	// request and always will be, so reading the first one found means the
+	// re-review can never be seen to have changed anything.
+	expect(latestVerdict(comments(pull)), 'the fixed change should be approved').toBe('approve')
 })

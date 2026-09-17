@@ -111,6 +111,20 @@ export async function announcePullRequest(repo: string, number: number, installa
 	await deliver('pull_request', installation, { action: 'opened', number, pull_request: pull, repository: repository(repo) })
 }
 
+/**
+ * A pull request that has just been pushed to, delivered as
+ * `pull_request.synchronize`.
+ *
+ * This is how a re-review starts. The review board has no review-to-review
+ * transition, so asking an item already in review to move there again does
+ * nothing at all: the fix gets pushed, no second review happens, and the only
+ * verdict on the pull request is the rejection from before it was fixed.
+ */
+export async function announcePush(repo: string, number: number, installation: number): Promise<void> {
+	const pull = JSON.parse(gh(['api', `repos/${repo}/pulls/${number}`]))
+	await deliver('pull_request', installation, { action: 'synchronize', number, pull_request: pull, repository: repository(repo) })
+}
+
 /** Every open pull request, delivered as `pull_request.opened`. */
 export async function seedPullRequests(repo: string, installation: number): Promise<number> {
 	const numbers = gh(['pr', 'list', '--repo', repo, '--state', 'open', '--limit', '200', '--json', 'number', '--jq', '.[].number'])

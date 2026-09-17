@@ -306,3 +306,29 @@ export function verdictOf(text: string): 'approve' | 'changes' | undefined {
 	if (/verdict:\s*\**\s*approve/i.test(text)) return 'approve'
 	return undefined
 }
+
+/**
+ * The verdict a review reached most recently.
+ *
+ * A rejection stays on a pull request for ever, so asking whether a verdict
+ * exists answers the wrong question after a re-review: the first one found is
+ * always the rejection, and the re-review can never be seen to have changed
+ * anything.
+ */
+export function latestVerdict(text: string): 'approve' | 'changes' | undefined {
+	const found = [...text.matchAll(/verdict:\s*\**\s*(request changes|changes requested|approve)/gi)]
+	const last = found.at(-1)?.[1]?.toLowerCase()
+	if (last === undefined) return undefined
+	return last === 'approve' ? 'approve' : 'changes'
+}
+
+/**
+ * Tell the board a pull request has been pushed to, so it reviews it again.
+ *
+ * The review board has no review-to-review transition, so the only way back
+ * through review is the event a push would have produced.
+ */
+export async function announcePush(number: number, repo: string): Promise<void> {
+	const { announcePush: push, installationFor } = await import('../../scripts/lib/webhook-stand-in.ts')
+	await push(repo, number, await installationFor(await cookie()))
+}
