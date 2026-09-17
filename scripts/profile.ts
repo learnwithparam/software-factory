@@ -14,6 +14,7 @@
 
 import { copyFileSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { allowed, failed, note, step, table, title, verdict } from '../steps/lib/out.ts'
 import { session } from './factory-connect.ts'
 import { loadRepo, repoRoot } from '../steps/lib/repo.ts'
@@ -69,7 +70,33 @@ title(`Putting the repository in the ${name} shape`)
 // in rather than patched: a shape is a whole position, not a diff.
 copyFileSync(join(from, 'charter.md'), join(repo.root, '.factory', 'charter.md'))
 copyFileSync(join(from, 'targets.json'), join(repo.root, '.factory', 'targets.json'))
-allowed('charter and ownership graph written into the repository')
+
+// Committed and pushed, not left in the working tree. Two reasons, and the
+// second one is the one that bites: a run clones the repository from GitHub, so
+// a shape that is only on this disk is a shape no agent will ever read. The
+// first is that the charter says it is owned by a person and changed
+// deliberately, and a governance change that leaves no record is neither.
+const changed = command('git', '-C', repo.root, 'status', '--porcelain', '.factory')
+if (changed.out !== '') {
+	command('git', '-C', repo.root, 'add', '.factory/charter.md', '.factory/targets.json')
+	const committed = command('git', '-C', repo.root, 'commit', '-q', '-m', `Operate in the ${name} shape`)
+	if (!committed.ok) {
+		failed('the shape could not be committed')
+		note(committed.out)
+		verdict('FAIL', 'A shape only on this disk is a shape no run will read.')
+		process.exit(1)
+	}
+	const pushed = command('git', '-C', repo.root, 'push', '-q', 'origin', 'HEAD')
+	if (!pushed.ok) {
+		failed('the shape was committed and not pushed')
+		note(pushed.out)
+		verdict('FAIL', 'Runs clone from the remote, so an unpushed shape changes nothing.')
+		process.exit(1)
+	}
+	allowed('charter and ownership graph committed and pushed')
+} else {
+	allowed('charter and ownership graph already match this shape')
+}
 
 const board = JSON.parse(readFileSync(join(from, 'board.json'), 'utf8')) as Board
 
@@ -117,3 +144,10 @@ table(
 	[[String(saved.autoRunEnabled), String(saved.autoApprovePlans), String(board.reviewQueueCap)]],
 )
 verdict('PASS', `The repository is in the ${name} shape. make lab-reset to start a run under it.`)
+
+
+/** Run a command and keep what it said, so a failure can explain itself. */
+function command(bin: string, ...args: string[]): { ok: boolean; out: string } {
+	const result = spawnSync(bin, args, { encoding: 'utf8' })
+	return { ok: result.status === 0, out: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim() }
+}
