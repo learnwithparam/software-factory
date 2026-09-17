@@ -1,0 +1,6 @@
+{
+  "$comment": "The two switches on the board, under the scaleup shape.",
+  "autoRunEnabled": false,
+  "autoApprovePlans": false,
+  "reviewQueueCap": 5
+}

@@ -233,7 +233,16 @@ export async function itemForRoute(repoRoot: string, route: string): Promise<Wor
  * arrived, which is the only difference between this lab and a public one.
  */
 export async function announcePull(number: number, repo: string): Promise<WorkItem> {
-	const { announcePullRequest } = await import('../../scripts/lib/webhook-stand-in.ts')
-	await announcePullRequest(BASE, await cookie(), await projectId(), repo, number)
-	return itemForPull(number)
+	const { announcePullRequest, installationFor } = await import('../../scripts/lib/webhook-stand-in.ts')
+	await announcePullRequest(repo, number, await installationFor(await cookie()))
+
+	// The delivery is handled asynchronously, so the item is not there the moment
+	// the post returns.
+	const deadline = Date.now() + 60_000
+	while (Date.now() < deadline) {
+		const found = (await items()).find((item) => item.externalSource?.externalId === `github-pr:${number}`)
+		if (found !== undefined) return found
+		await new Promise((resolve) => setTimeout(resolve, 2_000))
+	}
+	throw new Error(`pull request #${number} never reached the review board`)
 }

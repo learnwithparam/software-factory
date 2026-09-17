@@ -64,6 +64,9 @@ score: ## Score the build 0 to 100 from the latest check and e2e results
 demo: ## Run one step live against $(REPO): make demo STEP=02
 	@bun scripts/demo.ts $(STEP) $(filter-out $@,$(MAKECMDGOALS))
 
+profile: ## Put the repository in a company shape: make profile NAME=solo
+	@bun scripts/profile.ts $(NAME)
+
 lab-reset: ## Put $(REPO) back the way it started, and drop every workspace
 	@bun scripts/lab-reset.ts
 
