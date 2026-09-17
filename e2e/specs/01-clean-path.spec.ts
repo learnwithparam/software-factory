@@ -16,7 +16,7 @@
 import { test } from '@playwright/test'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, announcePull, approveWaiting, itemForRoute, settle, startRun, stageOf, transition } from '../lib/drive.ts'
+import { advance, announcePull, approveWaiting, itemForRoute, reviewText, settle, startRun, stageOf, transition, verdictOf } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 import { execFileSync } from 'node:child_process'
 
@@ -123,6 +123,5 @@ test('an uncontroversial issue reaches a reviewed pull request', async ({ page }
 	// outside documentation, so a review that sends it back means either the
 	// change or the reviewer is wrong, and both are worth a failure. Route six is
 	// where a rejection is the thing being demonstrated.
-	const comments = execFileSync('gh', ['api', `repos/${REPO}/issues/${pull.number}/comments`, '--jq', '.[].body'], { encoding: 'utf8' })
-	expect(comments, 'the review should state a verdict').toMatch(/Verdict:\s*approve/i)
+	expect(verdictOf(reviewText(REPO, pull.number)), 'the review should state a verdict').toBe('approve')
 })

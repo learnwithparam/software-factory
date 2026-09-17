@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
-import { advance, itemForPull, settle } from '../lib/drive.ts'
+import { advance, itemForPull, reviewText, settle, verdictOf } from '../lib/drive.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
@@ -39,7 +39,7 @@ function theProposal(): number {
 }
 
 function comments(pull: number): string {
-	return execFileSync('gh', ['api', `repos/${REPO}/issues/${pull}/comments`, '--jq', '.[].body'], { encoding: 'utf8' })
+	return reviewText(REPO, pull)
 }
 
 test('a review sends back a change that overreaches, and passes it once fixed', async ({ page }) => {
@@ -57,7 +57,7 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	await shot(page, 'factory-review-changes')
 
 	const verdict = comments(pull)
-	expect(verdict, 'this change should not be approved as it stands').toMatch(/Verdict:\s*request changes/i)
+	expect(verdictOf(verdict), 'this change should not be approved as it stands').toBe('changes')
 
 	// Both faults, named. A rejection that catches only the wide storage has
 	// missed the one that matters, because a weakened assertion is why every
@@ -90,5 +90,5 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	await showBoard(page)
 	await shot(page, 'factory-re-review')
 
-	expect(comments(pull), 'the fixed change should be approved').toMatch(/Verdict:\s*approve/i)
+	expect(verdictOf(comments(pull)), 'the fixed change should be approved').toBe('approve')
 })

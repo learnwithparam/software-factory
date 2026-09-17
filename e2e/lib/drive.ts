@@ -246,3 +246,39 @@ export async function announcePull(number: number, repo: string): Promise<WorkIt
 	}
 	throw new Error(`pull request #${number} never reached the review board`)
 }
+
+/**
+ * Everything a review wrote about a pull request, wherever it put it.
+ *
+ * Two runs of the same review posted to two different places: once as an issue
+ * comment on the pull request, once as a pull-request review with state
+ * COMMENTED. A spec that reads one of those reports a review that plainly
+ * happened as missing, so this reads both and the inline threads as well.
+ */
+export function reviewText(repo: string, pull: number): string {
+	const { execFileSync } = require('node:child_process') as typeof import('node:child_process')
+	const read = (path: string): string => {
+		try {
+			return execFileSync('gh', ['api', path, '--jq', '.[].body'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+		} catch {
+			return ''
+		}
+	}
+	return [
+		read(`repos/${repo}/issues/${pull}/comments`),
+		read(`repos/${repo}/pulls/${pull}/reviews`),
+		read(`repos/${repo}/pulls/${pull}/comments`),
+	].join('\n')
+}
+
+/**
+ * The verdict a review reached, in whichever words it used.
+ *
+ * "request changes" and "CHANGES REQUESTED" are the same answer, and which one
+ * appears is not a property worth failing a fifteen minute run over.
+ */
+export function verdictOf(text: string): 'approve' | 'changes' | undefined {
+	if (/verdict:\s*\**\s*(request changes|changes requested)/i.test(text)) return 'changes'
+	if (/verdict:\s*\**\s*approve/i.test(text)) return 'approve'
+	return undefined
+}
