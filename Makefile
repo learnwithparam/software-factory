@@ -23,6 +23,7 @@ check: ## Prose, types, unit and structural tests. No model, no network
 	@bun scripts/tree-hash.ts --all > artifacts/check-tree.txt
 	bun scripts/check-prose.ts
 	bun x tsc --noEmit
+	cd e2e && bun x tsc --noEmit -p tsconfig.json
 	bun test --reporter=junit --reporter-outfile=artifacts/junit.xml
 
 

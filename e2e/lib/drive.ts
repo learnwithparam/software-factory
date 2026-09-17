@@ -31,6 +31,8 @@ export interface Decision {
 	readonly type: string
 	readonly status: DecisionStatus
 	readonly attempts: number
+	/** When the board raised it. settleAfter reads this to tell new work from old. */
+	readonly createdAt: string
 	/**
 	 * The last error text, which is retained after a retry succeeds. A decision
 	 * can read succeeded and still carry one, so nothing here treats its presence

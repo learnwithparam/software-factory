@@ -28,6 +28,22 @@ import { shot } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
+const git = (args: string[]): string => {
+	try {
+		return execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+	} catch (error) {
+		const said = error as { stderr?: Buffer | string; stdout?: Buffer | string }
+		throw new Error(`git ${args.join(' ')} failed: ${String(said.stderr ?? '')}${String(said.stdout ?? '')}`.trim())
+	}
+}
+
+function pullForIssue(issue: number): { number: number } {
+	const out = execFileSync('gh', ['pr', 'list', '--repo', REPO, '--state', 'open', '--json', 'number,headRefName'], { encoding: 'utf8' })
+	const found = (JSON.parse(out) as Array<{ number: number; headRefName: string }>).find((p) => p.headRefName === `factory/issue-${issue}`)
+	if (found === undefined) throw new Error(`no open pull request on factory/issue-${issue}`)
+	return found
+}
+
 function filesOn(branch: string): string {
 	const list = execFileSync('gh', ['pr', 'list', '--repo', REPO, '--state', 'open', '--json', 'number,headRefName'], { encoding: 'utf8' })
 	const pull = (JSON.parse(list) as Array<{ number: number; headRefName: string }>).find((p) => p.headRefName === branch)
@@ -71,7 +87,6 @@ test('a change to the shared schema reaches every language that asserts it', asy
 	// asked to look again. The failure is real, its reason is real, and the cause
 	// is ours. That is worth saying out loud in the room rather than implying the
 	// model tripped.
-	const issue = built.item.metadata.githubIssueNumber as number
 	const pull = pullForIssue(issue)
 	const branch = `factory/issue-${issue}`
 
