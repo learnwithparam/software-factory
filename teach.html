@@ -363,11 +363,11 @@
 <title id="d3t">Where the time in one run actually goes</title>
 <text x="0" y="14" class="label">one run, every stage timed separately</text>
 <g>
-<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="537" height="16" rx="2"/><text x="657" y="48" class="small muted" data-figure="stage.triage">2m 58s</text>
+<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="520" height="16" rx="2"/><text x="640" y="48" class="small muted" data-figure="stage.triage">4m 45s</text>
 <text x="0" y="78" class="small mono muted">plan</text><rect class="solid" x="110" y="66" width="4" height="16" rx="2"/><text x="124" y="78" class="small muted" data-figure="stage.plan">1s</text>
-<text x="0" y="108" class="small mono muted">implement</text><rect class="solid" x="110" y="96" width="611" height="16" rx="2"/><text x="731" y="108" class="small muted" data-figure="stage.implement">3m 22s</text>
-<text x="0" y="138" class="small mono muted">review</text><rect class="solid" x="110" y="126" width="760" height="16" rx="2"/><text x="880" y="138" class="small muted" data-figure="stage.review">4m 12s</text>
-<text x="0" y="168" class="small mono wait">human</text><rect x="110" y="156" width="17" height="16" rx="2" fill="var(--c-wait)"/><text x="137" y="168" class="small wait" data-figure="humanWait">6s</text>
+<text x="0" y="108" class="small mono muted">implement</text><rect class="solid" x="110" y="96" width="760" height="16" rx="2"/><text x="880" y="108" class="small muted" data-figure="stage.implement">6m 56s</text>
+<text x="0" y="138" class="small mono muted">review</text><rect class="solid" x="110" y="126" width="354" height="16" rx="2"/><text x="474" y="138" class="small muted" data-figure="stage.review">3m 14s</text>
+<text x="0" y="168" class="small mono wait">human</text><rect x="110" y="156" width="15" height="16" rx="2" fill="var(--c-wait)"/><text x="135" y="168" class="small wait" data-figure="humanWait">8s</text>
 </g>
 <text x="0" y="218" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
 </svg>
@@ -388,7 +388,7 @@
 <h3>Delivery<span class="anchor">delivery</span></h3>
 <figure class="diagram" data-diagram="issue-lifecycle">
 <svg viewBox="-4 -4 1010 380" role="img" aria-labelledby="d4t">
-<title id="d4t">An item's journey, with its three feedback loops and the one refusal</title>
+<title id="d4t">An item's journey, with its four feedback loops and the one refusal</title>
 <defs>
 <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-ink-muted)" stroke="none"/></marker>
 <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--c-wait)" stroke="none"/></marker>
@@ -414,15 +414,18 @@
 <text x="430" y="234" class="small fail">2. a check fails, and the reason goes back with it</text>
 <text x="430" y="250" class="small muted">the next attempt starts from the failure, not from the beginning</text>
 <path d="M732 168 V 290 H 564 V 170" class="fail" marker-end="url(#arf)"/>
-<text x="574" y="310" class="small fail">3. the reviewer sends it back</text>
+<text x="574" y="310" class="small fail">4. the reviewer sends it back</text>
 <text x="574" y="326" class="small muted">a push, then another review, before anything merges</text>
+<path d="M396 168 V 268 H 300 V 170" class="fail" marker-end="url(#arf)"/>
+<text x="150" y="288" class="small fail">3. a person sends the plan back</text>
+<text x="150" y="304" class="small muted">the cheapest place to disagree, because no code exists yet</text>
 <path d="M228 168 V 200 H 120 V 180" class="refuse" marker-end="url(#arr)"/>
 <rect x="0" y="180" width="120" height="44" rx="6" fill="none" stroke="var(--c-refuse)"/>
 <text x="16" y="200" class="title refuse">Refused</text>
 <text x="16" y="216" class="small muted">no file touched</text>
 <text x="840" y="196" class="small muted">a person merges.</text>
 <text x="840" y="212" class="small muted">never the factory.</text>
-<text x="0" y="360" class="small muted">Three ways work comes back and one way it stops. A demonstration that only shows the straight line through the middle is not a demonstration of a factory.</text>
+<text x="0" y="360" class="small muted">Four ways work comes back and one way it stops. A demonstration that only shows the straight line through the middle is not a demonstration of a factory.</text>
 </svg>
 <figcaption>Figure 4. The straight line across the top is the path everyone expects. The loops below it are where the engineering is, and the box on the left is the outcome that looks like nothing happened.</figcaption>
 </figure>

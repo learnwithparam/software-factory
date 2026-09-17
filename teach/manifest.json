@@ -227,6 +227,18 @@
 			"name": "built-loop-recovery",
 			"spec": "08-built",
 			"shows": "A failure handed back, and the second attempt passing"
+		},
+		{
+			"name": "factory-plan-proposed",
+			"spec": "10-plan-revision",
+			"shows": "The first plan, before anybody has agreed with it",
+			"mustShow": "Planning"
+		},
+		{
+			"name": "factory-plan-revised",
+			"spec": "10-plan-revision",
+			"shows": "The second plan, after the priority changed",
+			"mustShow": "Planning"
 		}
 	],
 	"specs": [
@@ -239,7 +251,8 @@
 		"07-console",
 		"08-built",
 		"09-profiles",
-		"04b-gate-recovery"
+		"04b-gate-recovery",
+		"10-plan-revision"
 	],
 	"profiles": [
 		"solo",

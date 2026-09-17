@@ -29,9 +29,9 @@ is meant to show and the phrase the page had to be saying when it was taken, so 
 loading spinner or an empty board is reported rather than displayed as evidence.</p>
 
 <div class="tally">
-<div><b>31</b> show what they claim</div>
+<div><b>32</b> show what they claim</div>
 <div><b>0</b> taken but unproven</div>
-<div><b>2</b> not taken</div>
+<div><b>3</b> not taken</div>
 </div>
 
 <section>
@@ -325,11 +325,11 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 <section>
 <h2>04b-gate-recovery</h2>
 <div class="shots">
-<figure class="shot missing" id="factory-gate-failed">
-	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+<figure class="shot proven" id="factory-gate-failed">
+	<img src="evidence/screens/factory-gate-failed.png" alt="A check failing, with the reason it gives" loading="lazy">
 	<figcaption>
 		<h3>A check failing, with the reason it gives</h3>
-		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04b-gate-recovery</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="meta"><code>factory-gate-failed</code> &middot; taken by <code>04b-gate-recovery</code> &middot; <span class="verdict">shows what it claims</span></p>
 		<p class="claim">Asserted on screen: <code>request changes</code></p>
 	</figcaption>
 </figure>
@@ -339,6 +339,27 @@ loading spinner or an empty board is reported rather than displayed as evidence.
 		<h3>The second attempt, after the reason was acted on</h3>
 		<p class="meta"><code>factory-retry</code> &middot; taken by <code>04b-gate-recovery</code> &middot; <span class="verdict">not taken</span></p>
 		<p class="claim">Asserted on screen: <code>approve</code></p>
+	</figcaption>
+</figure>
+</div>
+</section>
+<section>
+<h2>10-plan-revision</h2>
+<div class="shots">
+<figure class="shot missing" id="factory-plan-proposed">
+	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+	<figcaption>
+		<h3>The first plan, before anybody has agreed with it</h3>
+		<p class="meta"><code>factory-plan-proposed</code> &middot; taken by <code>10-plan-revision</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="claim">Asserted on screen: <code>Planning</code></p>
+	</figcaption>
+</figure>
+<figure class="shot missing" id="factory-plan-revised">
+	<p class="gap">This run did not take it. A gap here is the difference between a run that covered everything and one that stopped early.</p>
+	<figcaption>
+		<h3>The second plan, after the priority changed</h3>
+		<p class="meta"><code>factory-plan-revised</code> &middot; taken by <code>10-plan-revision</code> &middot; <span class="verdict">not taken</span></p>
+		<p class="claim">Asserted on screen: <code>Planning</code></p>
 	</figcaption>
 </figure>
 </div>
