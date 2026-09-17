@@ -14,11 +14,11 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { BASE, EMAIL } from './factory.ts'
+import { AUTH, BASE, EMAIL } from './factory.ts'
 import { reach } from '../../scripts/lib/reach.ts'
 
 export type Role = 'triage' | 'plan' | 'work' | 'review'
@@ -67,18 +67,44 @@ function secret(name: string): string {
 
 let signedIn: Promise<string> | undefined
 
-/** One sign-in per process. Better Auth rate-limits it, and localhost shares one bucket. */
+/**
+ * One sign-in per run, shared with the browser.
+ *
+ * Better Auth rate-limits sign-in and on localhost it cannot determine a
+ * client address, so everything shares one bucket. Memoising per process was
+ * not enough: global-setup signs the browser in and this signed in again, two
+ * per run, and with any recent activity the second answered 429 and took the
+ * first route with it.
+ *
+ * So the session global-setup already saved is the one used here. Signing in is
+ * the fallback for running a helper outside the suite.
+ */
 async function cookie(): Promise<string> {
 	signedIn ??= (async () => {
+		const saved = fromStorageState()
+		if (saved !== undefined) return saved
+
 		const response = await reach(`${BASE}/auth/api/sign-in/email`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json', origin: BASE },
 			body: JSON.stringify({ email: EMAIL, password: secret('FACTORY_USER_PASSWORD') }),
 		})
-		if (!response.ok) throw new Error(`sign-in answered ${response.status}`)
+		if (!response.ok) {
+			throw new Error(
+				`sign-in answered ${response.status}${response.status === 429 ? ': Better Auth shares one bucket on localhost, so wait for its window rather than retrying' : ''}`,
+			)
+		}
 		return (response.headers.getSetCookie?.() ?? []).map((part) => part.split(';')[0]).join('; ')
 	})()
 	return signedIn
+}
+
+/** The cookie global-setup saved, as a header, or undefined if there is no run. */
+function fromStorageState(): string | undefined {
+	if (!existsSync(AUTH)) return undefined
+	const state = JSON.parse(readFileSync(AUTH, 'utf8')) as { cookies?: Array<{ name: string; value: string }> }
+	const pairs = (state.cookies ?? []).map((entry) => `${entry.name}=${entry.value}`)
+	return pairs.length > 0 ? pairs.join('; ') : undefined
 }
 
 async function api<T>(path: string, init: RequestInit = {}, tolerate: readonly number[] = []): Promise<T | undefined> {
