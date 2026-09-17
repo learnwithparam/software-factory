@@ -60,14 +60,23 @@ test('a stale check sends the change back, and the second attempt clears it', as
 
 	git(['fetch', '-q', 'origin', pull.headRefName])
 	git(['checkout', '-q', pull.headRefName])
-	writeFileSync(CHECKSUM, 'staleonpurpose\n')
+
+	// Idempotent, because a run that staled the checksum and then failed to read
+	// the verdict leaves the branch already broken, and git answers "nothing to
+	// commit" to a second identical break. The value carries the moment so there
+	// is always something to push, and a branch that is already stale is a state
+	// to continue from rather than an error.
+	const alreadyRed = latestVerdict(reviewText(REPO, pull.number)) === 'changes'
+	writeFileSync(CHECKSUM, `stale-${Date.now()}\n`)
 	git(['commit', '-qam', 'Stale the schema checksum, to watch the gate catch it'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
 	const brokenAt = Date.now()
 	await announcePush(pull.number, REPO)
-	const red = await waitForVerdict(REPO, pull.number, brokenAt, item.id)
+	const red = alreadyRed
+		? reviewText(REPO, pull.number)
+		: await waitForVerdict(REPO, pull.number, brokenAt, item.id)
 
 	// The claim of this loop: the failure travels with its reason. A verdict that
 	// says no without naming the check leaves the next attempt guessing.
