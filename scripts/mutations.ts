@@ -529,10 +529,24 @@ export const MUTATIONS: Record<string, Mutation> = {
 		because: 'no work item needs a person to accept the plan any more',
 	},
 	'tests/example-repo.test.ts > has at least one item whose change reaches more than one target': {
-		file: 'example:.factory/issues/04-tool-calls-total.md',
-		find: '  - packages/contracts/schema/run.schema.json\n  - packages/contracts/src/index.ts\n  - services/ingest/run.go\n  - apps/console/app/page.tsx',
-		replace: '  - apps/console/app/page.tsx',
-		because: 'the only item that spans several areas becomes a local one',
+		// Both of them. This was one edit and the comment called issue four "the
+		// only item that spans several areas", which stopped being true the day the
+		// plan-revision issue was added. The mutation still applied, the test still
+		// passed, and make prove went to 73 of 74 on a clean clone while passing
+		// here. Adding teaching material weakened a proof, quietly.
+		edits: [
+			{
+				file: 'example:.factory/issues/04-tool-calls-total.md',
+				find: '  - packages/contracts/schema/run.schema.json\n  - packages/contracts/src/index.ts\n  - services/ingest/run.go\n  - apps/console/app/page.tsx',
+				replace: '  - apps/console/app/page.tsx',
+			},
+			{
+				file: 'example:.factory/issues/07-retention-window.md',
+				find: '  - services/ingest/store.go\n  - apps/console/app/page.tsx',
+				replace: '  - apps/console/app/page.tsx',
+			},
+		],
+		because: 'no item spans more than one area, so nothing in the example needs the graph',
 	},
 	'tests/example-repo.test.ts > passes its own gate for a change to a target the factory may build': {
 		// Broken on the factory side rather than the example's, because this check
