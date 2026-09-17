@@ -227,33 +227,39 @@ const CHECKS: Check[] = [
 		},
 	},
 	{
-		what: 'work intake can actually read the repository',
+		what: 'the board has a feed, which is what decides whether it shows anything',
 		run: async () => {
-			// The check that would have saved an evening. Intake stored the repository
-			// slug where the query wanted the source's uuid, so every sweep returned
-			// zero issues and put "invalid input syntax for type uuid" in a failures
-			// array nothing read. Enabled, configured, pointed at the right repository,
-			// and silently fetching nothing.
+			// This check reported a healthy intake over a board with no cards on it,
+			// and then reported MISCONFIGURED over a board showing all seven. It was
+			// reading the wrong consumer.
+			//
+			// Two things read intake.config.github.sourceIds. The board matches it
+			// against the repository slug, and with no match it has no active feed
+			// and draws nothing, on every column, not only Intake. The server's
+			// sweep casts the same field to uuid and complains about a slug. The
+			// sweep is the polling path this lab does not use, because work items
+			// come from the issues.opened webhook, so its complaint is expected and
+			// the board's condition is the one worth failing over.
 			try {
 				const cookie = await session()
-				const response = await fetch(`${FACTORY_URL}/web/intake/items`, {
+				const slug = 'learnwithparam/agent-run-ledger'
+
+				const response = await fetch(`${FACTORY_URL}/web/intake/config`, {
 					headers: { cookie, accept: 'application/json' },
 					signal: AbortSignal.timeout(20_000),
 				})
-				if (!response.ok) return { ok: false, detail: `intake answered ${response.status}`, fix: 'make factory-connect' }
+				if (!response.ok) return { ok: false, detail: `intake config answered ${response.status}`, fix: 'make factory-connect' }
 
-				const { items, failures } = (await response.json()) as {
-					items: unknown[]
-					failures: Array<{ integrationId: string; message: string }>
-				}
-				if (failures.length > 0) {
+				const { config } = (await response.json()) as { config?: { github?: { enabled?: boolean; sourceIds?: string[] } } }
+				const enabled = config?.github?.enabled === true
+				const ids = config?.github?.sourceIds ?? []
+				if (!enabled || !ids.includes(slug)) {
 					return {
 						ok: false,
-						detail: failures.map((failure) => `${failure.integrationId}: ${failure.message}`).join('; '),
+						detail: enabled ? `sourceIds holds ${ids.join(', ') || 'nothing'} and the board matches on ${slug}` : 'github intake is switched off',
 						fix: 'make factory-connect',
 					}
 				}
-				if (items.length === 0) return { ok: false, detail: 'no failures, and no issues either', fix: 'make lab-reset' }
 
 				// Reading them is not routing them. An unbound source lists issues for
 				// ever while the board stays empty, which reads as a broken intake.
@@ -262,8 +268,8 @@ const CHECKS: Check[] = [
 				return {
 					ok: bindings.length > 0,
 					detail: bindings.length > 0
-						? `${items.length} issues visible, routed to the ${bindings[0]?.board ?? 'default'} board`
-						: `${items.length} issues visible, and nothing routes them to a board`,
+						? `the feed is on ${slug}, routed to the ${bindings[0]?.board ?? 'default'} board`
+						: `the feed is on ${slug}, and nothing routes it to a board`,
 					fix: 'make factory-connect',
 				}
 			} catch (error) {

@@ -107,13 +107,25 @@ if (import.meta.main) {
 /**
  * Point work intake at every repository the installation can see.
  *
- * Intake stores source ids, and the interface once wrote the repository slug
- * into that field. The query behind it expects a uuid, so every sweep returned
- * no issues and left "invalid input syntax for type uuid" in a failures array
- * nothing surfaced: enabled, pointed at the right repository, fetching nothing.
+ * Two consumers read `intake.config.github.sourceIds` and they disagree about
+ * what is in it. The board matches it against the repository slug:
  *
- * Writing the ids from the sources listing is both the repair and the setup, so
- * connecting a codebase and fixing this are the same command.
+ *     sourceIds.includes(repo.slug)
+ *
+ * and when that is false it has no active feed, so it draws "No intake sources"
+ * and not one card, on every column. The server's intake sweep casts the same
+ * field to uuid and leaves `invalid input syntax for type uuid` in a failures
+ * array when it holds a slug.
+ *
+ * The slug wins, because the board is what a person looks at and what every
+ * spec measures, while the sweep is the polling path this lab does not use:
+ * work items arrive from the `issues.opened` webhook, and the sweep only
+ * patches and closes items that already exist. Writing the uuid instead made
+ * the sweep clean and the board empty, which cost a run and read exactly like
+ * a broken factory.
+ *
+ * This is early access. If a later version casts the slug or matches the uuid,
+ * one of the two reads above changes and this function is the place to see it.
  */
 export async function pointIntakeAtSources(cookie: string): Promise<string> {
 	const listed = await fetch(`${BASE}/web/intake/sources`, { headers: { cookie, accept: 'application/json' } })
@@ -123,17 +135,23 @@ export async function pointIntakeAtSources(cookie: string): Promise<string> {
 	const github = sources.filter((source) => source.integrationId === 'github')
 	if (github.length === 0) return 'no repositories visible to intake yet'
 
+	// The slug, which is what the sources listing calls `name`.
 	const written = await fetch(`${BASE}/web/intake/config`, {
 		method: 'PUT',
 		headers: { 'content-type': 'application/json', origin: BASE, cookie },
-		body: JSON.stringify({ github: { enabled: true, sourceIds: github.map((source) => source.id) } }),
+		body: JSON.stringify({ github: { enabled: true, sourceIds: github.map((source) => source.name) } }),
 	})
 	if (!written.ok) throw new Error(`writing intake config answered ${written.status}`)
 
-	// Read back through the path that was broken, not the one just written.
-	const items = await fetch(`${BASE}/web/intake/items`, { headers: { cookie, accept: 'application/json' } })
-	const { failures } = (await items.json()) as { failures: Array<{ message: string }> }
-	if (failures.length > 0) throw new Error(`intake still fails: ${failures.map((failure) => failure.message).join('; ')}`)
+	// Read back what the board reads, because that is the consumer that decides
+	// whether anything is visible. Checking the sweep instead reported a healthy
+	// intake over an empty board.
+	const confirm = await fetch(`${BASE}/web/intake/config`, { headers: { cookie, accept: 'application/json' } })
+	const { config } = (await confirm.json()) as { config: { github: { enabled: boolean; sourceIds: string[] } } }
+	const missing = github.map((source) => source.name).filter((name) => !config.github.sourceIds.includes(name))
+	if (!config.github.enabled || missing.length > 0) {
+		throw new Error(`the board would show no feed: intake config is missing ${missing.join(', ') || 'its enabled flag'}`)
+	}
 
 	// Reading the issues is not the same as putting them on a board. Without a
 	// binding, intake lists six issues for ever and the board stays empty, which

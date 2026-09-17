@@ -65,7 +65,7 @@ export async function openBoard(page: Page): Promise<void> {
  * The columns become visible long before their cards do, and a count taken in
  * that gap reads zero: six issues on the board and a spec insisting there are
  * none. Waiting for a fixed period would trade one flake for another, so this
- * waits for the number of cards to stop changing.
+ * waits for a card to exist and then for the number of them to stop changing.
  *
  * Stability rather than a selector, because the skeletons are an implementation
  * detail and this file exists so that a UI change is one fix rather than nine.
@@ -74,6 +74,22 @@ export async function settleBoard(page: Page, timeoutMs = 60_000): Promise<void>
 	await expect(page.locator('[data-testid="board-column-intake"]')).toBeVisible({ timeout: timeoutMs })
 
 	const cards = page.locator('[data-testid="work-item-card"]')
+
+	// One card, before any stability is measured. Zero is a stable number: the
+	// columns draw before their cards do, so three readings of nothing satisfied
+	// the loop below inside two seconds and the whole suite read an empty board
+	// while the API reported eight items. The comment here used to say two
+	// readings were enough for a board that never had cards, which is the one
+	// case that cannot be told apart from a board still painting them in.
+	await cards
+		.first()
+		.waitFor({ state: 'visible', timeout: timeoutMs })
+		.catch(() => {
+			throw new Error(
+				`the board drew its columns and no cards within ${Math.round(timeoutMs / 1000)}s: run make lab-reset if the board should not be empty`,
+			)
+		})
+
 	const deadline = Date.now() + timeoutMs
 	let last = -1
 	let stable = 0
@@ -81,8 +97,7 @@ export async function settleBoard(page: Page, timeoutMs = 60_000): Promise<void>
 		const now = await cards.count()
 		stable = now === last ? stable + 1 : 0
 		last = now
-		// Three readings the same. Two is enough for a board that never had cards
-		// and not enough for one still painting them in.
+		// Three readings the same, now that at least one card exists.
 		if (stable >= 3) return
 		await page.waitForTimeout(500)
 	}
