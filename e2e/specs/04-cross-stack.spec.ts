@@ -19,9 +19,11 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, decisionsFor, itemForRoute, settle, stageOf, startRun } from '../lib/drive.ts'
+import { advance, announcePull, announcePush, itemForRoute, settle, stageOf, startRun, waitForVerdict } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
@@ -52,16 +54,60 @@ test('a change to the shared schema reaches every language that asserts it', asy
 
 	const built = await advance(item.id, 'execute', 'plan approved')
 	await showBoard(page)
-	await shot(page, 'factory-gate-failed')
 	expect(built.decision?.status, 'the build should succeed, however many attempts it took').toBe('succeeded')
 
-	// Attempts above one mean a gate went red and the run started again from the
-	// reason. That is the recovery this route is here to show; when it lands
-	// first time there is nothing to photograph and the run sheet says so.
-	const work = (await decisionsFor(item.id)).find((decision) => decision.role === 'work')
-	if ((work?.attempts ?? 1) > 1) await shot(page, 'factory-retry')
+	// The loop where a check fails and the reason goes back with it, staged the
+	// way make prove stages every other gate in this repository: by breaking it on
+	// purpose.
+	//
+	// Hoping the model stumbles does not work, and finding that out is the useful
+	// part. The schema carries a checksum precisely so a cross-stack change cannot
+	// pass quietly, and the run updated it correctly on its first attempt along
+	// with the schema, the TypeScript field list, the Go struct and the console.
+	// A competent agent does not fail a check it can discover, so a demonstration
+	// that waits for one to fail is a demonstration that does not happen.
+	//
+	// So the checksum is staled deliberately, on the branch, and the reviewer is
+	// asked to look again. The failure is real, its reason is real, and the cause
+	// is ours. That is worth saying out loud in the room rather than implying the
+	// model tripped.
+	const issue = built.item.metadata.githubIssueNumber as number
+	const pull = pullForIssue(issue)
+	const branch = `factory/issue-${issue}`
 
-	const files = filesOn(`factory/issue-${issue}`)
+	// The pull request has to be on the review board before anyone can ask it to
+	// look again, and only a webhook puts it there.
+	const review = await announcePull(pull.number, REPO)
+	await advance(review.id, 'review', 'read the change across all three languages')
+
+	git(['fetch', '-q', 'origin', branch])
+	git(['checkout', '-q', branch])
+	writeFileSync(join(LEDGER, 'packages', 'contracts', 'schema', 'run.checksum'), 'staleonpurpose\n')
+	git(['commit', '-qam', 'Stale the schema checksum, to watch the gate catch it'])
+	git(['push', '-q'])
+	git(['checkout', '-q', 'main'])
+
+	const brokenAt = Date.now()
+	await announcePush(pull.number, REPO)
+	const red = await waitForVerdict(REPO, pull.number, brokenAt, review.id)
+	expect(red, 'the reviewer should name the check that failed and what fixes it').toMatch(/checksum/i)
+	await showBoard(page)
+	await shot(page, 'factory-gate-failed')
+
+	// Second attempt, starting from the reason the gate gave.
+	git(['checkout', '-q', branch])
+	execFileSync('bun', ['run', 'checksum'], { cwd: join(LEDGER, 'packages', 'contracts') })
+	git(['commit', '-qam', 'Rewrite the checksum the way the gate said to'])
+	git(['push', '-q'])
+	git(['checkout', '-q', 'main'])
+
+	const fixedAt = Date.now()
+	await announcePush(pull.number, REPO)
+	await waitForVerdict(REPO, pull.number, fixedAt, review.id)
+	await showBoard(page)
+	await shot(page, 'factory-retry')
+
+	const files = filesOn(branch)
 	expect(files, 'the schema is the contract, so it changes first').toContain('packages/contracts/schema/run.schema.json')
 
 	// The point of the route: the schema moved, so everything asserting it moved.
