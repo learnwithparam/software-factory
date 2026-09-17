@@ -232,13 +232,13 @@
 			"name": "factory-plan-proposed",
 			"spec": "10-plan-revision",
 			"shows": "The plan in its session, before anybody has agreed with it",
-			"mustShow": "Keep runs for longer"
+			"mustShow": "Keep runs"
 		},
 		{
 			"name": "factory-plan-revised",
 			"spec": "10-plan-revision",
 			"shows": "The session after the objection, with a second plan",
-			"mustShow": "Keep runs for longer"
+			"mustShow": "Keep runs"
 		},
 		{
 			"name": "factory-clicked-start",

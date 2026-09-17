@@ -20,7 +20,7 @@ import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { expect, openBoard, openSession, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, again, announceComment, decisionsFor, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
+import { advance, again, announceComment, decisionsFor, itemForRoute, sessionUrl, settleAfter, stageOf, startRun } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
@@ -89,7 +89,9 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const before = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
 	expect(before, 'planning should have produced a plan').toBeGreaterThan(0)
 
-	const session = await openSession(page, item.title)
+	const session = await sessionUrl(planned.item, 'plan')
+	await page.goto(session, { waitUntil: 'domcontentloaded' })
+	await page.waitForTimeout(3_000)
 	await shot(page, 'factory-plan-proposed')
 
 	// A person reads it and changes the priority. This is the whole loop: the

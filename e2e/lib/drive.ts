@@ -43,6 +43,7 @@ export interface Decision {
 
 export interface WorkItem {
 	readonly id: string
+	readonly sessions?: Readonly<Record<string, { readonly threadId: string }>>
 	readonly stageHistory?: ReadonlyArray<{ readonly stage: string; readonly by: string; readonly enteredAt: string }>
 	readonly title: string
 	readonly board: string | null
@@ -458,4 +459,18 @@ export async function again(itemId: string, stage: string, cause: string): Promi
 	const at = Date.now()
 	await redo(current, stage, cause)
 	return settleAfter(itemId, at)
+}
+
+/**
+ * The address of a session, built rather than clicked.
+ *
+ * Which button opens a session depends on the stage: a resting card offers
+ * Investigate, one in planning offers Build, and Open session comes and goes.
+ * Four runs were spent waiting for a button whose label changes underneath the
+ * run sheet, when the work item has carried the thread id all along.
+ */
+export async function sessionUrl(item: WorkItem, role: string): Promise<string> {
+	const thread = item.sessions?.[role]?.threadId
+	if (thread === undefined) throw new Error(`${item.title} has no ${role} session`)
+	return `${BASE}/factories/${await projectId()}/workspaces/${thread}/threads/${thread}`
 }
