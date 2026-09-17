@@ -69,6 +69,11 @@ test.afterAll(() => {
 })
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
+function autoStarts(shape: string): boolean {
+	const file = join(ROOT, 'profiles', shape, 'board.json')
+	return (JSON.parse(readFileSync(file, 'utf8')) as { autoRunEnabled: boolean }).autoRunEnabled
+}
+
 function autonomyFor(shape: string, target: string): string {
 	const file = join(ROOT, 'profiles', shape, 'targets.json')
 	const graph = JSON.parse(readFileSync(file, 'utf8')) as { targets: Record<string, { autonomy: string }> }
@@ -108,10 +113,24 @@ for (const shape of SHAPES) {
 		run('make', ['lab-reset'])
 
 		await openBoard(page)
-		const item = await itemForRoute(LEDGER, 'refused')
-		expect(stageOf(item), 'every shape starts the same way').toBe('intake')
+		let item = await itemForRoute(LEDGER, 'refused')
 
-		await startRun(item, 'triage', 'factory-triage')
+		// Under solo the run has already begun by the time anybody looks, because
+		// that shape turns auto-start on. Asserting every shape starts in intake
+		// failed on exactly the behaviour this session exists to demonstrate, which
+		// is a test disagreeing with the thing it is testing.
+		if (autoStarts(shape)) {
+			const deadline = Date.now() + 3 * 60 * 1000
+			while (stageOf(item) === 'intake' && Date.now() < deadline) {
+				await new Promise((resolve) => setTimeout(resolve, 5_000))
+				item = await itemForRoute(LEDGER, 'refused')
+			}
+			expect(stageOf(item), `${shape} turns auto-start on, so nobody should have to start this`).not.toBe('intake')
+		} else {
+			expect(stageOf(item), `${shape} leaves auto-start off, so the item waits for a person`).toBe('intake')
+			await startRun(item, 'triage', 'factory-triage')
+		}
+
 		const triaged = await settle(item.id)
 		expect(triaged.decision?.status, 'triage should complete under every shape').toBe('succeeded')
 
