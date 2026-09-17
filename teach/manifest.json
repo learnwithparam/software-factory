@@ -232,13 +232,13 @@
 			"name": "factory-plan-proposed",
 			"spec": "10-plan-revision",
 			"shows": "The first plan, before anybody has agreed with it",
-			"mustShow": "Planning"
+			"mustShow": "Understanding"
 		},
 		{
 			"name": "factory-plan-revised",
 			"spec": "10-plan-revision",
 			"shows": "The second plan, after the priority changed",
-			"mustShow": "Planning"
+			"mustShow": "Sending this plan back"
 		}
 	],
 	"specs": [

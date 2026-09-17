@@ -18,19 +18,42 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { expect, openBoard, showBoard } from '../lib/factory.ts'
+import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
-import { shot } from '../lib/shot.ts'
+import { shot, shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
-function comments(issue: number): string {
+/**
+ * What the factory wrote, excluding anything a person did.
+ *
+ * The first version of this read every comment, so the assertion that the second
+ * plan took up the date range was satisfied by the rejection asking for it,
+ * which this spec posts itself. A test that passes on its own words is worse
+ * than no test: it reported a loop as proven when no second plan existed.
+ */
+function factorySaid(issue: number, since: number): string {
 	try {
-		return execFileSync('gh', ['api', `repos/${REPO}/issues/${issue}/comments`, '--jq', '.[].body'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+		const out = execFileSync('gh', [
+			'api', `repos/${REPO}/issues/${issue}/comments`,
+			'--jq', `[.[] | select((.created_at | fromdateiso8601) > ${Math.floor(since / 1000)}) | select(.body | startswith("Sending this plan back") | not) | .body] | join("\\n")`,
+		], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+		return out.trim()
 	} catch {
 		return ''
 	}
+}
+
+/** Wait for the factory to write something new, rather than assuming it has. */
+async function waitForPlan(issue: number, since: number, timeoutMs = 15 * 60 * 1000): Promise<string> {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline) {
+		const said = factorySaid(issue, since)
+		if (said.length > 200) return said
+		await new Promise((resolve) => setTimeout(resolve, 15_000))
+	}
+	throw new Error(`no second plan on issue #${issue} within ${Math.round(timeoutMs / 60000)} minutes`)
 }
 
 test('a plan is sent back, and the next one answers the objection', async ({ page }) => {
@@ -55,10 +78,10 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const planned = await advance(item.id, 'planning', 'accepted, let us see what it proposes')
 	expect(stageOf(planned.item), 'the item should reach planning').toBe('planning')
 
-	const first = comments(issue)
+	const first = factorySaid(issue, 0)
 	expect(first.length, 'the run should have written a plan somebody can disagree with').toBeGreaterThan(200)
 
-	await showBoard(page)
+	await page.goto(`https://github.com/${REPO}/issues/${issue}`, { waitUntil: 'domcontentloaded' })
 	await shot(page, 'factory-plan-proposed')
 
 	// A person reads it and changes the priority. This is the whole loop: the
@@ -82,11 +105,12 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	await advance(item.id, 'planning', 'plan rejected, the priority changed')
 	await settleAfter(item.id, sentBackAt)
 
-	await showBoard(page)
-	await shot(page, 'factory-plan-revised')
-
-	// The claim: the objection moved the plan. A second plan that still proposes
-	// paging has answered nothing, and saying so is the point of the route.
-	const revised = comments(issue).slice(first.length)
+	// The factory's own words, after the rejection and not counting it.
+	const revised = await waitForPlan(issue, sentBackAt)
 	expect(revised, 'the second plan should take up the date range that was asked for').toMatch(/date range|date filter|from.*to|month/i)
+
+	// The issue, where the plans are. Two pictures of the same board differ by a
+	// timestamp and teach nothing.
+	await page.goto(`https://github.com/${REPO}/issues/${issue}`, { waitUntil: 'domcontentloaded' })
+	await shotAt(page, 'Sending this plan back', 'factory-plan-revised')
 })
