@@ -123,7 +123,6 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const after = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
 	expect(after, 'the objection should have produced a second plan').toBeGreaterThan(before)
 
-	await showBoard(page)
 	await openSession(page, item.title)
 	await shot(page, 'factory-plan-revised')
 })
