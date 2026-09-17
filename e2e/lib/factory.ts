@@ -131,8 +131,11 @@ export async function act(page: Page, title: string, action: string): Promise<vo
 }
 
 export async function openSession(page: Page, title: string): Promise<void> {
-	await cardByTitle(page, title).click()
-	await page.waitForTimeout(2_000)
+	// The button, not the card. Clicking the card selects it and leaves the board
+	// on screen, so two pictures of "the plan in its session" came out as two
+	// pictures of the board differing by a timestamp.
+	await act(page, title, 'Open session')
+	await page.waitForTimeout(3_000)
 }
 
 /** The two switches that decide how much of the board runs unattended. */
