@@ -11,7 +11,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Page } from '@playwright/test'
 
@@ -40,10 +40,36 @@ export function looksUnfinished(text: string): boolean {
  * failed run, because the run tells you now and the picture tells you in front
  * of a room.
  */
+/**
+ * What each picture must have on screen, from the manifest that names it.
+ *
+ * Read from there rather than passed in, so the claim lives beside the caption
+ * and no spec can quietly photograph something else.
+ */
+function mustShowFor(name: string): string | undefined {
+	const manifest = JSON.parse(readFileSync(join(ROOT, 'teach', 'manifest.json'), 'utf8')) as {
+		screenshots: Array<{ name: string; mustShow?: string }>
+	}
+	return manifest.screenshots.find((shot) => shot.name === name)?.mustShow
+}
+
 export async function shot(page: Page, name: string): Promise<void> {
 	await settled(page, name)
+	const text = (await page.locator('body').innerText().catch(() => '')) || ''
+
+	// The claim the picture is making, checked against the page making it. Three
+	// screenshots in this repository were a loading spinner or an empty board and
+	// every assertion around them passed, because a PNG cannot be read by a test.
+	const mustShow = mustShowFor(name)
+	if (mustShow !== undefined && !text.includes(mustShow)) {
+		throw new Error(`${name} should show ${JSON.stringify(mustShow)} and the page does not say it`)
+	}
+
 	mkdirSync(SCREENS, { recursive: true })
 	await page.screenshot({ path: join(SCREENS, `${name}.png`), fullPage: false })
+	// What was on screen, beside the picture of it, so make status can check a
+	// stale file rather than trusting that it exists.
+	writeFileSync(join(SCREENS, `${name}.txt`), text)
 }
 
 /** Wait for the interface to stop saying it is loading, then prove it stopped. */

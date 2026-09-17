@@ -20,7 +20,7 @@ import { ROOT } from './tree-hash.ts'
 interface Manifest {
 	diagrams: Array<{ id: string; shows: string }>
 	patterns: string[]
-	screenshots: Array<{ name: string; spec: string; shows: string }>
+	screenshots: Array<{ name: string; spec: string; shows: string; mustShow?: string }>
 	specs: string[]
 	profiles: string[]
 	surfaces: string[]
@@ -91,16 +91,29 @@ export function deliverables(): Deliverable[] {
 	}
 
 	for (const shot of m.screenshots) {
-		// Captured by a spec and present on disk are different failures, and the
-		// difference is the whole point: a picture nobody takes is a picture that
-		// goes stale without anyone noticing.
+		// Captured by a spec, present on disk, and showing what it claims are three
+		// different failures. The third is the one that cost this repository the
+		// most: a picture of a loading spinner and a picture of an empty board both
+		// sit on disk looking exactly like evidence.
 		const takes = captured.has(shot.name)
 		const onDisk = existsSync(join(ROOT, 'evidence/screens', `${shot.name}.png`))
+		const beside = join(ROOT, 'evidence/screens', `${shot.name}.txt`)
+		const said = existsSync(beside) ? readFileSync(beside, 'utf8') : undefined
+		const shows = shot.mustShow === undefined || (said !== undefined && said.includes(shot.mustShow))
+
 		out.push({
 			group: 'screenshot',
 			name: shot.name,
-			done: takes && onDisk,
-			detail: !takes ? 'no spec takes it' : onDisk ? shot.shows : 'a spec takes it, the run has not happened',
+			done: takes && onDisk && shows,
+			detail: !takes
+				? 'no spec takes it'
+				: !onDisk
+					? 'a spec takes it, the run has not happened'
+					: said === undefined
+						? 'taken before the page text was recorded, so it proves nothing'
+						: shows
+							? shot.shows
+							: `the page never said ${JSON.stringify(shot.mustShow)}`,
 		})
 	}
 

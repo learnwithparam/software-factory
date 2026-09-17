@@ -1,0 +1,84 @@
+BETA
+⌘ K
+agent-run-ledger
+Overview
+Supervisor
+Work
+Review
+Activity
+Audit log
+Work Sessions
+Issue #1: Add a Contributing section to the README
+Issue #70: Warn earlier when spend is heading for the limit
+Issue #58: Add a Contributing section to the README
+Issue #50: Add a Contributing section to the README
+Issue #44: Add a Contributing section to the README
+Show 1 more
+Review Sessions
+PR #65: Add Contributing section to the README
+PR #57: docs: add Contributing section to README
+PR #19: Add a Contributing section to the README
+User Sessions
+
+No sessions yet
+
+Needs attention
+2
+Workshop
+Settings
+Search cards
+All teammates
+All relevance
+All labels
+Auto-start runs
+Auto-approve plans
+Intake
+6
+0
+Triage
+0
+Planning
+0
+Building
+0
+Review
+0
+Done
+0
+Canceled
+#92 · Param-Harrison · 3m
+Issue:
+Warn earlier when spend is heading for the limit
+Suggested: Investigate
+Investigate
+Param-Harrison
+#93 · Param-Harrison · 3m
+Issue:
+Review the pull request that adds a saved view to the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#91 · Param-Harrison · 3m
+Issue:
+Record how many tool calls a whole run made
+Suggested: Investigate
+Investigate
+Param-Harrison
+#90 · Param-Harrison · 3m
+Issue:
+Show what each run cost in the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#89 · Param-Harrison · 3m
+Issue:
+A limit of zero is refused instead of returning nothing
+Suggested: Investigate
+Investigate
+Param-Harrison
+#88 · Param-Harrison · 3m
+Issue:
+Add a Contributing section to the README
+Suggested: Investigate
+Investigate
+Param-Harrison
