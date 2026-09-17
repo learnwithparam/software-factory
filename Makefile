@@ -59,6 +59,7 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@bun scripts/run-report.ts
 	@bun scripts/waterfall.ts
 	@bun scripts/org-shapes.ts
+	@bun scripts/spine-rail.ts
 	@bun scripts/review-page.ts
 
 finish: ## Run only the specs whose evidence is missing, until nothing more can be produced

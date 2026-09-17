@@ -8,6 +8,23 @@
 <link rel="stylesheet" href="teach/teach.css">
 </head>
 <body>
+<div class="page">
+<nav class="rail" aria-label="Contents">
+<h3>The spine</h3>
+<ol>
+<li><a href="#l-overview"><span class="where">Overview</span><span>What a factory is, and why a better prompt is not one</span></a></li>
+<li><a href="#l-boundary"><span class="where">Layer one</span><span>Boundary</span></a></li>
+<li><a href="#l-context"><span class="where">Layers two and three</span><span>Context and skills</span></a></li>
+<li><a href="#l-execution"><span class="where">Layer four</span><span>Execution</span></a></li>
+<li><a href="#l-verification"><span class="where">Layer five</span><span>Verification</span></a></li>
+<li><a href="#l-loop"><span class="where">Layer five, continued</span><span>Self-healing</span></a></li>
+<li><a href="#l-delivery"><span class="where">Layer six</span><span>Delivery</span></a></li>
+<li><a href="#l-shapes"><span class="where">The same factory, four companies</span><span>Who does what, under each shape</span></a></li>
+<li><a href="#l-patterns"><span class="where">What survives the products</span><span>Fourteen patterns</span></a></li>
+<li><a href="#l-platform"><span class="where">The same architecture, bought instead of built</span><span>On a platform</span></a></li>
+</ol>
+</nav>
+<main>
 
 <header class="mast">
 <div class="wrap">
@@ -359,17 +376,15 @@
 <p>The surprise on a first real run is that generation is rarely the slow part. Time accumulates in setup, in repeated checks, in verification that replays work already done, and in the stretch where the run is waiting on a person and nothing says so.</p>
 <p>So each stage is timed separately and recorded: claiming the item, assembling context, implementing, gates, verification, and human wait. Every figure quoted in these pages is read from that record by a test, which is why none of them can drift from the run that produced them.</p>
 <figure class="diagram" data-diagram="stage-waterfall">
-<svg viewBox="-4 -4 1010 238" role="img" aria-labelledby="d3t">
+<svg viewBox="-4 -4 1010 178" role="img" aria-labelledby="d3t">
 <title id="d3t">Where the time in one run actually goes</title>
 <text x="0" y="14" class="label">one run, every stage timed separately</text>
 <g>
-<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="520" height="16" rx="2"/><text x="640" y="48" class="small muted" data-figure="stage.triage">4m 45s</text>
+<text x="0" y="48" class="small mono muted">triage</text><rect class="solid" x="110" y="36" width="760" height="16" rx="2"/><text x="880" y="48" class="small muted" data-figure="stage.triage">4m 31s</text>
 <text x="0" y="78" class="small mono muted">plan</text><rect class="solid" x="110" y="66" width="4" height="16" rx="2"/><text x="124" y="78" class="small muted" data-figure="stage.plan">1s</text>
-<text x="0" y="108" class="small mono muted">implement</text><rect class="solid" x="110" y="96" width="760" height="16" rx="2"/><text x="880" y="108" class="small muted" data-figure="stage.implement">6m 56s</text>
-<text x="0" y="138" class="small mono muted">review</text><rect class="solid" x="110" y="126" width="354" height="16" rx="2"/><text x="474" y="138" class="small muted" data-figure="stage.review">3m 14s</text>
-<text x="0" y="168" class="small mono wait">human</text><rect x="110" y="156" width="15" height="16" rx="2" fill="var(--c-wait)"/><text x="135" y="168" class="small wait" data-figure="humanWait">8s</text>
+<text x="0" y="108" class="small mono wait">human</text><rect x="110" y="96" width="73" height="16" rx="2" fill="var(--c-wait)"/><text x="193" y="108" class="small wait" data-figure="humanWait">26s</text>
 </g>
-<text x="0" y="218" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
+<text x="0" y="158" class="small muted">Generation is rarely the slow part. Waiting on a person usually is, and it stays invisible until somebody measures it.</text>
 </svg>
 <figcaption>Figure 3. A run with each stage timed on its own, drawn from <code>evidence/factory-run.json</code> on openrouter/deepseek/deepseek-v4-flash. Every figure here is the median of what the factory recorded, so none of them can drift from what actually happened.</figcaption>
 </figure>
@@ -455,6 +470,107 @@
 <p>One immutable file per run: what was attempted, which files changed, every verdict, the timings, the cost. Appended to, never rewritten, because the value is in comparing the tenth run to the first.</p>
 <p>It is what turns an opinion about whether this is working into a measurement, and it is what the console in this repository displays.</p>
 </article>
+
+</div>
+</section>
+
+<section class="layer" id="l-shapes">
+<div class="wrap">
+<p class="kicker">The same factory, four companies</p>
+<h2>Who does what, under each shape</h2>
+
+<p>The four profiles in <code data-file="profiles/README.md">profiles/</code> are usually read as a
+table of permissions. That is the least interesting thing about them. What each one really describes
+is a division of labour: who files the work, who decides it is worth doing, who accepts the approach,
+who reads the diff, who presses merge, and who gets woken up when it was wrong.</p>
+
+<p>Read the four together and the argument becomes hard to avoid. None of them is more advanced than
+the others. Each moves the same set of decisions to different people, and each pays for that
+somewhere.</p>
+
+<h3>Solo</h3>
+
+<p>One person files, decides, accepts, reads and merges. The factory starts its own runs and approves
+its own plans, because the only reviewer is the person who will read the diff before merging anyway,
+and a gate between an author and themselves is ceremony.</p>
+
+<p>The queue cap is one. That number surprises people until they think about it: a solo developer
+with three things waiting is not three times as productive, they are a bottleneck with a backlog. The
+constraint worth declaring here is attention, not capacity.</p>
+
+<p>The money path is <code>build</code>, which reads as reckless and is not. The gate has moved to
+merge, where this person reads every line regardless. Moving it earlier would add a step that the
+same human performs twice.</p>
+
+<h3>Startup</h3>
+
+<p>A few people file and one of them accepts. Runs still start on arrival, because waiting for a
+person to press start on an obviously good issue is a tax nobody is paying for. Plans no longer
+approve themselves.</p>
+
+<p>That single change is the whole shape. A small team shares the cost of being wrong without sharing
+the context that would have prevented it, so somebody reads the approach before code exists. The
+money path is <code>propose</code> for the same reason.</p>
+
+<p>The queue cap is three. Above that, the person accepting plans becomes the constraint and the
+factory is generating work faster than the team can agree to it.</p>
+
+<h3>Scaleup</h3>
+
+<p>Teams own areas. Somebody files, the owning team triages, and a person on that team starts the
+run deliberately rather than letting arrival trigger it. The money path is <code>refuse</code>,
+because it has an owning team and an item that reaches it belongs in their queue rather than in a
+plan written by whoever filed it.</p>
+
+<p>This is the first shape where the answer to "who decides this" is a different person from "who
+noticed it", and most of the friction in a scaling engineering organisation lives in that gap. The
+ownership graph is where that gets written down instead of argued about on the day.</p>
+
+<p>The queue cap rises to five, because there are more people who can read a plan. It does not rise
+further, because the reviewers are still individuals with calendars.</p>
+
+<h3>Enterprise</h3>
+
+<p>Nothing is planned or implemented until a person has accepted the item. The tier is
+<code>controlled</code> rather than <code>supervised</code>, and the difference is real: work does
+not begin on arrival at all.</p>
+
+<p>The money path is refused and protected, so a run stops at the boundary rather than producing a
+plan nobody may act on. The contract package is refused too. What an agent may do here is
+investigate, and propose.</p>
+
+<p>The queue cap falls back to two, which reads as a mistake and is not. The constraint is no longer
+how many plans a team can read; it is how many items a change process can carry at once. A larger
+cap would queue work against a slower gate and call it throughput.</p>
+
+<figure class="diagram" data-diagram="who-decides">
+<svg viewBox="-4 -4 1010 300" role="img" aria-labelledby="d7t">
+<title id="d7t">Which decisions move to which people under each shape</title>
+<text x="0" y="14" class="label">the same six decisions, four divisions of labour</text>
+<g>
+<text x="190" y="44" class="title">solo</text><text x="390" y="44" class="title">startup</text><text x="590" y="44" class="title">scaleup</text><text x="790" y="44" class="title">enterprise</text>
+</g>
+<g>
+<text x="0" y="82" class="small mono muted">decide it is worth doing</text>
+<text x="190" y="82" class="small muted">the author</text><text x="390" y="82" class="small muted">the team</text><text x="590" y="82" class="small muted">the owning team</text><text x="790" y="82" class="small muted">a change process</text>
+<text x="0" y="114" class="small mono muted">accept the approach</text>
+<text x="190" y="114" class="small muted">nobody</text><text x="390" y="114" class="small muted">a teammate</text><text x="590" y="114" class="small muted">the owning team</text><text x="790" y="114" class="small muted">a named approver</text>
+<text x="0" y="146" class="small mono muted">start the run</text>
+<text x="190" y="146" class="small muted">arrival</text><text x="390" y="146" class="small muted">arrival</text><text x="590" y="146" class="small muted">a person</text><text x="790" y="146" class="small muted">a person</text>
+<text x="0" y="178" class="small mono muted">read the diff</text>
+<text x="190" y="178" class="small muted">the author</text><text x="390" y="178" class="small muted">a teammate</text><text x="590" y="178" class="small muted">the owning team</text><text x="790" y="178" class="small muted">two people</text>
+<text x="0" y="210" class="small mono muted">press merge</text>
+<text x="190" y="210" class="small wait">a person</text><text x="390" y="210" class="small wait">a person</text><text x="590" y="210" class="small wait">a person</text><text x="790" y="210" class="small wait">a person</text>
+<text x="0" y="242" class="small mono muted">carry the pager</text>
+<text x="190" y="242" class="small muted">the author</text><text x="390" y="242" class="small muted">whoever is up</text><text x="590" y="242" class="small muted">the owning team</text><text x="790" y="242" class="small muted">an operations team</text>
+</g>
+<text x="0" y="278" class="small muted">One row never moves. Nobody has built a shape where a machine presses merge, and the four that exist disagree about everything else.</text>
+</svg>
+<figcaption>Figure 7. The decisions each shape hands to a different person. The row that does not move is the one worth defending.</figcaption>
+</figure>
+
+<p class="because">A team that cannot say which of these four it is will configure its factory by
+accident, and the accident will be whichever shape the tool shipped with.</p>
 
 </div>
 </section>
@@ -702,5 +818,7 @@ kind of advice you cannot argue with.</p>
 </div>
 </footer>
 
+</main>
+</div>
 </body>
 </html>
