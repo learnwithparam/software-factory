@@ -156,11 +156,50 @@ export async function startRun(item: WorkItem, role: Role, skillName: string): P
 	})
 }
 
-/** Move an item to a stage, which is what a person does when they approve. */
+/**
+ * Move an item to a stage, which is what a person does when they approve.
+ *
+ * Refuses to be handed the stage the item is already in. The server accepts that
+ * request and then silently returns unless `reenter` is set, which is one line
+ * of rules/transition-service.js:
+ *
+ *   if (result.status === "accepted" && result.stage === from && !request.reenter) return
+ *
+ * Accepted, and nothing happens. Three runs of this suite were spent waiting for
+ * work that request had quietly declined to start, so asking for it is an error
+ * here rather than a shrug.
+ */
 export async function transition(item: WorkItem, stage: string, cause: string): Promise<void> {
+	if (stageOf(item) === stage) {
+		throw new Error(
+			`${item.title} is already in ${stage}. A stage repeats because something happened, not because it was asked twice: ` +
+				'deliver the event a person would have caused, or call redo() if you mean to run it again deliberately.',
+		)
+	}
+	await send(item, stage, cause, false)
+}
+
+/**
+ * Run a stage again, deliberately.
+ *
+ * The operator's "do that again", as opposed to a push or a comment causing it.
+ * Production reaches this through events; a rehearsal sometimes needs to ask.
+ */
+export async function redo(item: WorkItem, stage: string, cause: string): Promise<void> {
+	await send(item, stage, cause, true)
+}
+
+async function send(item: WorkItem, stage: string, cause: string, reenter: boolean): Promise<void> {
 	await need(`/web/factory/projects/${await projectId()}/work-items/${item.id}/transition`, {
 		method: 'POST',
-		body: JSON.stringify({ board: item.board ?? 'work', stage, expectedRevision: item.revision, requestId: randomUUID(), cause }),
+		body: JSON.stringify({
+			board: item.board ?? 'work',
+			stage,
+			expectedRevision: item.revision,
+			requestId: randomUUID(),
+			cause,
+			...(reenter ? { reenter: true } : {}),
+		}),
 	})
 }
 
@@ -404,4 +443,18 @@ export async function waitForVerdict(repo: string, pull: number, since: number, 
 export async function announceComment(repo: string, issue: number, commentId: number): Promise<void> {
 	const { announceComment: say, installationFor } = await import('../../scripts/lib/webhook-stand-in.ts')
 	await say(repo, issue, commentId, await installationFor(await cookie()))
+}
+
+/**
+ * Run a stage again and wait for what it produces.
+ *
+ * advance() for the same stage, with the flag that stops the server accepting
+ * the request and doing nothing.
+ */
+export async function again(itemId: string, stage: string, cause: string): Promise<Settled> {
+	const current = (await items()).find((candidate) => candidate.id === itemId)
+	if (current === undefined) throw new Error(`work item ${itemId} vanished`)
+	const at = Date.now()
+	await redo(current, stage, cause)
+	return settleAfter(itemId, at)
 }

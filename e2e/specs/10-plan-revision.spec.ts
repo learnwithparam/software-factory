@@ -20,7 +20,7 @@ import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, announceComment, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
+import { advance, again, announceComment, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
 import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
@@ -107,7 +107,13 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	// not a step this board has, so it does nothing and the first plan stands.
 	const commentId = Number(posted.trim().split('#issuecomment-').pop())
 	await announceComment(REPO, issue, commentId)
-	await settleAfter(item.id, sentBackAt)
+
+	// And ask for the stage again, explicitly. The comment tells the factory a
+	// person objected; reentering planning is what makes it plan again. Without
+	// the flag the server accepts the request and returns without doing anything,
+	// which is how two runs waited fifteen minutes for a plan nobody had asked
+	// for a second time.
+	await again(item.id, 'planning', 'the plan was sent back, and the priority changed')
 
 	// The factory's own words, after the rejection and not counting it.
 	const revised = await waitForPlan(issue, sentBackAt)
