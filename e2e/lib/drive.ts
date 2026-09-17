@@ -43,6 +43,7 @@ export interface Decision {
 
 export interface WorkItem {
 	readonly id: string
+	readonly stageHistory?: ReadonlyArray<{ readonly stage: string; readonly by: string; readonly enteredAt: string }>
 	readonly title: string
 	readonly board: string | null
 	readonly stages: readonly string[]

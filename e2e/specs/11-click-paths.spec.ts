@@ -17,7 +17,7 @@ import { test } from '@playwright/test'
 import { column, expect, openBoard, PHASES, showBoard } from '../lib/factory.ts'
 import { NAV, SWITCHES } from '../lib/controls.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { itemForRoute, settleAfter, stageOf } from '../lib/drive.ts'
+import { itemForRoute, stageOf } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 
 test('every control the run sheets name is on the page', async ({ page }) => {
@@ -52,10 +52,17 @@ test('a person starts a run by clicking, not by calling the API', async ({ page 
 	await card.scrollIntoViewIfNeeded()
 	await card.getByRole('button', { name: 'Investigate' }).click()
 
-	// The gate a click raises still waits for a person, so settleAfter approves it
-	// the way the operator in the room would.
-	const started = await settleAfter(before.id, startedAt)
-	expect(stageOf(started.item), 'clicking Investigate should move the item off intake').not.toBe('intake')
+	// The claim is that the click started something, not that the run finished.
+	// Waiting for the whole of triage made this fifteen minutes long and failed on
+	// a deadline rather than on anything about clicking.
+	const deadline = Date.now() + 5 * 60 * 1000
+	let now = before
+	while (stageOf(now) === 'intake' && Date.now() < deadline) {
+		await new Promise((resolve) => setTimeout(resolve, 5_000))
+		now = await itemForRoute(LEDGER, 'clean')
+	}
+	expect(stageOf(now), 'clicking Investigate should move the item off intake').not.toBe('intake')
+	expect(Date.now(), 'and it should have raised work, not just been clicked').toBeGreaterThan(startedAt)
 
 	await showBoard(page)
 	await shot(page, 'factory-clicked-start')

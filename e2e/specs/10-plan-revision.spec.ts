@@ -76,7 +76,12 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	expect(triaged.item.triageType, 'triage should have classified the issue').not.toBeNull()
 
 	const planned = await advance(item.id, 'planning', 'accepted, let us see what it proposes')
-	expect(stageOf(planned.item), 'the item should reach planning').toBe('planning')
+
+	// Reached planning, not sitting in it. A stage that finishes can hand the item
+	// on by itself, and this one does: asserting where the item is now failed on a
+	// run that had already moved to execute, which is the board working.
+	expect(planned.item.stageHistory?.map((entry) => entry.stage) ?? [], 'the item should have been through planning')
+		.toContain('planning')
 
 	// A plan is not published to the issue. It lives in the session, and only
 	// reaches GitHub when the work agent commits it beside the diff. Two runs of
