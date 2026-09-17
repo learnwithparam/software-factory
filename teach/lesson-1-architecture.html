@@ -173,6 +173,36 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="7-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>The same policy, read by a product</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They have seen the charter they just wrote being obeyed by software none of us built.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Point out that the board is reading the same `.factory` directory the hand-built loop reads.</li>
+<li>The value of a written policy is that a second implementation can honour it without being told anything else.</li>
+<li>Name what is missing on purpose: nothing has run yet, so nothing on screen is a claim about quality.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make factory-up
+<span class="prompt">$ </span>make lab-reset</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-intake.png" alt="Six issues waiting on the Intake board">
+<figcaption>Six issues arrive from one repository. Nothing has started, and both switches are off.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches six cards appear without anybody filing them.</li>
+<li>Notices that Auto-start runs is off, so arrival and action are separate things.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>If your policy file vanished, which of these six would a stranger get wrong first?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

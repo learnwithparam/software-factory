@@ -108,6 +108,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="5-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Finished, and still not merged</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They stop treating a board reaching done as a claim that anything shipped.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Done on the board means the machine has nothing left to do, which is not the same as merged.</li>
+<li>Two boards, and this is the one for issues; the pull request lives on the other with its own phases.</li>
+<li>Anyone who conflates them will report a week of work that is still sitting unreviewed.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make e2e</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-work-done.png" alt="The work item closed after a human merge">
+<figcaption>The item reaches done while its pull request stays open.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Finds the same change represented on both boards.</li>
+<li>Writes the sentence they would use in a status update, and has it corrected.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Your dashboard says twelve done. How many of those can a customer use?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

@@ -151,6 +151,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="7-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>The pull request as the interface</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can describe the hand-off point between a machine and a person in one sentence.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Every route in this material ends at a draft, on every tier, without exception.</li>
+<li>The pull request is where the evidence lives, which is what makes it reviewable by someone who watched none of the run.</li>
+<li>Contrast that with a chat transcript, which nobody can audit six weeks later.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>gh pr list --repo learnwithparam/agent-run-ledger</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-pr-opened.png" alt="The pull request the run opened">
+<figcaption>The change, its evidence, and nothing merged.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens the pull request and finds the commands the run actually executed.</li>
+<li>Confirms nothing was merged by anything except a person.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What in this pull request would you need if you were reviewing it a month from now?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

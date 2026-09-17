@@ -144,6 +144,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="7-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>A reviewer that can say no</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They accept that a reviewer which never rejects anything has not been tested.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>The interesting artefact is the refusal, not the approval.</li>
+<li>Read the two findings aloud and note that one of them is a weakened assertion, which no path rule could have caught.</li>
+<li>This is why the charter forbids editing a test to make a suite green: it is a property of the change, not of a filename.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make lab-reset</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-review-changes.png" alt="A reviewer sending work back with findings">
+<figcaption>The verdict line, with the two findings that produced it.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads the verdict line and both findings.</li>
+<li>Identifies which finding a glob could have prevented and which it could not.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Your suite went green after an edit to a test. What would tell you which kind of edit it was?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

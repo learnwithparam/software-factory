@@ -119,6 +119,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="5-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>A gate failing in one language</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend running only the checks a change reaches, and name what that misses.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>The ownership graph decides which suites a change is measured by, so a schema edit is judged by all three.</li>
+<li>Show the failure and note that the language it failed in is not the language the issue named.</li>
+<li>Then name the cost honestly: a wrong graph means a real failure nobody ran.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make check</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-gate-failed.png" alt="A check failing in one of three languages">
+<figcaption>One change, three suites, and only one of them red.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads which suites ran and which did not.</li>
+<li>Names one path in their repository whose owner is currently ambiguous.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>If your graph were wrong by one directory, which failure would you never see?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

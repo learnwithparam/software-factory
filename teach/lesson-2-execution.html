@@ -149,6 +149,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="7-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>Somebody else's sandbox, same rule</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say why an isolated checkout is a property of the harness rather than a courtesy.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Two harnesses now: the one built in this lesson and the one inside the product.</li>
+<li>Both give a run its own tree, and for the same reason, which is that a shared tree makes two runs indistinguishable when one of them breaks.</li>
+<li>Show where the checkout lives, and that deleting it costs nothing.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>ls ../mastra/.sandboxes || true</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-building.png" alt="The session working in its sandbox">
+<figcaption>A run holds a checkout of its own. The repository on your disk is untouched while it works.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens the sandbox directory and confirms it is a real clone.</li>
+<li>Confirms their own working tree has no new branch.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What breaks first if two runs share one checkout: the build, the test, or the diff?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>

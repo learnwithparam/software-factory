@@ -107,6 +107,35 @@
 </div>
 </section>
 
+
+<section class="segment" data-segment="5-factory">
+<div class="wrap">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Coming back from red</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can distinguish a retry that uses the reason from one that merely repeats.</p></div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>A loop that retries without reading the failure is a slower way to fail the same way.</li>
+<li>Compare the two attempts and find the sentence in the second that only exists because of the first.</li>
+<li>Cap the attempts out loud: twice with the reason attached, then a person.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre class="term"><span class="prompt">$ </span>make score</pre>
+<figure class="shot">
+<img src="../evidence/screens/factory-retry.png" alt="The second attempt, starting from the reason">
+<figcaption>Attempt two, beginning from the failure text rather than from the issue again.</figcaption>
+</figure>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Finds the failure text carried into the second attempt.</li>
+<li>Sets a retry limit for their own repository and writes the reason beside it.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many times should something fail before the failure becomes yours rather than its?</p></div>
+</div>
+</section>
+
 </main>
 
 <footer>
