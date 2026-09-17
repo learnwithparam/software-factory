@@ -239,6 +239,12 @@
 			"spec": "10-plan-revision",
 			"shows": "The session after the objection, with a second plan",
 			"mustShow": "Keep runs for longer"
+		},
+		{
+			"name": "factory-clicked-start",
+			"spec": "11-click-paths",
+			"shows": "A run a person started by clicking, not by calling the API",
+			"mustShow": "Triage"
 		}
 	],
 	"specs": [
@@ -252,7 +258,8 @@
 		"08-built",
 		"09-profiles",
 		"04b-gate-recovery",
-		"10-plan-revision"
+		"10-plan-revision",
+		"11-click-paths"
 	],
 	"profiles": [
 		"solo",

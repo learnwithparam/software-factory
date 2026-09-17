@@ -1,0 +1,62 @@
+/**
+ * The interface has the controls the run sheets send people to, and a person can
+ * start a run by clicking.
+ *
+ * Every approval in this repository went through the API. The twelve sheets tell
+ * a presenter which buttons to press and nothing had ever pressed one, so the
+ * first click anything attempted timed out: the card was drawn before the item
+ * moved and still offered Investigate rather than Open session.
+ *
+ * Two claims, then. That every control a sheet names is on the page. And that a
+ * person clicking Investigate starts a run, which is the gate the whole
+ * supervised tier rests on and was, until now, only known to work through an
+ * HTTP call nobody in a session will ever make.
+ */
+
+import { test } from '@playwright/test'
+import { column, expect, openBoard, PHASES, showBoard } from '../lib/factory.ts'
+import { NAV, SWITCHES } from '../lib/controls.ts'
+import { LEDGER } from '../lib/ledger.ts'
+import { itemForRoute, settleAfter, stageOf } from '../lib/drive.ts'
+import { shot } from '../lib/shot.ts'
+
+test('every control the run sheets name is on the page', async ({ page }) => {
+	await openBoard(page)
+
+	for (const item of NAV) {
+		await expect(page.getByRole('link', { name: item }).or(page.getByRole('button', { name: item })).first(), `nav: ${item}`).toBeVisible()
+	}
+
+	for (const phase of PHASES) {
+		await expect(column(page, phase), `column: ${phase}`).toBeAttached()
+	}
+
+	for (const name of SWITCHES) {
+		await expect(page.getByRole('switch', { name }), `switch: ${name}`).toBeVisible()
+	}
+
+	// The button a session opens on, on a card that is resting.
+	const waiting = page.locator('[data-testid="work-item-card"]').first()
+	await expect(waiting.getByRole('button', { name: 'Investigate' }), 'a resting card offers Investigate').toBeVisible()
+})
+
+test('a person starts a run by clicking, not by calling the API', async ({ page }) => {
+	test.setTimeout(20 * 60 * 1000)
+
+	await openBoard(page)
+	const before = await itemForRoute(LEDGER, 'clean')
+	expect(stageOf(before), 'the clean issue should be resting').toBe('intake')
+
+	const startedAt = Date.now()
+	const card = page.locator('[data-testid="work-item-card"]').filter({ hasText: before.title }).first()
+	await card.scrollIntoViewIfNeeded()
+	await card.getByRole('button', { name: 'Investigate' }).click()
+
+	// The gate a click raises still waits for a person, so settleAfter approves it
+	// the way the operator in the room would.
+	const started = await settleAfter(before.id, startedAt)
+	expect(stageOf(started.item), 'clicking Investigate should move the item off intake').not.toBe('intake')
+
+	await showBoard(page)
+	await shot(page, 'factory-clicked-start')
+})
