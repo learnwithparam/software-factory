@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
-import { advance, announcePush, itemForPull, labelledVerdict, latestVerdict, reviewText, settleAfter, verdictOf } from '../lib/drive.ts'
+import { advance, announcePush, itemForPull, labelledVerdict, latestVerdict, reviewText, verdictOf, waitForVerdict } from '../lib/drive.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
@@ -107,8 +107,12 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// nothing and the rejection stays the only verdict on the pull request.
 	const pushedAt = Date.now()
 	await announcePush(pull, REPO)
-	const again = await settleAfter(item.id, pushedAt)
-	expect(again.decision?.status, 'the re-review should complete').toBe('succeeded')
+
+	// Wait for the verdict, not for a decision. The decisions a review creates
+	// succeed within seconds and the agent then works for minutes, so a run that
+	// waits on them calls the re-review finished before it has read anything.
+	const second = await waitForVerdict(REPO, pull, pushedAt)
+	expect(verdictOf(second), 'the re-review should approve the fixed change').toBe('approve')
 
 	await showBoard(page)
 	await shot(page, 'factory-re-review')

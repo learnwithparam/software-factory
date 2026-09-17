@@ -355,3 +355,34 @@ export function labelledVerdict(repo: string, pull: number): 'approve' | 'change
 	if (labels.includes('status:changes-requested')) return 'changes'
 	return undefined
 }
+
+/**
+ * Wait for a review to publish something new on a pull request.
+ *
+ * Not for a decision. A decision here is a dispatch record: the pair created
+ * when a review starts succeeds within about six seconds, and the agent then
+ * works for eight minutes before publishing. Waiting on decisions therefore
+ * reports a review as finished before it has read a line, which is what made
+ * three runs of the rejection route insist the re-review had approved nothing.
+ *
+ * So this waits for the artefact the route is actually about: a verdict on the
+ * pull request that was not there before.
+ */
+export async function waitForVerdict(repo: string, pull: number, since: number, timeoutMs = 20 * 60 * 1000): Promise<string> {
+	const deadline = Date.now() + timeoutMs
+	const newer = (): string => {
+		const out = execFileSync(
+			'gh',
+			['api', `repos/${repo}/issues/${pull}/comments`, '--jq', `[.[] | select((.created_at | fromdateiso8601) > ${Math.floor(since / 1000)}) | .body] | join("\n")`],
+			{ encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 },
+		)
+		return out.trim()
+	}
+
+	while (Date.now() < deadline) {
+		const said = newer()
+		if (verdictOf(said) !== undefined) return said
+		await new Promise((resolve) => setTimeout(resolve, 15_000))
+	}
+	throw new Error(`no new verdict on pull request #${pull} within ${Math.round(timeoutMs / 60000)} minutes`)
+}
