@@ -117,14 +117,25 @@ test('a broken invariant sends the change back, and the second attempt clears it
 	await page.goto(`https://github.com/${REPO}/pull/${number}`, { waitUntil: 'domcontentloaded' })
 	await shotAt(page, 'request changes', 'factory-gate-failed')
 
-	// The second attempt does what the reason said: a person, who may touch the
-	// money path, puts the invariant back.
+	// The second attempt does what the reason said, and keeps the thing the change
+	// was for. Reverting to nothing is not a fix: the first go at this left an
+	// empty pull request, and the re-review rightly answered that there was no
+	// longer any code change to evaluate.
+	//
+	// So the invariant goes back into the money path and the clamp moves to the
+	// console, which is where a display concern belongs. That is the answer a
+	// person gives when a reviewer says the layer is wrong.
 	git(['checkout', '-q', BRANCH])
 	writeFileSync(MONEY, readFileSync(MONEY, 'utf8').replace(
 		'remaining_minor: (limit_minor - spent_minor).max(0),',
 		'remaining_minor: limit_minor - spent_minor,',
 	))
-	git(['commit', '-qam', 'Put the invariant back, the way the review asked'])
+	const console_ = join(LEDGER, 'apps', 'console', 'app', 'page.tsx')
+	writeFileSync(console_, readFileSync(console_, 'utf8').replace(
+		'? `${formatMinor(budget.budget.remainingMinor, budget.budget.currency)} remaining`',
+		'? `${formatMinor(Math.max(0, budget.budget.remainingMinor), budget.budget.currency)} remaining`',
+	))
+	git(['commit', '-qam', 'Clamp the remaining figure where it is displayed, not where it is computed'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
