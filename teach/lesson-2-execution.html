@@ -168,6 +168,22 @@
 <figcaption>A run holds a checkout of its own. The repository on your disk is untouched while it works.</figcaption>
 </figure>
 </div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>a card in Building</li>
+<li class="arrow">to</li>
+<li>Open session</li>
+<li class="arrow">to</li>
+<li>the file tree</li>
+</ul>
+<div class="where">
+<div><h4>A checkout of its own, every time</h4><p>The session holds a clone under .sandboxes. Delete it while the run is going and the run dies; delete your own working tree and nothing happens, which is the whole point of the boundary.</p></div>
+<div><h4>The one that cost me an evening</h4><p>A review once checked a pull request out in the Factory server's own directory rather than a sandbox. docker-compose.yml and package.json vanished and the only symptom was "compose file is invalid". Ask the room where they would have looked first.</p></div>
+<div><h4>Sandboxes are cattle</h4><p>They are named by run, not by branch, and nothing in them is worth keeping once the pull request exists.</p></div>
+</div>
+</div></div>
 <div class="part expect" data-part="expect"><h3>Room does</h3><div>
 <ul>
 <li>Opens the sandbox directory and confirms it is a real clone.</li>

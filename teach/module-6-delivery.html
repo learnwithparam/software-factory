@@ -127,6 +127,22 @@
 <figcaption>The item reaches done while its pull request stays open.</figcaption>
 </figure>
 </div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>its own phases</li>
+<li class="arrow">to</li>
+<li>the same change on Work</li>
+<li class="arrow">to</li>
+<li>done, unmerged</li>
+</ul>
+<div class="where">
+<div><h4>Done means the machine is finished</h4><p>The work item reaches done when its pull request exists. Nothing has merged, nobody has read it, and the board is not claiming otherwise.</p></div>
+<div><h4>The same change, two boards</h4><p>Find it on Work as an issue and on Review as a pull request. They have different phases because they are different questions: is this worth doing, and is this done well.</p></div>
+<div><h4>A re-review needs a push</h4><p>The review board has no review-to-review step. Fixing the branch is what starts the second pass, and asking the board to review again does nothing at all.</p></div>
+</div>
+</div></div>
 <div class="part expect" data-part="expect"><h3>Room does</h3><div>
 <ul>
 <li>Finds the same change represented on both boards.</li>

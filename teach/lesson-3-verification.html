@@ -163,6 +163,22 @@
 <figcaption>The verdict line, with the two findings that produced it.</figcaption>
 </figure>
 </div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>the pull request</li>
+<li class="arrow">to</li>
+<li>Conversation</li>
+<li class="arrow">to</li>
+<li>the verdict line</li>
+</ul>
+<div class="where">
+<div><h4>The verdict is the first line, on purpose</h4><p>A reviewer that buries its conclusion in prose cannot be checked by anything. One line, one of two values, and everything after it is the argument for it.</p></div>
+<div><h4>A weakened assertion is not a path rule</h4><p>Changing toBeCloseTo(1, 10) to toBeGreaterThanOrEqual(0) touches no protected file. No glob catches it, which is why the charter forbids it in words and the reviewer has to be the thing that notices.</p></div>
+<div><h4>A picture is the one artefact a test cannot read</h4><p>Four screenshots in this repository were a loading spinner, and every assertion around them passed. Show the room the guard that refuses to photograph a page still saying it is loading.</p></div>
+</div>
+</div></div>
 <div class="part expect" data-part="expect"><h3>Room does</h3><div>
 <ul>
 <li>Reads the verdict line and both findings.</li>

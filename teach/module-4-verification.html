@@ -138,6 +138,22 @@
 <figcaption>One change, three suites, and only one of them red.</figcaption>
 </figure>
 </div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>the cross-stack item</li>
+<li class="arrow">to</li>
+<li>its session</li>
+<li class="arrow">to</li>
+<li>three suites, one change</li>
+</ul>
+<div class="where">
+<div><h4>Only the suites a change reaches</h4><p>The ownership graph decides what runs. A schema edit is judged by all three languages; a console change is judged by one. Show which ran and which did not.</p></div>
+<div><h4>A wrong graph is a failure nobody sees</h4><p>If a directory is claimed by the wrong target, its suite never runs against changes that reach it. That is the cost of this design and it belongs in the room rather than in a footnote.</p></div>
+<div><h4>The verdict is quoted, never summarised</h4><p>The record carries the gate's own last line. A summary is a second source of truth about whether something passed.</p></div>
+</div>
+</div></div>
 <div class="part expect" data-part="expect"><h3>Room does</h3><div>
 <ul>
 <li>Reads which suites ran and which did not.</li>
