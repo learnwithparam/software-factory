@@ -1,15 +1,22 @@
 /**
  * The question: an issue that does not say enough to build from.
  *
- * "Add cost to the table" names no source for the number and no format for it,
- * and the console owns no numbers of its own: money comes from the budget
- * engine. So there is a real decision here that the issue never made, and the
- * right behaviour is to ask rather than to pick one and be confidently wrong.
+ * The issue asks for a cost-per-thousand-tokens rate, which does not exist, and
+ * says nothing about where it should be computed. That matters here more than it
+ * would elsewhere: `apps/console/lib/ledger.ts` opens by saying the console owns
+ * no numbers and that the view is never the resolver. So the obvious
+ * implementation, a division inside page.tsx, is the one the repository forbids,
+ * and the issue never says which service should own the new figure.
  *
  * This is the hardest route to demonstrate honestly, because a model that asks
  * no question is not obviously broken, it is just guessing. What the spec can
  * check is that the work stopped somewhere a person can answer, rather than a
  * pull request appearing that quietly invented a number.
+ *
+ * The first version of this issue asked for a cost column that already existed,
+ * and the run went and proved it existed, with line numbers and five real
+ * currency values. That was the right answer to the wrong question, and the
+ * issue was the thing that had to change.
  */
 
 import { test } from '@playwright/test'
@@ -57,7 +64,7 @@ test('an underspecified issue is asked about rather than guessed at', async ({ p
 	// Answering it is a person's move, and the work resumes from the answer.
 	execFileSync('gh', [
 		'issue', 'comment', String(issue), '--repo', REPO,
-		'--body', 'Use the cost the budget engine already reports for the run, formatted as US dollars to the cent. Do not compute it in the console.',
+		'--body', 'Compute it in the ingest service, which owns runs, and put it on the run alongside costMinor. The console renders it and derives nothing, the way ledger.ts says.',
 	])
 
 	const resumed = await advance(item.id, 'execute', 'question answered, build it')

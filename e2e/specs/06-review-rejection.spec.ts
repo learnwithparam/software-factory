@@ -21,8 +21,11 @@
 
 import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, openBoard, showBoard } from '../lib/factory.ts'
 import { advance, itemForPull, settle } from '../lib/drive.ts'
+import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
 
@@ -64,12 +67,19 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 
 	// Fix it the way a person would: put the assertion back and store only what
 	// was asked for. Then the same reviewer reads it again.
-	const root = process.env.FACTORY_REPO ?? '../ledger'
-	const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+	// LEDGER, not a relative path: this runs with e2e/ as its working directory,
+	// so "../ledger" pointed inside the factory and git answered ENOENT.
+	const git = (args: string[]) => execFileSync('git', args, { cwd: LEDGER, encoding: 'utf8' })
 	git(['fetch', '-q', 'origin', BRANCH])
 	git(['checkout', '-q', BRANCH])
-	execFileSync('bash', ['-c', `cd ${root} && git checkout -q origin/main -- apps/console/lib/ledger.test.ts`])
-	execFileSync('bash', ['-c', `cd ${root} && sed -i '' '/sort:/d;/columnWidths:/d;/lastRunOpened:/d' apps/console/lib/views.ts`])
+	git(['checkout', '-q', 'origin/main', '--', 'apps/console/lib/ledger.test.ts'])
+	writeFileSync(
+		join(LEDGER, 'apps', 'console', 'lib', 'views.ts'),
+		readFileSync(join(LEDGER, 'apps', 'console', 'lib', 'views.ts'), 'utf8')
+			.split('\n')
+			.filter((line) => !/\bsort:|columnWidths:|lastRunOpened:/.test(line))
+			.join('\n'),
+	)
 	git(['commit', '-qam', 'Store only the filter, and put the shares assertion back'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])

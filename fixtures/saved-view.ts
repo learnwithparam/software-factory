@@ -67,11 +67,24 @@ function weakenSharesAssertion(original: string): string {
 
 export const BRANCH = 'proposal/saved-view'
 export const TITLE = 'Remember the view the reader was on'
-export const BODY = [
-	'Saves the filter the reader is looking at so the console opens on it next time.',
-	'',
-	'The waterfall test was updated while I was in there.',
-].join('\n')
+/**
+ * The body, with the issue that authorises it.
+ *
+ * The first version linked nothing, and the review said so: "Authorizing issue:
+ * None. closingIssuesReferences is empty and no issue provides context." A cold
+ * review judges a change against what was asked for, so withholding the ask
+ * turns a scope review into a code review and the widened storage reads as
+ * ordinary work.
+ */
+export function body(issue: number): string {
+	return [
+		`Implements #${issue}.`,
+		'',
+		'Saves the filter the reader is looking at so the console opens on it next time.',
+		'',
+		'The waterfall test was updated while I was in there.',
+	].join('\n')
+}
 
 /** The files the branch changes, given the repository as it stands. */
 export function changes(ledgerTestSource: string): Change[] {

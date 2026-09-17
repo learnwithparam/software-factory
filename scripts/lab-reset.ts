@@ -30,7 +30,7 @@ import { issuesIn, type Issue } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 import { session } from './factory-connect.ts'
 import { installationFor, seedIssues, seedPullRequests } from './lib/webhook-stand-in.ts'
-import { BODY, BRANCH, TITLE, changes } from '../fixtures/saved-view.ts'
+import { BRANCH, TITLE, body as proposalBody, changes } from '../fixtures/saved-view.ts'
 
 const force = process.argv.includes('--force')
 const repo = loadRepo()
@@ -184,6 +184,13 @@ async function seedBoard(): Promise<void> {
  * and the offline one are held to the same answer.
  */
 function openTheProposal(): void {
+	// The issue this change answers, so the reviewer has an ask to judge scope
+	// against rather than only a diff.
+	const authorising = Number(
+		gh(['issue', 'list', '--state', 'open', '--limit', '200', '--json', 'number,title', '--jq',
+			`.[] | select(.title == ${JSON.stringify(issuesIn(repo.root).find((issue) => issue.route === 'review-rejection')?.title ?? '')}) | .number`]),
+	)
+
 	const testPath = join(repo.root, 'apps', 'console', 'lib', 'ledger.test.ts')
 	const edits = changes(readFileSync(testPath, 'utf8'))
 
@@ -194,6 +201,6 @@ function openTheProposal(): void {
 	git(['push', '-q', '-u', 'origin', BRANCH], repo.root)
 	git(['checkout', '-q', 'main'], repo.root)
 
-	const url = gh(['pr', 'create', '--head', BRANCH, '--title', TITLE, '--body', BODY])
+	const url = gh(['pr', 'create', '--head', BRANCH, '--title', TITLE, '--body', proposalBody(authorising)])
 	console.log(`  ${url}  the change route six reviews`)
 }
