@@ -29,7 +29,7 @@ import { advance, announcePull, announcePush, latestVerdict, waitForVerdict } fr
 import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
-const CHECKSUM = join(LEDGER, 'packages', 'contracts', 'schema', 'run.checksum')
+const MONEY = join(LEDGER, 'services', 'budget', 'src', 'lib.rs')
 
 function git(args: string[]): string {
 	try {
@@ -40,7 +40,7 @@ function git(args: string[]): string {
 	}
 }
 
-const BRANCH = 'gate/stale-checksum'
+const BRANCH = 'gate/threshold-moved'
 
 /**
  * A small pull request of its own, rather than the cross-stack one.
@@ -51,20 +51,27 @@ const BRANCH = 'gate/stale-checksum'
  * and this loop is about the reason a gate gives rather than the size of the
  * diff it gave it about.
  *
- * One line of schema and a checksum nobody recomputed. The gate has exactly one
- * thing to say.
+ * The break has to be one the reviewer cannot repair. A stale checksum was the
+ * obvious choice and the wrong one: the review found it, ran `bun run checksum`,
+ * committed the fix and approved, because the skill treats a mechanical fix as
+ * its own work rather than homework for the author. That is good behaviour and
+ * it makes a mechanically fixable break useless for demonstrating a rejection.
+ *
+ * So the break is on the money path. `services/budget/**` is in the charter's
+ * protected block, the reviewer may not edit it, and the failing test can only
+ * go back to a person. The ownership graph decides what a reviewer may repair,
+ * not only what an agent may build, and that is worth a slide of its own.
  */
 function openTheBreak(): number {
 	git(['fetch', '-q', 'origin', 'main'])
 	git(['checkout', '-q', '-B', BRANCH, 'origin/main'])
 
-	const schema = join(LEDGER, 'packages', 'contracts', 'schema', 'run.schema.json')
-	const parsed = JSON.parse(readFileSync(schema, 'utf8')) as { description?: string }
-	parsed.description = `A run, as the ingest service records it. Touched at ${new Date().toISOString()}.`
-	writeFileSync(schema, `${JSON.stringify(parsed, null, 2)}\n`)
+	// Move the warning threshold, which the budget tests assert exactly. The path
+	// is protected, so the reviewer can read the failure and not repair it.
+	const money = MONEY
+	writeFileSync(money, readFileSync(money, 'utf8').replace('const WARNING_PERCENT: i64 = 80;', 'const WARNING_PERCENT: i64 = 70;'))
 
-	// Left stale on purpose. This is the break.
-	git(['commit', '-qam', 'Describe the run schema, and forget the checksum'])
+	git(['commit', '-qam', 'Warn at seventy percent instead of eighty'])
 	git(['push', '-qf', '-u', 'origin', BRANCH])
 	git(['checkout', '-q', 'main'])
 
@@ -73,8 +80,8 @@ function openTheBreak(): number {
 
 	const url = execFileSync('gh', [
 		'pr', 'create', '--repo', REPO, '--head', BRANCH, '--base', 'main',
-		'--title', 'Describe the run schema',
-		'--body', 'One line of documentation on the shared schema. The checksum beside it was not recomputed, which is the point.',
+		'--title', 'Warn earlier when spend is heading for the limit',
+		'--body', 'Moves the warning threshold from eighty percent to seventy. The budget tests assert eighty exactly, so this fails them, and the money path is protected so nobody but a person may fix it.',
 	], { encoding: 'utf8' }).trim()
 	return Number(url.split('/').pop())
 }
@@ -91,17 +98,18 @@ test('a stale check sends the change back, and the second attempt clears it', as
 
 	const red = await waitForVerdict(REPO, number, openedAt, item.id)
 	expect(latestVerdict(red), 'a stale checksum should send the change back').toBe('changes')
-	expect(red, 'the reason should name the check that failed').toMatch(/checksum/i)
+	expect(red, 'the reason should name the suite that failed').toMatch(/budget|cargo|warning|threshold/i)
 
 	// The pull request, not the board, and scrolled to the verdict. A board shows
 	// an item in a column whatever its checks did.
 	await page.goto(`https://github.com/${REPO}/pull/${number}`, { waitUntil: 'domcontentloaded' })
 	await shotAt(page, 'request changes', 'factory-gate-failed')
 
-	// The second attempt does what the reason said.
+	// The second attempt does what the reason said: a person, who may touch the
+	// money path, puts the threshold back.
 	git(['checkout', '-q', BRANCH])
-	execFileSync('bun', ['run', 'checksum'], { cwd: join(LEDGER, 'packages', 'contracts') })
-	git(['commit', '-qam', 'Recompute the checksum the way the gate said to'])
+	writeFileSync(MONEY, readFileSync(MONEY, 'utf8').replace('const WARNING_PERCENT: i64 = 70;', 'const WARNING_PERCENT: i64 = 80;'))
+	git(['commit', '-qam', 'Put the threshold back, the way the review asked'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
