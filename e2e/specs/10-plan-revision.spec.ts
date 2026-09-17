@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process'
 import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
 import { advance, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
-import { shot, shotAt } from '../lib/shot.ts'
+import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
@@ -82,7 +82,7 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	expect(first.length, 'the run should have written a plan somebody can disagree with').toBeGreaterThan(200)
 
 	await page.goto(`https://github.com/${REPO}/issues/${issue}`, { waitUntil: 'domcontentloaded' })
-	await shot(page, 'factory-plan-proposed')
+	await shotAt(page, 'Understanding', 'factory-plan-proposed')
 
 	// A person reads it and changes the priority. This is the whole loop: the
 	// objection is about what to build, not about whether the code is correct,
