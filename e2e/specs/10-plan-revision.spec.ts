@@ -20,7 +20,7 @@ import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { expect, openBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
+import { advance, announceComment, itemForRoute, settleAfter, stageOf, startRun } from '../lib/drive.ts'
 import { shotAt } from '../lib/shot.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
@@ -87,7 +87,7 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	// A person reads it and changes the priority. This is the whole loop: the
 	// objection is about what to build, not about whether the code is correct,
 	// and it arrives before any code exists.
-	execFileSync('gh', [
+	const posted = execFileSync('gh', [
 		'issue', 'comment', String(issue), '--repo', REPO,
 		'--body', [
 			'Sending this plan back.',
@@ -99,10 +99,14 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 			'Plan a date range filter on the runs list instead. Keep the ingest service the only thing that',
 			'decides what a run is, and keep the change to the two files the issue names.',
 		].join('\n'),
-	])
+	], { encoding: 'utf8' })
 
 	const sentBackAt = Date.now()
-	await advance(item.id, 'planning', 'plan rejected, the priority changed')
+
+	// The comment is the event. Moving an item already in planning to planning is
+	// not a step this board has, so it does nothing and the first plan stands.
+	const commentId = Number(posted.trim().split('#issuecomment-').pop())
+	await announceComment(REPO, issue, commentId)
 	await settleAfter(item.id, sentBackAt)
 
 	// The factory's own words, after the rejection and not counting it.

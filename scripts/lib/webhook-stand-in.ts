@@ -57,7 +57,7 @@ function gh(args: readonly string[]): string {
  * Returns what the server answered so a caller can fail loudly. A 401 here means
  * the secret on disk and the secret the server booted with disagree.
  */
-async function deliver(event: 'issues' | 'pull_request', installation: number, payload: Record<string, unknown>): Promise<void> {
+async function deliver(event: 'issues' | 'pull_request' | 'issue_comment', installation: number, payload: Record<string, unknown>): Promise<void> {
 	const body = JSON.stringify({ ...payload, installation: { id: installation }, sender: sender() })
 	const signature = createHmac('sha256', secret()).update(body).digest('hex')
 
@@ -87,6 +87,20 @@ function sender(): unknown {
 /** The repository block every delivery carries, straight from the API. */
 function repository(repo: string): unknown {
 	return JSON.parse(gh(['api', `repos/${repo}`]))
+}
+
+/**
+ * A comment on an issue, delivered as `issue_comment.created`.
+ *
+ * How a person gets a plan reconsidered. Transitioning an item that is already in
+ * planning to planning is not a step this board has, so it does nothing at all
+ * and the first plan stands for ever. The comment is the event, and posting it
+ * with gh writes the words without delivering the news.
+ */
+export async function announceComment(repo: string, issue: number, commentId: number, installation: number): Promise<void> {
+	const comment = JSON.parse(gh(['api', `repos/${repo}/issues/comments/${commentId}`]))
+	const issueBody = JSON.parse(gh(['api', `repos/${repo}/issues/${issue}`]))
+	await deliver('issue_comment', installation, { action: 'created', issue: issueBody, comment, repository: repository(repo) })
 }
 
 /** Every open issue, delivered as `issues.opened`. */

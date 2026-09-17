@@ -399,3 +399,9 @@ export async function waitForVerdict(repo: string, pull: number, since: number, 
 	}
 	throw new Error(`no new verdict on pull request #${pull} within ${Math.round(timeoutMs / 60000)} minutes`)
 }
+
+/** Tell the board a person commented, which is how a plan gets reconsidered. */
+export async function announceComment(repo: string, issue: number, commentId: number): Promise<void> {
+	const { announceComment: say, installationFor } = await import('../../scripts/lib/webhook-stand-in.ts')
+	await say(repo, issue, commentId, await installationFor(await cookie()))
+}
