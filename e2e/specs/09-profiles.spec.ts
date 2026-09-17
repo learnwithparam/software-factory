@@ -37,6 +37,20 @@ import { ROOT, shot } from '../lib/shot.ts'
 
 const SHAPES = ['solo', 'startup', 'scaleup', 'enterprise'] as const
 
+/**
+ * The picture each shape produces, spelled out.
+ *
+ * Written as literals so somebody grepping for profile-scaleup finds the line
+ * that takes it, and so make status can see the claim before any run has
+ * happened rather than only afterwards.
+ */
+const SHOT = {
+	solo: 'profile-solo',
+	startup: 'profile-startup',
+	scaleup: 'profile-scaleup',
+	enterprise: 'profile-enterprise',
+} as const
+
 /** The ledger's governance files as this spec found them. */
 let found: string | undefined
 
@@ -102,7 +116,7 @@ for (const shape of SHAPES) {
 		expect(triaged.decision?.status, 'triage should complete under every shape').toBe('succeeded')
 
 		await showBoard(page)
-		await shot(page, `profile-${shape}`)
+		await shot(page, SHOT[shape])
 
 		// The money path is never written by an agent under any shape, because
 		// nothing merges unattended on any tier. What differs is how far the run

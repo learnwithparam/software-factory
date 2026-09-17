@@ -95,7 +95,13 @@ export function deliverables(): Deliverable[] {
 		// different failures. The third is the one that cost this repository the
 		// most: a picture of a loading spinner and a picture of an empty board both
 		// sit on disk looking exactly like evidence.
-		const takes = captured.has(shot.name)
+		// Claimed by the spec that owns it, or proven by the sidecar shot() writes
+		// at capture time. The source scan catches a manifest entry nobody wired up
+		// before any run has happened; the sidecar is execution rather than
+		// parsing, and it does not care whether the name was written as a literal
+		// or built from a loop variable. Four screenshots existed on disk and
+		// counted as missing because the spec named them `profile-${shape}`.
+		const takes = captured.has(shot.name) || existsSync(join(ROOT, 'evidence/screens', `${shot.name}.txt`))
 		const onDisk = existsSync(join(ROOT, 'evidence/screens', `${shot.name}.png`))
 		const beside = join(ROOT, 'evidence/screens', `${shot.name}.txt`)
 		const said = existsSync(beside) ? readFileSync(beside, 'utf8') : undefined
