@@ -130,7 +130,7 @@ export async function act(page: Page, title: string, action: string): Promise<vo
 	await target.getByRole('button', { name: action }).click()
 }
 
-export async function openSession(page: Page, title: string): Promise<void> {
+export async function openSession(page: Page, title: string): Promise<string> {
 	// The button, not the card: clicking the card selects it and leaves the board
 	// on screen. And found by the text a person reads rather than by aria-label,
 	// because the first click this suite ever attempted timed out waiting for
@@ -150,6 +150,11 @@ export async function openSession(page: Page, title: string): Promise<void> {
 	await target.scrollIntoViewIfNeeded()
 	await target.getByRole('button', { name: 'Open session' }).click({ timeout: 30_000 })
 	await page.waitForTimeout(3_000)
+
+	// The address, so a caller can come back. The button is not always on the
+	// card: after a stage runs again it is gone, and the session it opened is
+	// still there. A URL survives that; a button does not.
+	return page.url()
 }
 
 /** The two switches that decide how much of the board runs unattended. */

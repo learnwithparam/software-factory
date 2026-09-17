@@ -84,7 +84,7 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const before = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
 	expect(before, 'planning should have produced a plan').toBeGreaterThan(0)
 
-	await openSession(page, item.title)
+	const session = await openSession(page, item.title)
 	await shot(page, 'factory-plan-proposed')
 
 	// A person reads it and changes the priority. This is the whole loop: the
@@ -123,6 +123,10 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	const after = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
 	expect(after, 'the objection should have produced a second plan').toBeGreaterThan(before)
 
-	await openSession(page, item.title)
+	// Back to the same session by address. Plan and triage share one thread, so
+	// this is the conversation the second plan was written into, and the Open
+	// session button is no longer on the card to click.
+	await page.goto(session, { waitUntil: 'domcontentloaded' })
+	await page.waitForTimeout(3_000)
 	await shot(page, 'factory-plan-revised')
 })
