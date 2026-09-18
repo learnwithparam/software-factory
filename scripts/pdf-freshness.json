@@ -1,6 +1,6 @@
 {
 	"software-factory-book.pdf": {
-		"teach.html": "8515192cd2d1a044",
+		"teach.html": "04ffbe0b50e3862e",
 		"teach/lesson-1-architecture.html": "62cde7d236a9cd65",
 		"teach/lesson-2-execution.html": "1d032cc242bd6db6",
 		"teach/lesson-3-verification.html": "76e4de639bb43c65",
@@ -11,9 +11,9 @@
 		"teach/module-4-verification.html": "0e60c386ab933452",
 		"teach/module-5-loop.html": "eb2cdc72620ea246",
 		"teach/module-6-delivery.html": "37078c75947ba4ca",
-		"teach/workshop-operating-model.html": "1bc8065422b55279",
+		"teach/workshop-operating-model.html": "ab8a5466f3877387",
 		"teach/office-hours.html": "d6098d7d5faedbab",
-		"teach/sessions.json": "fd03204d316ca988",
+		"teach/sessions.json": "1598bcff63981be5",
 		"teach/teach.css": "c7c523b90fff53e4",
 		"teach/tokens.css": "d685bae27ca76a66",
 		"scripts/build-book.ts": "ee9837950047cd50",
@@ -90,7 +90,7 @@
 		"scripts/book.ts": "fc37ac032ebaa0ed"
 	},
 	"teach/pdf/workshop-operating-model.pdf": {
-		"teach/workshop-operating-model.html": "1bc8065422b55279",
+		"teach/workshop-operating-model.html": "ab8a5466f3877387",
 		"teach/teach.css": "c7c523b90fff53e4",
 		"teach/tokens.css": "d685bae27ca76a66",
 		"scripts/build-book.ts": "ee9837950047cd50",

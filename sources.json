@@ -1,0 +1,33 @@
+{
+  "$comment": "Every external source the teaching surfaces cite. Each entry carries the date it was last read, because a link that rotted is a citation nobody can check. tests/sources.test.ts binds this list to the pages in both directions: a URL on a page that is not here fails, and an entry here that no page cites fails. Reachability is a separate CI job, because a gate that needs the network cannot live in make check.",
+  "sources": [
+    {
+      "url": "https://dora.dev/insights/balancing-ai-tensions/",
+      "title": "Balancing AI tensions: moving from AI adoption to effective SDLC use",
+      "publisher": "DORA, from the 2025 State of AI-assisted Software Development report",
+      "read": "2026-09-18",
+      "supports": "Adoption at 90 percent of technology professionals, a third of developers reporting little or no trust in AI-generated code, adoption correlating with higher throughput and higher instability at the same time, and the amplifier finding"
+    },
+    {
+      "url": "https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/",
+      "title": "Measuring the impact of early-2025 AI on experienced open-source developer productivity",
+      "publisher": "METR",
+      "read": "2026-09-18",
+      "supports": "The randomised trial in which sixteen experienced developers took 19 percent longer on 246 real tasks with AI tools, while believing they had been faster"
+    },
+    {
+      "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+      "title": "OWASP Top 10 for Agentic Applications",
+      "publisher": "OWASP GenAI Security Project, published 9 December 2025",
+      "read": "2026-09-18",
+      "supports": "The named agentic risk classes each layer of the factory removes, from goal hijack through to rogue agents"
+    },
+    {
+      "url": "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents",
+      "title": "Effective context engineering for AI agents",
+      "publisher": "Anthropic, engineering blog",
+      "read": "2026-09-18",
+      "supports": "Compaction, structured note-taking and sub-agent architectures as the published alternatives to a prompt that keeps growing"
+    }
+  ]
+}

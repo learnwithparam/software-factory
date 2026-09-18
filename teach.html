@@ -33,8 +33,9 @@
 <li><span class="no">07</span><a href="#l-delivery">Delivery<span class="what">Layer six</span></a></li>
 <li><span class="no">08</span><a href="#l-shapes">Who does what, under each shape<span class="what">The same factory, four companies</span></a></li>
 <li><span class="no">09</span><a href="#l-findings">A rule written in a prompt is a request, and a rule written in a gate is a limit<span class="what">Measured, not asserted</span></a></li>
-<li><span class="no">10</span><a href="#l-patterns">The patterns that outlast both products<span class="what">What survives the products</span></a></li>
-<li><span class="no">11</span><a href="#l-platform">On a platform<span class="what">The same architecture, bought instead of built</span></a></li>
+<li><span class="no">10</span><a href="#l-measured">What the field has measured, and what it says about this architecture<span class="what">Grounding</span></a></li>
+<li><span class="no">11</span><a href="#l-patterns">The patterns that outlast both products<span class="what">What survives the products</span></a></li>
+<li><span class="no">12</span><a href="#l-platform">On a platform<span class="what">The same architecture, bought instead of built</span></a></li>
 </ol>
 </nav>
 
@@ -747,6 +748,52 @@ not have seen it. Pick which one is the record and derive the other from it.</p>
 <p class="because">These four are worth more to the room than a run where everything went right. A
 clean demonstration teaches that the architecture is plausible. This teaches where it actually gives
 way, which is the only part anybody will have to deal with on a Tuesday.</p>
+</div>
+</section>
+
+<section class="chapter" id="l-measured">
+<p class="kicker">Grounding</p>
+<h2>What the field has measured, and what it says about this architecture</h2>
+<p class="lede">The argument in this book is that the generator is not the missing piece. That is a claim about the world, so it should be held against what has actually been measured rather than against how a good demo feels.</p>
+
+<div class="concept" id="c-adoption-evidence">
+<h3>Adoption raises throughput and instability at the same time<span class="anchor">adoption-evidence</span></h3>
+<p>DORA's 2025 research reports that <a href="https://dora.dev/insights/balancing-ai-tensions/">nine in ten technology professionals now use AI at work</a>, that around a third of developers report little or no trust in the code it produces, and that higher adoption correlates with more delivery throughput and more delivery instability together.</p>
+<p>Their conclusion is the one worth carrying into an architecture review. AI is an amplifier: it magnifies a strong platform and it magnifies a weak one, and the difference between the two outcomes is testing, workflow and the platform underneath, not the model.</p>
+<p class="because">Read that finding next to the six layers and it stops being a survey result. Throughput rises because generation got cheap. Instability rises because verification and delivery did not change, and those are the two layers that decide whether work arriving faster also arrives working.</p>
+</div>
+
+<div class="concept" id="c-speed-evidence">
+<h3>Feeling faster and being faster are different measurements<span class="anchor">speed-evidence</span></h3>
+<p>METR ran a randomised trial in which <a href="https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/">sixteen experienced open-source developers worked 246 real tasks</a> in repositories they already knew, with AI allowed on half of them. They took 19 percent longer with the tools, and estimated afterwards that they had been about 20 percent faster.</p>
+<p>Two honest caveats belong with that number, and stating them is what makes it usable. It measures experienced maintainers on codebases they know well, which is the case least likely to benefit, and it measures tools from early 2025.</p>
+<p>What survives both caveats is the gap between the felt result and the measured one. A team deciding how far to go on the strength of how the last demo felt is using the instrument this study showed to be wrong by about forty points.</p>
+</div>
+
+<div class="concept" id="c-risk-classes">
+<h3>Each layer removes a named risk, not a vague one<span class="anchor">risk-classes</span></h3>
+<p>OWASP published its <a href="https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/">Top 10 for Agentic Applications</a> in December 2025, covering threats that belong to agents rather than to models. Mapping them onto the layers turns a security conversation into an architecture one.</p>
+<div class="wide">
+<table>
+<thead>
+<tr><th>Layer</th><th>The risk class it removes</th><th>What does the removing</th></tr>
+</thead>
+<tbody>
+<tr><td class="k">Boundary</td><td>Excessive agency, and privilege abuse</td><td>A charter that refuses a path, checked by a function rather than described in a prompt</td></tr>
+<tr><td class="k">Context</td><td>Memory and context poisoning</td><td>Routing, which means a task never sees material that has nothing to do with it</td></tr>
+<tr><td class="k">Execution</td><td>Unexpected code execution</td><td>A worktree, a command list and a network boundary, so the blast radius is a directory</td></tr>
+<tr><td class="k">Verification</td><td>Goal hijack, and tool misuse</td><td>A gate that a run cannot talk its way past, and a reviewer that reads the diff cold</td></tr>
+<tr><td class="k">Delivery</td><td>Human-agent trust exploitation</td><td>A pull request that arrives with its evidence, and a merge only a person can press</td></tr>
+</tbody>
+</table>
+</div>
+<p>Using their names has a practical payoff. A security reviewer at a large company can map this architecture onto a list they already hold, rather than reading an argument assembled from first principles by a workshop.</p>
+</div>
+
+<div class="concept" id="c-routing-evidence">
+<h3>Routing rather than piling is published practice<span class="anchor">routing-evidence</span></h3>
+<p>Anthropic's engineering guidance on <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">effective context engineering</a> names three techniques for work that outgrows a context window: compaction, structured note-taking, and sub-agents that explore in their own window and return a summary.</p>
+<p>All three are the same move as the context router here. Decide what this task needs, give it that, and keep everything else out, rather than adding a paragraph to a file every task pays for.</p>
 </div>
 </section>
 

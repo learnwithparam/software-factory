@@ -50,6 +50,9 @@ A factory whose own suite knows the codebase it was written against is a script 
   the text layer. They are reset in the print block of `teach/teach.css`, `tests/design.test.ts`
   asserts the resets are still there, and `make book` reads its own output with `pdftotext` and
   fails on a welded or over-split run.
+- **Every external claim carries its source in the sentence that makes it.** `sources.json` is the
+  one list, `tests/sources.test.ts` fails on a URL that is not in it and on an entry nothing cites,
+  and the `links` workflow resolves them weekly. `make check` never touches the network.
 - **No em dashes** in prose. `scripts/check-prose.ts` enforces it across every tracked markdown and
   HTML file.
 - **Secrets never go on a command line.** Pass them through the environment or stdin.

@@ -86,7 +86,7 @@
       "kind": "workshop",
       "title": "Design an AI-Native Software Factory for Your Organization",
       "minutes": 360,
-      "covers": ["six-layers", "charter", "autonomy-tier", "protected-path", "queue-cap", "human-merge-gate", "latency-budget", "ownership-graph"],
+      "covers": ["six-layers", "charter", "autonomy-tier", "protected-path", "queue-cap", "human-merge-gate", "latency-budget", "ownership-graph", "adoption-evidence", "speed-evidence", "risk-classes", "routing-evidence"],
       "steps": ["01-boundary", "06-delivery"]
     },
     {
