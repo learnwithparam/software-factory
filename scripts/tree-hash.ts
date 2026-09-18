@@ -14,7 +14,17 @@ import { join } from 'node:path'
 
 export const ROOT = join(import.meta.dirname, '..')
 
-const PROSE = /\.(md|html)$/
+/**
+ * What counts as prose for the stamp.
+ *
+ * `make score` treats a result whose stamp differs from the tree as missing, so
+ * a fifteen-minute end-to-end run must not be invalidated by an edit to a run
+ * sheet. The teaching stylesheet, the book builder and the PDFs it writes are in
+ * the same position: `make e2e` never loads any of them, so none of them can
+ * change what a run proved. Everything the run does exercise is still stamped.
+ */
+const PROSE =
+	/\.(md|html|pdf)$|^teach\/(teach|tokens)\.css$|^scripts\/(book|build-book)\.ts$|^scripts\/pdf-freshness\.json$|^tests\/book\.test\.ts$/
 
 export function trackedFiles(): string[] {
 	const out = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], {

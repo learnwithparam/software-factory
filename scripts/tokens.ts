@@ -16,6 +16,8 @@ export interface Tokens {
 	contrast: { pairs: Array<{ fg: string; bg: string; level: 'AA' | 'AAA' | 'AA-large' }> }
 	font: Record<string, { value: string; use: string }>
 	size: Record<string, string>
+	/** Reading measures. Prose is read and takes the narrower one; furniture is scanned. */
+	measure: Record<string, string>
 	space: Record<string, string>
 	radius: Record<string, string>
 	surfaces: Array<{ name: string; out: string }>
@@ -55,6 +57,7 @@ export function renderCss(t: Tokens, surface: string): string {
 		lines.push(`\t--font-${name}: ${token.value};`)
 	}
 	for (const [name, value] of Object.entries(t.size)) lines.push(`\t--${name}: ${value};`)
+	for (const [name, value] of Object.entries(t.measure)) lines.push(`\t--measure-${name}: ${value};`)
 	for (const [name, value] of Object.entries(t.space)) lines.push(`\t--space-${name}: ${value};`)
 	for (const [name, value] of Object.entries(t.radius)) lines.push(`\t--radius-${name}: ${value};`)
 	lines.push('}', '')

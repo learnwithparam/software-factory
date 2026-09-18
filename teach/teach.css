@@ -1,5 +1,16 @@
-/* The teaching surfaces. Light, technical, diagram-led.
-   Colour, type and spacing come from tokens.css, which is generated. */
+/* The teaching surfaces, as a book.
+ *
+ * Two documents share this file because they share a house, not a job. A concept
+ * spine is read start to finish, so its prose is serif at a reading measure. A run
+ * sheet is scanned while somebody is standing up in front of a room, so its
+ * furniture is sans and its parts are a table you can find your place in. House
+ * rule: prose is serif, working furniture is not, and never a fill where a
+ * hairline will do.
+ *
+ * Colour, type and spacing come from tokens.css, which is generated.
+ * The print block at the end is not decoration. Six CSS properties silently
+ * destroy the text layer of a Chromium PDF, and every one of them is reset there.
+ */
 
 @import url('./tokens.css');
 
@@ -11,53 +22,191 @@ body {
 	margin: 0;
 	background: var(--c-bg);
 	color: var(--c-ink);
-	font-family: var(--font-sans);
+	font-family: var(--font-serif);
 	font-size: var(--step-0);
-	line-height: 1.6;
+	line-height: 1.65;
 	text-wrap: pretty;
 }
 
-.wrap { max-width: 78rem; margin: 0 auto; padding: 0 var(--space-6); }
-.col { max-width: 44rem; }
+/* The page shell ---------------------------------------------------------
+ *
+ * One column of text with a rail beside it for numbers. The rail is not a
+ * navigation: the contents is a page at the front, so it prints with the book.
+ * There was a sticky sidebar here and a chip row under the masthead, both
+ * listing the same sections, inside a grid that a full-bleed layout was still
+ * fighting. One of each now. */
 
-/* Masthead ------------------------------------------------------------- */
-
-.mast { border-bottom: 1px solid var(--c-line); padding: var(--space-8) 0 var(--space-6); }
-.mast .kicker { color: var(--c-accent); }
-.mast h1 { font-size: var(--step-4); line-height: 1.05; letter-spacing: -0.02em; margin: var(--space-2) 0 var(--space-3); }
-.mast p { color: var(--c-ink-muted); margin: 0; max-width: 44rem; }
-
-.kicker {
-	font-family: var(--font-mono);
-	font-size: var(--step--1);
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	margin: 0;
+.doc {
+	--rail: 5rem;
+	--gutter: 1.75rem;
+	max-width: calc(var(--rail) + var(--gutter) + var(--measure-prose) + 4rem);
+	margin-inline: auto;
+	padding-inline: var(--space-6);
+	padding-block: var(--space-16) var(--space-24);
 }
 
-/* Navigation ----------------------------------------------------------- */
+.chapter {
+	display: grid;
+	grid-template-columns: var(--rail) minmax(0, 1fr);
+	column-gap: var(--gutter);
+	align-items: start;
+	padding-block: var(--space-16) 0;
+	border-top: 1px solid var(--c-line);
+}
+.chapter:first-of-type { border-top: 0; }
 
-nav.index { border-bottom: 1px solid var(--c-line); background: var(--c-bg-alt); padding: var(--space-4) 0; }
-nav.index ul { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: 0; }
-nav.index a { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); text-decoration: none; }
-nav.index a:hover, nav.index a:focus-visible { color: var(--c-accent); text-decoration: underline; }
+/* A concept is an anchor target and a grouping, not a box. Passing its children
+   through to the chapter grid is what lets a figure number sit out in the rail
+   beside the figure rather than indented inside it. */
+.concept { display: contents; }
 
-/* Layer and concept sections ------------------------------------------- */
+.chapter > *, .concept > * { grid-column: 2; min-width: 0; }
+.chapter > .mark, .concept > .mark { grid-column: 1; }
 
-.layer { border-bottom: 1px solid var(--c-line); padding: var(--space-12) 0; }
-.layer:nth-of-type(even) { background: var(--c-bg-alt); }
-.layer > .wrap > h2 { font-size: var(--step-3); letter-spacing: -0.015em; margin: var(--space-2) 0 var(--space-4); }
+.chapter > .kicker, .mark {
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	font-variant-numeric: tabular-nums;
+	color: var(--c-ink-faint);
+	text-align: right;
+	margin: 0;
+	padding-top: 0.45em;
+	letter-spacing: 0;
+	text-transform: none;
+	line-height: 1.4;
+}
+.chapter > .kicker { grid-column: 1; grid-row: 1; }
 
-.concept { padding: var(--space-8) 0 0; scroll-margin-top: var(--space-8); }
-.concept h3 { font-size: var(--step-1); margin: 0 0 var(--space-2); }
-.concept h3 .anchor { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin-left: var(--space-2); }
-.concept p { margin: 0 0 var(--space-3); max-width: 44rem; }
-.concept .because { border-left: 2px solid var(--c-accent); padding-left: var(--space-4); color: var(--c-ink-muted); }
+/* Cover -------------------------------------------------------------------- */
 
-/* Code, commands and verdicts ------------------------------------------ */
+.cover { padding-bottom: var(--space-12); }
+.cover .series {
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	color: var(--c-ink-muted);
+	margin: 0 0 var(--space-4);
+}
+.cover h1 {
+	font-family: var(--font-serif);
+	font-size: var(--step-4);
+	font-weight: 600;
+	line-height: 1.08;
+	margin: 0 0 var(--space-4);
+	max-width: 22ch;
+}
+.cover .deck {
+	font-size: var(--step-1);
+	line-height: 1.5;
+	color: var(--c-ink-2);
+	margin: 0;
+	max-width: var(--measure-prose);
+}
 
-code, kbd, samp { font-family: var(--font-mono); font-size: 0.925em; }
-p code, li code, td code { background: var(--c-bg-inset); border-radius: var(--radius-sm); padding: 0.08em 0.32em; }
+.facts {
+	display: grid;
+	grid-template-columns: 7rem minmax(0, 1fr);
+	gap: var(--space-2) var(--space-4);
+	margin: var(--space-6) 0 0;
+	padding-top: var(--space-4);
+	border-top: 1px solid var(--c-line);
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	max-width: var(--measure-furniture);
+}
+.facts dt { color: var(--c-ink-muted); }
+.facts dd { margin: 0; }
+
+/* Contents ----------------------------------------------------------------- */
+
+.contents {
+	margin-top: var(--space-8);
+	padding: var(--space-6) 0 var(--space-8);
+	border-top: 1px solid var(--c-line);
+}
+.contents h2 {
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	font-weight: 600;
+	color: var(--c-ink-muted);
+	margin: 0 0 var(--space-4);
+}
+.contents ol { list-style: none; margin: 0; padding: 0; }
+.contents li {
+	display: grid;
+	grid-template-columns: 2.5rem minmax(0, 1fr);
+	gap: var(--space-4);
+	padding: var(--space-3) 0;
+	border-bottom: 1px solid var(--c-line-2);
+}
+.contents .no {
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	font-variant-numeric: tabular-nums;
+	color: var(--c-ink-faint);
+	padding-top: 0.25em;
+}
+.contents a { color: var(--c-ink); text-decoration: none; }
+.contents a:hover, .contents a:focus-visible { text-decoration: underline; text-decoration-color: var(--c-accent); }
+.contents .what { display: block; font-size: var(--step--1); color: var(--c-ink-muted); font-family: var(--font-sans); }
+
+/* Chapters and concepts ----------------------------------------------------- */
+
+.chapter > h2 {
+	font-family: var(--font-serif);
+	font-size: var(--step-3);
+	font-weight: 600;
+	line-height: 1.15;
+	margin: 0 0 var(--space-3);
+	max-width: 26ch;
+}
+.chapter > .lede {
+	font-size: var(--step-1);
+	line-height: 1.5;
+	color: var(--c-ink-2);
+	margin: 0 0 var(--space-8);
+	max-width: var(--measure-prose);
+}
+
+.chapter > h3, .concept > h3 {
+	font-family: var(--font-serif);
+	font-size: var(--step-1);
+	font-weight: 600;
+	line-height: 1.3;
+	margin: var(--space-8) 0 var(--space-3);
+	scroll-margin-top: var(--space-8);
+	max-width: 42ch;
+}
+.chapter > h3 .anchor, .chapter > h3 .anchor, .concept > h3 .anchor {
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	font-weight: 400;
+	color: var(--c-ink-faint);
+	margin-left: var(--space-2);
+	white-space: nowrap;
+}
+
+p, .concept > ul, .concept > ol { max-width: var(--measure-prose); }
+.chapter > p, .concept > p { margin: 0 0 var(--space-4); }
+.chapter > ul, .chapter > ol, .concept > ul, .concept > ol { margin: 0 0 var(--space-4); padding-left: 1.1em; }
+.chapter li, .concept li { margin-bottom: var(--space-2); }
+.chapter li::marker, .concept li::marker { color: var(--c-ink-faint); }
+
+/* A block that is looked at across, not read down: a wide table of findings. */
+.wide { grid-column: 1 / -1; }
+.wide table { max-width: none; }
+
+.because {
+	border-left: 2px solid var(--c-accent);
+	padding-left: var(--space-4);
+	color: var(--c-ink-2);
+	font-size: var(--step--1);
+	margin: var(--space-4) 0 var(--space-6);
+}
+
+/* Code, commands and verdicts ----------------------------------------------- */
+
+code, kbd, samp { font-family: var(--font-mono); font-size: 0.9em; }
+p code, li code, td code, dd code { background: var(--c-bg-inset); border-radius: var(--radius-sm); padding: 0.08em 0.32em; }
 
 pre.term {
 	background: var(--c-term-bg);
@@ -65,13 +214,15 @@ pre.term {
 	border-radius: var(--radius-md);
 	padding: var(--space-4) var(--space-6);
 	overflow-x: auto;
-	font-size: var(--step--1);
-	line-height: 1.55;
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	line-height: 1.6;
 	margin: 0 0 var(--space-4);
+	max-width: var(--measure-furniture);
 }
-pre.term .prompt { color: var(--c-ink-muted); user-select: none; }
+pre.term .prompt { color: var(--c-ink-faint); user-select: none; }
 
-.verdict { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.02em; }
+.verdict { font-family: var(--font-mono); font-weight: 600; }
 .verdict.pass { color: var(--c-pass); }
 .verdict.fail { color: var(--c-fail); }
 .verdict.wait { color: var(--c-wait); }
@@ -80,71 +231,166 @@ pre.term .prompt { color: var(--c-ink-muted); user-select: none; }
 .chip {
 	display: inline-block;
 	font-family: var(--font-mono);
-	font-size: var(--step--1);
+	font-size: var(--step--2);
 	border: 1px solid currentColor;
 	border-radius: var(--radius-sm);
 	padding: 0 0.4em;
 	line-height: 1.5;
 }
 
-/* Tables ---------------------------------------------------------------- */
+/* Tables are scanned, so they are furniture and never serif. ---------------- */
 
-table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-6); font-size: var(--step--1); }
-th, td { border-bottom: 1px solid var(--c-line); padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; }
-thead th { background: var(--c-bg-inset); border-bottom-color: var(--c-ink-muted); white-space: nowrap; }
+table {
+	border-collapse: collapse;
+	width: 100%;
+	max-width: var(--measure-furniture);
+	margin: 0 0 var(--space-6);
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+}
+th, td { border-bottom: 1px solid var(--c-line-2); padding: var(--space-2) var(--space-3); text-align: left; vertical-align: top; }
+thead th { background: var(--c-bg-inset); border-bottom: 1px solid var(--c-line); white-space: nowrap; font-weight: 600; }
 td.k, th.k { font-family: var(--font-mono); white-space: nowrap; }
 
-/* Figures ---------------------------------------------------------------- */
+/* Figures are the one thing here allowed to be loud. ------------------------
+ *
+ * Every diagram and every number in this repository is bound to a run that
+ * produced it, which is the only claim it makes that a slide deck cannot. So a
+ * figure spans the rail as well as the text, and its number sits out in the rail
+ * beside the caption that says where it came from. */
 
-figure { margin: 0 0 var(--space-6); }
-figure svg { display: block; width: 100%; height: auto; }
-figcaption { color: var(--c-ink-muted); font-size: var(--step--1); margin-top: var(--space-2); }
-figure img { display: block; width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: var(--radius-md); }
+.chapter > figure, .concept > figure {
+	grid-column: 1 / -1;
+}
+figure {
+	display: grid;
+	grid-template-columns: var(--rail) minmax(0, 1fr);
+	column-gap: var(--gutter);
+	margin: var(--space-6) 0 var(--space-8);
+}
+figure > svg, figure > img { grid-column: 1 / -1; display: block; width: 100%; height: auto; }
+figure > img { border: 1px solid var(--c-line); border-radius: var(--radius-md); }
+figcaption {
+	grid-column: 2;
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	line-height: 1.5;
+	color: var(--c-ink-muted);
+	margin-top: var(--space-3);
+	max-width: var(--measure-prose);
+}
+figure > .mark { grid-column: 1; align-self: end; padding-top: var(--space-3); }
 
-.figure-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+/* Run sheets ---------------------------------------------------------------- */
 
-/* Run sheet segments ------------------------------------------------------ */
-
-.segment { border-bottom: 1px solid var(--c-line); padding: var(--space-8) 0; }
-.segment:nth-of-type(even) { background: var(--c-bg-alt); }
-.segment .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
-.segment .head h2 { font-size: var(--step-2); margin: 0; letter-spacing: -0.01em; }
-.segment .when { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); margin: 0; }
-
-.part { display: grid; grid-template-columns: 7rem 1fr; gap: var(--space-4); padding: var(--space-3) 0; border-top: 1px dotted var(--c-line); }
-.part > h3 { font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink-muted); margin: 0; padding-top: 0.2em; }
-.part > div, .part > p { margin: 0; min-width: 0; }
-.part.say > div { max-width: 44rem; }
-.part.say li { margin-bottom: var(--space-2); }
-
-a.concept-link { color: var(--c-ink); text-decoration-color: var(--c-accent); text-underline-offset: 2px; }
-
-/* Footer ------------------------------------------------------------------ */
-
-footer { padding: var(--space-12) 0; color: var(--c-ink-muted); font-size: var(--step--1); }
-footer a { color: inherit; }
-
-@media (max-width: 40rem) {
-	.wrap { padding: 0 var(--space-4); }
-	.mast h1 { font-size: var(--step-3); }
-	.part { grid-template-columns: 1fr; gap: var(--space-2); }
-	nav.index ul { gap: var(--space-2); }
+.segment {
+	padding-block: var(--space-12) var(--space-8);
+	border-top: 1px solid var(--c-line);
+}
+.segment:first-of-type { border-top: 0; }
+.segment > .head { margin-bottom: var(--space-6); }
+.segment .when {
+	font-family: var(--font-mono);
+	font-size: var(--step--2);
+	font-variant-numeric: tabular-nums;
+	color: var(--c-ink-muted);
+	margin: 0 0 var(--space-2);
+}
+.segment .head h2 {
+	font-family: var(--font-serif);
+	font-size: var(--step-2);
+	font-weight: 600;
+	line-height: 1.2;
+	margin: 0;
+	max-width: 30ch;
 }
 
-@media print {
-	nav.index { display: none; }
-	.segment, .layer { break-inside: avoid; background: none; }
-	pre.term { background: none; color: var(--c-ink); border: 1px solid var(--c-line); }
+.part {
+	display: grid;
+	grid-template-columns: 6rem minmax(0, 1fr);
+	column-gap: var(--space-6);
+	padding: var(--space-4) 0;
+	border-top: 1px solid var(--c-line-2);
+}
+.part > h3 {
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	font-weight: 600;
+	color: var(--c-ink-muted);
+	margin: 0;
+	padding-top: 0.15em;
+}
+.part.run > h3 { color: var(--c-accent); }
+.part.expect > h3 { color: var(--c-pass); }
+.part > div, .part > p { margin: 0; min-width: 0; max-width: var(--measure-prose); }
+.part.goal p { font-size: var(--step-1); line-height: 1.5; }
+.part.ask p { font-style: italic; }
+.part ul, .part ol { margin: 0; padding-left: 1.1em; max-width: var(--measure-prose); }
+.part li { margin-bottom: var(--space-2); }
+.part li::marker { color: var(--c-ink-faint); }
+.part > div > * + * { margin-top: var(--space-3); }
+/* The default paragraph margin pushed a one-line answer half a row below the
+   label naming it, so every part read as if it had lost its first line. */
+.part p, .part ul, .part ol, .part pre, .where p, .where h4, figcaption p { margin-block: 0; }
+
+/* Furniture inside a run sheet: sans, because it is looked at rather than read. */
+.part.say ul, .part.expect ul, .part.show div, .files, .where, .path { font-family: var(--font-sans); font-size: var(--step--1); }
+
+.path { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; list-style: none; padding: 0; margin: 0; }
+.path li { border: 1px solid var(--c-line); border-radius: 999px; padding: 2px 10px; margin: 0; font-size: var(--step--2); }
+.path li.arrow { border: 0; color: var(--c-ink-faint); padding: 2px 0; }
+
+.where { display: grid; gap: var(--space-4); }
+.where > div { display: grid; gap: var(--space-1); padding-left: var(--space-4); border-left: 2px solid var(--c-line); }
+.where h4 { margin: 0; font-family: var(--font-sans); font-size: var(--step--1); font-weight: 600; }
+.where p { margin: 0; color: var(--c-ink-muted); }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: var(--space-6); }
+.shot { display: block; grid-column: auto; margin: 0; }
+.shot img { width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: var(--radius-md); }
+.shot figcaption { grid-column: auto; margin-top: var(--space-2); }
+
+.files { color: var(--c-ink-muted); }
+.files code { background: transparent; padding: 0; }
+
+/* Patterns ------------------------------------------------------------------ */
+
+.pattern { padding-block: var(--space-8) 0; scroll-margin-top: var(--space-8); }
+.pattern h3 { font-family: var(--font-serif); font-size: var(--step-1); font-weight: 600; margin: 0 0 var(--space-2); }
+.pattern .anchor { font-family: var(--font-mono); font-size: var(--step--2); font-weight: 400; color: var(--c-ink-faint); margin-left: var(--space-2); }
+.pattern dl {
+	display: grid;
+	grid-template-columns: 8rem minmax(0, 1fr);
+	gap: var(--space-2) var(--space-4);
+	margin: var(--space-4) 0 0;
+	max-width: var(--measure-furniture);
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+}
+.pattern dt { color: var(--c-ink-muted); }
+.pattern dd { margin: 0; }
+
+/* Links and footer ---------------------------------------------------------- */
+
+a { color: inherit; text-decoration-color: var(--c-accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+footer {
+	margin-top: var(--space-16);
+	padding-top: var(--space-6);
+	border-top: 1px solid var(--c-line);
+	font-family: var(--font-sans);
+	font-size: var(--step--1);
+	color: var(--c-ink-muted);
 }
 
-/* Diagrams ---------------------------------------------------------------- */
+/* Diagrams ------------------------------------------------------------------ */
 
-figure.diagram { margin: var(--space-8) 0; }
-figure.diagram svg { display: block; width: 100%; height: auto; overflow: visible; }
+figure.diagram svg { overflow: visible; }
 figure.diagram text { font-family: var(--font-sans); fill: var(--c-ink); }
 figure.diagram text.mono { font-family: var(--font-mono); }
 figure.diagram text.muted { fill: var(--c-ink-muted); }
-figure.diagram text.label { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; font-family: var(--font-mono); fill: var(--c-ink-muted); }
+figure.diagram text.label { font-size: 13px; font-family: var(--font-sans); fill: var(--c-ink-muted); }
 figure.diagram text.title { font-size: 15px; font-weight: 600; }
 figure.diagram text.small { font-size: 12.5px; }
 figure.diagram rect.box { fill: var(--c-bg-alt); stroke: var(--c-line); }
@@ -163,68 +409,94 @@ figure.diagram .wait { stroke: var(--c-wait); } figure.diagram text.wait { fill:
 figure.diagram .refuse { stroke: var(--c-refuse); } figure.diagram text.refuse { fill: var(--c-refuse); stroke: none; }
 figure.diagram .dashed { stroke-dasharray: 4 4; }
 
-/* Patterns ---------------------------------------------------------------- */
+/* Narrow screens ------------------------------------------------------------ */
 
-.pattern { border-top: 1px solid var(--c-line); padding: var(--space-8) 0 var(--space-2); scroll-margin-top: var(--space-8); }
-.pattern h3 { font-size: var(--step-1); margin: 0 0 var(--space-1); }
-.pattern .anchor { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin-left: var(--space-2); }
-.pattern dl { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-2) var(--space-4); margin: var(--space-4) 0 0; max-width: 46rem; }
-.pattern dt { font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-ink-muted); }
-.pattern dd { margin: 0; }
-.pattern dd.here, .pattern dd.there { font-size: var(--step--1); }
-.pattern dd code { font-family: var(--font-mono); background: var(--c-bg-inset); border-radius: var(--radius-sm); padding: 0.08em 0.32em; }
-
-@media (max-width: 40rem) { .pattern dl { grid-template-columns: 1fr; gap: var(--space-1); } .pattern dt { margin-top: var(--space-3); } }
-
-/* Showing the interface, not only naming it.
- *
- * A run sheet that says "open the board" leaves the presenter to find the path
- * live. These carry the click path and what to point at once it is open, which
- * is the difference between a sheet somebody can follow and notes somebody
- * wrote for themselves. Borrowed in shape from the AI SRE workshop, which had
- * already learned this. */
-.part.show .path { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; list-style: none; padding: 0; margin: 0 0 14px; }
-.part.show .path li { background: var(--c-bg-inset); border: 1px solid var(--c-line); border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; }
-.part.show .path li.arrow { border: 0; background: transparent; color: var(--c-ink-muted); padding: 2px 0; }
-.where { display: grid; gap: 14px; }
-.where > div { display: grid; gap: 6px; padding: 12px 14px; background: var(--c-bg-alt); border: 1px solid var(--c-line); border-radius: 6px; }
-.where h4 { margin: 0; font-size: 0.95rem; }
-.where p { margin: 0; color: var(--c-ink-muted); }
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 14px; }
-.shot { margin: 0; display: grid; gap: 8px; }
-.shot img { width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: 6px; background: var(--c-bg-alt); }
-.shot figcaption { font-size: 0.85rem; color: var(--c-ink-muted); max-width: 68ch; }
-.files { font-size: 0.85rem; color: var(--c-ink-muted); }
-.files code { background: transparent; padding: 0; }
-
-/* The shell: a sticky contents rail beside the reading column.
- *
- * The spine was one long column with no way to see its shape. A reader arriving
- * at "what is a verification layer" had to scroll and hope. Borrowed from the AI
- * SRE workshop, which had already learned that a day needs a schedule down the
- * side and a book needs a contents. */
-.page { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; }
-.page > main { display: grid; gap: 56px; min-width: 0; }
-.rail { position: sticky; top: 24px; align-self: start; }
-.rail h3 { margin: 0 0 12px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--c-ink-muted); }
-.rail ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.rail a { display: grid; gap: 1px; padding: 7px 9px; border-radius: 4px; text-decoration: none; color: var(--c-ink); font-size: 0.9rem; line-height: 1.3; }
-.rail a:hover { background: var(--c-bg-inset); }
-.rail .where { font-size: 0.72rem; color: var(--c-ink-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-
-/* The mast sits above the shell, so it keeps the full width. */
-.page .wrap { max-width: none; padding-inline: 0; }
-
-@media (max-width: 860px) {
-	.page { grid-template-columns: 1fr; gap: 24px; padding-block: 24px 56px; }
-	.rail { position: static; }
-	.rail ol { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+@media (max-width: 48rem) {
+	.doc { --rail: 0px; --gutter: 0px; padding-block: var(--space-8) var(--space-16); }
+	.chapter, figure { grid-template-columns: minmax(0, 1fr); }
+	.chapter > .mark, .concept > .mark, figure > .mark { grid-column: 1; text-align: left; padding-top: 0; }
+	.chapter > *, .concept > *, figcaption { grid-column: 1; }
+	.part, .facts, .pattern dl { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+	.part > h3 { padding-top: 0; }
+	table { display: block; overflow-x: auto; }
+	.shots { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (max-width: 560px) {
-	.page { padding-inline: 16px; }
-	.rail ol { grid-template-columns: 1fr 1fr; }
-	.part { grid-template-columns: 1fr; gap: 6px; }
-	table { display: block; overflow-x: auto; }
-	.shots { grid-template-columns: 1fr; }
+/* Print ---------------------------------------------------------------------
+ *
+ * 🔴 Do not simplify anything in this block without reading why it is here.
+ *
+ * A Chromium print-to-PDF fails in a way no visual review catches: every page
+ * looks perfect and the text layer extracts as garbage. Each reset below
+ * neutralises one known cause, and scripts/build-book.ts reads its own output
+ * back with pdftotext to prove they are still doing it.
+ *
+ *   1  ui-sans-serif and system-ui resolve to SF Pro, which Chromium embeds as
+ *      per-word runs with no space glyph: prose extracts as "onelongtoken"
+ *   2  letter-spacing above about .13em emits one run per character, so a label
+ *      extracts as "S I X L A Y E R S". Negative tracking does the opposite and
+ *      glues words together. normal covers both
+ *   3  font-weight 900 on a variable face glues the run and drops its first
+ *      character. 700 is indistinguishable at these sizes
+ *   4  an element positioned out of flow paints last, so its text lands at the
+ *      end of the stream, detached from the heading it sat under
+ *   5  a negative margin that leaves the containing block drops the first
+ *      character of every run inside it, and only inside it, so every
+ *      whole-document count stays green
+ *
+ * The page inset lives in @page and nowhere else. A CSS @page margin overrides
+ * the margin option passed to page.pdf(), and padding on a wrapper insets only
+ * the start and end of a block, so page two onward prints flush to the paper.
+ */
+
+@page {
+	size: A4;
+	margin: 18mm 16mm 20mm;
+	@bottom-center { content: counter(page); font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #5F594F; }
+}
+
+/* A title page carries neither a running head nor its own number. */
+@page :first {
+	@top-left { content: ""; }
+	@bottom-center { content: ""; }
+}
+
+@media print {
+	/* Rebound at the root rather than per selector. Listing the selectors that
+	   print in sans is how three of them get missed, and a missed one is a
+	   paragraph that renders perfectly and extracts as one long token. Georgia,
+	   Helvetica, Arial and Courier all embed with real space glyphs; neither
+	   ui-sans-serif nor system-ui does. */
+	:root {
+		--font-serif: Georgia, "Times New Roman", serif;
+		--font-sans: Helvetica, Arial, sans-serif;
+		--font-mono: "Courier New", Courier, monospace;
+	}
+	body { font-size: 11.5pt; line-height: 1.5; background: #fff; }
+
+	* { letter-spacing: normal !important; }
+	h1, h2, h3, h4, strong, b, thead th { font-weight: 700 !important; }
+	li { position: static !important; }
+
+	.doc { max-width: none; padding: 0; }
+	/* The document's own cover starts a page. A session's title block inside the
+	   bound book is a heading, not a cover, and twelve of those would be twelve
+	   near-empty pages. */
+	.doc > .cover { break-after: page; }
+	.cover { padding-bottom: 0; }
+	.contents { break-after: page; border-top: 0; padding-top: 0; }
+	.chapter { break-before: page; border-top: 0; padding-top: 0; }
+	.segment { break-inside: avoid; }
+	figure, table, .pattern, .part, .where > div { break-inside: avoid; }
+	h1, h2, h3, h4 { break-after: avoid; }
+	p, li { orphans: 2; widows: 2; }
+
+	figure svg { max-height: 92mm; }
+	figure > img, .shot img { max-height: 110mm; width: auto; max-width: 100%; }
+
+	pre.term { background: #fff; color: #1F1B16; border: 1px solid #E6E1D8; border-radius: 0; }
+	pre.term .prompt { color: #5F594F; }
+
+	a { text-decoration: none; }
+	.doc a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 8.5pt; color: #5F594F; word-break: break-all; }
 }

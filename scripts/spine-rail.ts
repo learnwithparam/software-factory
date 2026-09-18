@@ -1,10 +1,10 @@
 /**
- * Build the sidebar from the sections that exist.
+ * Build the contents page from the sections that exist.
  *
- * The concept spine was one long column with no way to see its shape or jump
- * around it. A reader arriving at "what is a verification layer" had to scroll
- * and hope. The AI SRE workshop solved this with a sticky rail listing the day,
- * and this is the same idea applied to a book rather than a schedule.
+ * This was a sticky sidebar, beside a second chip row listing the same sections,
+ * inside a grid the rest of the page was still fighting. A book has one contents
+ * and it sits at the front, so it is there when the book is printed and a reader
+ * who is holding paper can still find the verification chapter.
  *
  * Generated, because a hand-written list of links is a list that will point at a
  * section somebody renamed.
@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './tree-hash.ts'
 
-const OPEN = '<nav class="rail" aria-label="Contents">'
+const OPEN = '<nav class="contents" aria-label="Contents">'
 const CLOSE = '</nav>'
 
 export interface Entry {
@@ -39,10 +39,13 @@ export function sections(page: string): Entry[] {
 
 export function rail(entries: Entry[]): string {
 	const items = entries
-		.map((entry) => `<li><a href="#${entry.id}"><span class="where">${entry.kicker}</span><span>${entry.title}</span></a></li>`)
+		.map((entry, index) => {
+			const number = String(index + 1).padStart(2, '0')
+			return `<li><span class="no">${number}</span><a href="#${entry.id}">${entry.title}<span class="what">${entry.kicker}</span></a></li>`
+		})
 		.join('\n')
 	return `${OPEN}
-<h3>The spine</h3>
+<h2>Contents</h2>
 <ol>
 ${items}
 </ol>

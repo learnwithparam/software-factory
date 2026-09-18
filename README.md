@@ -49,6 +49,7 @@ build this or buy it.
 make install
 make check    # prose, types, unit and structural tests. No model, no network
 make prove    # break each scored gate on purpose and confirm it fails
+make book     # the bound PDF and one printable sheet per session
 make score    # what is actually proven, 0 to 100
 make demo STEP=06
 ```

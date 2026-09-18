@@ -7,19 +7,15 @@
 <link rel="stylesheet" href="teach.css">
 </head>
 <body>
+<main class="doc">
 
-<header class="mast">
-<div class="wrap">
-<p class="kicker">Lightning lesson, sixty minutes</p>
+<header class="cover">
+<p class="series">Lightning lesson, sixty minutes</p>
 <h1>Build Your First Software Factory Execution Harness</h1>
-<p>Hands on. Attendees follow along in their own repository and finish with an isolated place for agent work.</p>
-</div>
+<p class="deck">Hands on. Attendees follow along in their own repository and finish with an isolated place for agent work.</p>
 </header>
 
-<main>
-
 <section class="segment" data-segment="0-before">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">Twenty minutes ahead</p><h2>Setup you do alone</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Worktrees can be created and removed instantly, with nothing left over from an earlier rehearsal.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div><p>Nothing. Preparation only.</p></div></div>
@@ -35,11 +31,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Widen the terminal font now, because this session is watched closely.</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="1-why">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:00 to 0:10</p><h2>Why your checkout is the wrong place</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>The room stops seeing isolation as ceremony and starts seeing it as the fix for something that already bit them.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -52,11 +46,9 @@
 <div class="part run" data-part="run"><h3>Run</h3><div><p>Terminal open, nothing typed.</p></div></div>
 <div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>An empty prompt and their own stories on the whiteboard.</p></div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Who has lost work to a background run? What did it cost to recover?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="2-worktree">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:10 to 0:28</p><h2>A second checkout, built live</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has created one, written a file in it, and confirmed their own branch never moved.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -80,11 +72,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Your build needs installed dependencies. Where do those live now, and what does that cost per task?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="3-claim">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:28 to 0:42</p><h2>Two runs, one item</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand how ownership is settled without anything new to operate.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -104,11 +94,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What else in your pipeline would be simpler if the coordination lived in a tool you already run?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="4-limits">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:42 to 0:54</p><h2>What it can reach from in there</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can state limits for one task in their own repository and know what happens when one is exceeded.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -130,11 +118,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>List three commands you would never want a background run to execute. Why those three?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="5-close">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:54 to 1:00</p><h2>Take it home</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has the harness working against their own repository before they close the call.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -146,12 +132,10 @@
 <div class="part run" data-part="run"><h3>Run</h3><div><p>Leave the worktree list and a clean status side by side on screen.</p></div></div>
 <div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>The repository address and the two files worth reading first.</p></div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Any repository where a second checkout would not work? Bring it to the next session.</p></div>
-</div>
 </section>
 
 
 <section class="segment" data-segment="7-factory">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>Somebody else's sandbox, same rule</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say why an isolated checkout is a property of the harness rather than a courtesy.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -191,14 +175,12 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What breaks first if two runs share one checkout: the build, the test, or the diff?</p></div>
-</div>
 </section>
 
-</main>
-
 <footer>
-<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-worktree" data-concept="worktree">worktree per task</a>, <a class="concept-link" href="../teach.html#c-branch-claim" data-concept="branch-claim">the branch as claim</a>, <a class="concept-link" href="../teach.html#c-sandbox-limits" data-concept="sandbox-limits">limits</a>, <a class="concept-link" href="../teach.html#c-executor-interface" data-concept="executor-interface">executor interface</a>.</p></div>
+<p>Concepts: <a class="concept-link" href="../teach.html#c-worktree" data-concept="worktree">worktree per task</a>, <a class="concept-link" href="../teach.html#c-branch-claim" data-concept="branch-claim">the branch as claim</a>, <a class="concept-link" href="../teach.html#c-sandbox-limits" data-concept="sandbox-limits">limits</a>, <a class="concept-link" href="../teach.html#c-executor-interface" data-concept="executor-interface">executor interface</a>.</p>
 </footer>
 
+</main>
 </body>
 </html>

@@ -7,19 +7,15 @@
 <link rel="stylesheet" href="teach.css">
 </head>
 <body>
+<main class="doc">
 
-<header class="mast">
-<div class="wrap">
-<p class="kicker">Cohort module four, two hours</p>
+<header class="cover">
+<p class="series">Cohort module four, two hours</p>
 <h1>Make Agents Prove Their Work</h1>
-<p>The longest build of the course. Everyone finishes with checks that fail closed and a reviewer that reads their diffs without being told the story.</p>
-</div>
+<p class="deck">The longest build of the course. Everyone finishes with checks that fail closed and a reviewer that reads their diffs without being told the story.</p>
 </header>
 
-<main>
-
 <section class="segment" data-segment="1-failclosed">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:00 to 0:30</p><h2>One script, one result line</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone's checks are behind one command that says one thing, and a missing check is louder than a failing one.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -41,11 +37,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your checks is currently optional, and who decided that?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="2-holdout">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:30 to 1:00</p><h2>Tests the writer never sees</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has a small set of behavioural checks kept out of the implementing agent's reach.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -66,11 +60,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What behaviour would embarrass you most if it broke quietly? Start there.</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="3-negative">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:00 to 1:30</p><h2>The check no gate can make</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has run it against a test they already trusted, and some of them are surprised.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -91,11 +83,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>How many of your tests have never once been red? What does that number mean?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="4-evidence">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:30 to 2:00</p><h2>Deciding what a result may claim</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Their pipeline downgrades a conclusion whose evidence is missing, without consulting what the agent said.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -116,12 +106,10 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your pipeline currently believe purely because something reported it?</p></div>
-</div>
 </section>
 
 
 <section class="segment" data-segment="5-factory">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>A gate failing in one language</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend running only the checks a change reaches, and name what that misses.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -161,14 +149,12 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>If your graph were wrong by one directory, which failure would you never see?</p></div>
-</div>
 </section>
 
-</main>
-
 <footer>
-<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-gate-verdict" data-concept="gate-verdict">the result line</a>, <a class="concept-link" href="../teach.html#c-holdout-test" data-concept="holdout-test">held-out checks</a>, <a class="concept-link" href="../teach.html#c-cold-verifier" data-concept="cold-verifier">an independent read</a>, <a class="concept-link" href="../teach.html#c-negative-proof" data-concept="negative-proof">proving the test bites</a>, <a class="concept-link" href="../teach.html#c-evidence-rule" data-concept="evidence-rule">evidence rules</a>, <a class="concept-link" href="../teach.html#c-contract-drift" data-concept="contract-drift">one definition</a>.</p></div>
+<p>Concepts: <a class="concept-link" href="../teach.html#c-gate-verdict" data-concept="gate-verdict">the result line</a>, <a class="concept-link" href="../teach.html#c-holdout-test" data-concept="holdout-test">held-out checks</a>, <a class="concept-link" href="../teach.html#c-cold-verifier" data-concept="cold-verifier">an independent read</a>, <a class="concept-link" href="../teach.html#c-negative-proof" data-concept="negative-proof">proving the test bites</a>, <a class="concept-link" href="../teach.html#c-evidence-rule" data-concept="evidence-rule">evidence rules</a>, <a class="concept-link" href="../teach.html#c-contract-drift" data-concept="contract-drift">one definition</a>.</p>
 </footer>
 
+</main>
 </body>
 </html>

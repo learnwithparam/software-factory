@@ -7,19 +7,15 @@
 <link rel="stylesheet" href="teach.css">
 </head>
 <body>
+<main class="doc">
 
-<header class="mast">
-<div class="wrap">
-<p class="kicker">Cohort module one, two hours</p>
+<header class="cover">
+<p class="series">Cohort module one, two hours</p>
 <h1>Design Your Software Factory Architecture</h1>
-<p>Everyone arrives with a repository they are allowed to change. They leave with a written policy for it that a run can read, and that they could defend in a design review.</p>
-</div>
+<p class="deck">Everyone arrives with a repository they are allowed to change. They leave with a written policy for it that a run can read, and that they could defend in a design review.</p>
 </header>
 
-<main>
-
 <section class="segment" data-segment="1-orient">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:00 to 0:20</p><h2>Their repository, not mine</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has named the area of their codebase where an error would be most expensive.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -40,11 +36,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Would a small edit there be safer than a large one somewhere else? Say why out loud.</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="2-tier">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:20 to 0:45</p><h2>Grading freedom by consequence</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend a tier for their repository using recoverability rather than size.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -65,11 +59,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the worst thing an unattended run could do to you, and how long would undoing it take?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="3-graph">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:45 to 1:20</p><h2>Who owns which paths</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a graph where every directory has exactly one owner, and the build refuses when one does not.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -92,11 +84,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Which directory in your project was hardest to assign, and what does that tell you?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="4-capacity">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:20 to 1:45</p><h2>The number that stops production</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has committed to a limit on pending decisions, chosen from their own week.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -116,11 +106,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What happens today when that number is exceeded, and who notices first?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="5-homework">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Before Wednesday</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a committed policy file in their own repository before the next session.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -134,12 +122,10 @@
 </div></div>
 <div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the check against their own draft and fixes what it names.</p></div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Bring the line you are least sure about to Friday.</p></div>
-</div>
 </section>
 
 
 <section class="segment" data-segment="6-factory">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Watching a limit hold</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has seen their own class of protected path refused rather than described.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -180,14 +166,12 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your protected paths has ever actually stopped a change? If none, is it protecting anything?</p></div>
-</div>
 </section>
 
-</main>
-
 <footer>
-<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-charter" data-concept="charter">the charter</a>, <a class="concept-link" href="../teach.html#c-autonomy-tier" data-concept="autonomy-tier">autonomy by consequence</a>, <a class="concept-link" href="../teach.html#c-protected-path" data-concept="protected-path">protected paths</a>, <a class="concept-link" href="../teach.html#c-queue-cap" data-concept="queue-cap">back-pressure</a>, <a class="concept-link" href="../teach.html#c-ownership-graph" data-concept="ownership-graph">the ownership graph</a>.</p></div>
+<p>Concepts: <a class="concept-link" href="../teach.html#c-charter" data-concept="charter">the charter</a>, <a class="concept-link" href="../teach.html#c-autonomy-tier" data-concept="autonomy-tier">autonomy by consequence</a>, <a class="concept-link" href="../teach.html#c-protected-path" data-concept="protected-path">protected paths</a>, <a class="concept-link" href="../teach.html#c-queue-cap" data-concept="queue-cap">back-pressure</a>, <a class="concept-link" href="../teach.html#c-ownership-graph" data-concept="ownership-graph">the ownership graph</a>.</p>
 </footer>
 
+</main>
 </body>
 </html>

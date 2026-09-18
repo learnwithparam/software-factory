@@ -7,7 +7,7 @@ SHELL := /bin/bash
 REPO ?= ../ledger
 export FACTORY_REPO := $(REPO)
 
-.PHONY: help install tokens status check prove e2e score demo lab-reset clean factory-up factory-down factory-model factory-connect factory-doctor factory-user factory-app
+.PHONY: help install tokens book status check prove e2e score demo lab-reset clean factory-up factory-down factory-model factory-connect factory-doctor factory-user factory-app
 
 help: ## List every target
 	@grep -E '^[a-z0-9-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[33m%-11s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +32,9 @@ check: e2e/node_modules ## Prose, types, unit and structural tests. No model, no
 	cd e2e && bun x tsc --noEmit -p tsconfig.json
 	bun test --reporter=junit --reporter-outfile=artifacts/junit.xml
 
+
+book: e2e/node_modules ## Render the bound book and every run sheet to PDF, then read them back
+	@bun scripts/build-book.ts
 
 prove: ## Break each scored gate on purpose and confirm it fails
 	@bun scripts/prove-gates.ts

@@ -7,19 +7,15 @@
 <link rel="stylesheet" href="teach.css">
 </head>
 <body>
+<main class="doc">
 
-<header class="mast">
-<div class="wrap">
-<p class="kicker">Lightning lesson, sixty minutes</p>
+<header class="cover">
+<p class="series">Lightning lesson, sixty minutes</p>
 <h1>Enforce Code Quality with Automated Agent Verifiers</h1>
-<p>The session that changes how people review. Most of the hour is spent on one idea: undo the change and watch the test go red.</p>
-</div>
+<p class="deck">The session that changes how people review. Most of the hour is spent on one idea: undo the change and watch the test go red.</p>
 </header>
 
-<main>
-
 <section class="segment" data-segment="0-before">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">Fifteen minutes ahead</p><h2>Arm the demonstration</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>A recorded run is ready that produced a genuinely flawed change, so the rejection is real rather than staged.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div><p>Nothing. Loading a recording.</p></div></div>
@@ -33,11 +29,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Have the flawed diff open in a second window, ready to show.</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="1-plausible">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:00 to 0:10</p><h2>Code that reads correctly</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>The room agrees that reviewing plausible work is more expensive than reviewing obviously broken work.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -50,11 +44,9 @@
 <div class="part run" data-part="run"><h3>Run</h3><div><p>The diff on screen. No commands.</p></div></div>
 <div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>A change that looks fine, with a passing suite beside it.</p></div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>How much of your review time goes on work that turns out to be correct?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="2-verdict">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:10 to 0:24</p><h2>One line nobody may rephrase</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can state why a missing check must be louder than a failing one.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -76,11 +68,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>If your pipeline lost its test step tonight, how long before anyone noticed?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="3-negative">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:24 to 0:42</p><h2>Undo the fix</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone leaves able to apply this to code that has no agents anywhere near it.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -101,11 +91,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Take the last test you wrote. Would it have gone red without your change?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="4-cold">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:42 to 0:54</p><h2>Reading the diff cold</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand why the reviewer is deliberately denied the story of the work.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -125,11 +113,9 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your reviewer currently read first, and does it change what they conclude?</p></div>
-</div>
 </section>
 
 <section class="segment" data-segment="5-close">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:54 to 1:00</p><h2>Cost and close</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>Nobody leaves thinking this is free.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -141,12 +127,10 @@
 <div class="part run" data-part="run"><h3>Run</h3><div><p>Show the stage timings from the recorded run.</p></div></div>
 <div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>Where the minutes actually went, with checking larger than writing.</p></div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>What would you accept paying, in minutes, for an independent read of every change?</p></div>
-</div>
 </section>
 
 
 <section class="segment" data-segment="7-factory">
-<div class="wrap">
 <div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>A reviewer that can say no</h2></div>
 <div class="part goal" data-part="goal"><h3>Goal</h3><p>They accept that a reviewer which never rejects anything has not been tested.</p></div>
 <div class="part say" data-part="say"><h3>Say</h3><div>
@@ -186,14 +170,12 @@
 </ul>
 </div></div>
 <div class="part ask" data-part="ask"><h3>Ask</h3><p>Your suite went green after an edit to a test. What would tell you which kind of edit it was?</p></div>
-</div>
 </section>
 
-</main>
-
 <footer>
-<div class="wrap"><p>Concepts: <a class="concept-link" href="../teach.html#c-gate-verdict" data-concept="gate-verdict">the verdict line</a>, <a class="concept-link" href="../teach.html#c-holdout-test" data-concept="holdout-test">holdout tests</a>, <a class="concept-link" href="../teach.html#c-cold-verifier" data-concept="cold-verifier">the cold reviewer</a>, <a class="concept-link" href="../teach.html#c-negative-proof" data-concept="negative-proof">the negative proof</a>, <a class="concept-link" href="../teach.html#c-doer-tester" data-concept="doer-tester">Doer and Tester</a>.</p></div>
+<p>Concepts: <a class="concept-link" href="../teach.html#c-gate-verdict" data-concept="gate-verdict">the verdict line</a>, <a class="concept-link" href="../teach.html#c-holdout-test" data-concept="holdout-test">holdout tests</a>, <a class="concept-link" href="../teach.html#c-cold-verifier" data-concept="cold-verifier">the cold reviewer</a>, <a class="concept-link" href="../teach.html#c-negative-proof" data-concept="negative-proof">the negative proof</a>, <a class="concept-link" href="../teach.html#c-doer-tester" data-concept="doer-tester">Doer and Tester</a>.</p>
 </footer>
 
+</main>
 </body>
 </html>

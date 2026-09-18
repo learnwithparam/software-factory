@@ -7,26 +7,33 @@
 <meta name="description" content="Every screenshot the end-to-end run took, in the order it took them, with what each is meant to show and whether the page said so.">
 <link rel="stylesheet" href="teach/teach.css">
 <style>
-.shots { display: grid; gap: 2rem; }
-.shot { margin: 0; border: 1px solid var(--c-line); border-radius: 6px; overflow: hidden; background: var(--c-bg); }
-.shot img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--c-line); }
-.shot figcaption { padding: 1rem 1.25rem; }
-.shot h3 { margin: 0 0 .35rem; font-size: 1rem; }
-.shot .meta, .shot .claim { margin: .2rem 0; color: var(--c-ink-muted); font-size: .85rem; }
-.shot .gap { margin: 0; padding: 2rem 1.25rem; background: var(--c-bg-inset); color: var(--c-ink-muted); }
+/* This page is a contact sheet rather than a chapter, so it sets its own grid
+   and borrows everything else from the book. Hairlines, never a fill. */
+.shots { display: grid; gap: var(--space-8); }
+.shot { margin: 0; }
+.shot img { display: block; width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: var(--radius-md); }
+.shot figcaption { margin-top: var(--space-3); }
+.shot h3 { margin: 0 0 var(--space-1); font-family: var(--font-serif); font-size: var(--step-0); }
+.shot .meta, .shot .claim { margin: 0; color: var(--c-ink-muted); font-size: var(--step--1); }
+.shot .gap { margin: 0; padding: var(--space-8) 0; border-top: 1px solid var(--c-line); color: var(--c-ink-muted); }
 .verdict { font-weight: 600; }
 .proven .verdict { color: var(--c-pass); }
 .unproven .verdict, .missing .verdict { color: var(--c-fail); }
-.tally { display: flex; gap: 2rem; padding: 1rem 1.25rem; background: var(--c-bg-inset); border-radius: 6px; }
-.tally b { display: block; font-size: 1.6rem; }
+.tally { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); margin: var(--space-6) 0 var(--space-12); padding-top: var(--space-4); border-top: 1px solid var(--c-line); font-family: var(--font-sans); font-size: var(--step--1); color: var(--c-ink-muted); }
+.tally b { display: block; font-family: var(--font-mono); font-size: var(--step-2); font-variant-numeric: tabular-nums; color: var(--c-ink); }
+main > section { padding-top: var(--space-12); }
+main > section > h2 { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin: 0 0 var(--space-6); }
 </style>
 </head>
 <body>
-<main>
+<main class="doc">
+<header class="cover">
+<p class="series">Software Factory · evidence</p>
 <h1>What the run produced</h1>
-<p>Every picture the end-to-end run took, in the order the specs take them. Each one carries what it
+<p class="deck">Every picture the end-to-end run took, in the order the specs take them. Each one carries what it
 is meant to show and the phrase the page had to be saying when it was taken, so a screenshot of a
 loading spinner or an empty board is reported rather than displayed as evidence.</p>
+</header>
 
 <div class="tally">
 <div><b>36</b> show what they claim</div>

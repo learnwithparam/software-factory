@@ -11,6 +11,7 @@ make install   # the factory's own dependencies
 make check     # prose, types, unit and structural tests. No model, no network
 make prove     # break each scored gate on purpose and confirm it fails
 make e2e       # real model, real repository, real pull requests
+make book      # render the bound PDF and every run sheet, then read the text layer back
 make score     # 0 to 100 from the latest check and e2e results. Below 100 exits 1
 make demo STEP=02
 make check REPO=~/work/your-repo   # every target takes a repository
@@ -42,6 +43,13 @@ A factory whose own suite knows the codebase it was written against is a script 
   that a check still passes, the mutation is wrong, not the check.
 - **The teach surfaces hold one copy of each idea.** Explanations live in `teach.html`. Run sheets in
   `teach/` carry the talk track and the commands, and cite concepts by id.
+- **A page that changed and a PDF that did not is a stale book.** `make book` rebuilds every PDF and
+  records the hash of each source it read. `make check` fails and names the file when one has moved
+  since. The builder counts as a source.
+- **Never judge a generated PDF by looking at it.** Six CSS properties render perfectly and destroy
+  the text layer. They are reset in the print block of `teach/teach.css`, `tests/design.test.ts`
+  asserts the resets are still there, and `make book` reads its own output with `pdftotext` and
+  fails on a welded or over-split run.
 - **No em dashes** in prose. `scripts/check-prose.ts` enforces it across every tracked markdown and
   HTML file.
 - **Secrets never go on a command line.** Pass them through the environment or stdin.
