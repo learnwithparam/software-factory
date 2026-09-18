@@ -29,10 +29,13 @@ else
   echo "no $SECRETS yet; run make factory-doctor to see what is missing"
 fi
 
+# Any HTTP status means the server is up: with auth on, the root answers 401, which curl -f calls a failure.
+answering() { [[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:4111)" != "000" ]]; }
+
 echo "starting postgres and redis"
 docker compose -f "$MASTRA/docker-compose.yml" up -d --wait
 
-if curl -sf -o /dev/null http://localhost:4111 2>/dev/null; then
+if answering; then
   echo "the Factory server is already up on http://localhost:4111"
   exit 0
 fi
@@ -42,7 +45,7 @@ echo "starting the Factory server, logging to $LOG"
 ( cd "$MASTRA" && nohup bun run dev > "$LOG" 2>&1 & echo $! > "$HERE/artifacts/factory.pid" )
 
 for _ in $(seq 1 60); do
-  if curl -sf -o /dev/null http://localhost:4111 2>/dev/null; then
+  if answering; then
     echo "up on http://localhost:4111"
     exit 0
   fi
