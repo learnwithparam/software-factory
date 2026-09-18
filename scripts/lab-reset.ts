@@ -24,6 +24,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
@@ -104,7 +105,7 @@ rmSync(join(WORKTREES, basename(repo.root)), { recursive: true, force: true })
 
 // Mastra clones the repo once per session and never deletes it. The reset ends every session.
 const SANDBOXES =
-	process.env.MASTRACODE_LOCAL_SANDBOX_ROOT?.trim() || join(import.meta.dirname, '..', '..', 'workspaces')
+	process.env.MASTRACODE_LOCAL_SANDBOX_ROOT?.trim() || join(homedir(), '.cache', 'software-factory', 'sandboxes')
 for (const sandbox of existsSync(SANDBOXES) ? readdirSync(SANDBOXES) : []) {
 	rmSync(join(SANDBOXES, sandbox), { recursive: true, force: true })
 }

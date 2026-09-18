@@ -3,3 +3,4 @@
 # absorbing them, because that is how it would work on your repository.
 [test]
 root = "tests"
+preload = ["./tests/setup.ts"]
