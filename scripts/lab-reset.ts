@@ -23,7 +23,7 @@
  * somebody's afternoon to fix it.
  */
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { WORKTREES, git, list, remove } from '../steps/02-execution/worktree.ts'
 import { issuesIn, type Issue } from '../steps/lib/issues.ts'
@@ -101,6 +101,14 @@ for (const workspace of list(repo.root)) {
 	console.log(`  removed workspace ${workspace.branch}`)
 }
 rmSync(join(WORKTREES, basename(repo.root)), { recursive: true, force: true })
+
+// Mastra clones the repo once per session and never deletes it. The reset ends every session.
+const SANDBOXES =
+	process.env.MASTRACODE_LOCAL_SANDBOX_ROOT?.trim() || join(import.meta.dirname, '..', '..', 'workspaces')
+for (const sandbox of existsSync(SANDBOXES) ? readdirSync(SANDBOXES) : []) {
+	rmSync(join(SANDBOXES, sandbox), { recursive: true, force: true })
+}
+console.log(`  cleared session sandboxes in ${SANDBOXES}`)
 
 for (const number of gh(['pr', 'list', '--state', 'open', '--json', 'number', '--jq', '.[].number']).split('\n').filter(Boolean)) {
 	gh(['pr', 'close', number, '--delete-branch'])

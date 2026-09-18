@@ -8,7 +8,7 @@
 import { afterAll, expect, it } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { claim } from '../steps/02-execution/claim.ts'
 import {
 	LimitExceeded,
@@ -17,7 +17,7 @@ import {
 	checkWrite,
 	profileFor,
 } from '../steps/02-execution/limits.ts'
-import { branchFor, create, git, list, remove, status } from '../steps/02-execution/worktree.ts'
+import { WORKTREES, branchFor, create, git, list, remove, status } from '../steps/02-execution/worktree.ts'
 
 const throwaway: string[] = []
 
@@ -38,7 +38,11 @@ function repository(): string {
 }
 
 afterAll(() => {
-	for (const path of throwaway) rmSync(path, { recursive: true, force: true })
+	// create() puts worktrees under WORKTREES, outside the scratch repo, so they go too.
+	for (const path of throwaway) {
+		rmSync(path, { recursive: true, force: true })
+		rmSync(join(WORKTREES, basename(path)), { recursive: true, force: true })
+	}
 })
 
 it('a branch name is derived from the item, never generated', () => {
