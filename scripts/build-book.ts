@@ -45,7 +45,11 @@ function sha256(path: string): string {
 }
 
 function runningHead(title: string): string {
-	return `@page { @top-left { content: ${JSON.stringify(title)}; font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #948D80; } }`
+	// The blank for the title page is repeated here, because Chromium takes the
+	// last margin box it is given rather than the most specific one: the rule in
+	// teach.css loses to this one and a cover prints with a head across the top.
+	return `@page { @top-left { content: ${JSON.stringify(title)}; font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #948D80; } }
+@page :first { @top-left { content: ""; } }`
 }
 
 /**

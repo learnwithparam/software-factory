@@ -113,6 +113,10 @@ export function compose(): string {
 /* Running heads. Chromium has supported @page margin boxes since 131 and this
    is checked before the render, so a missing head fails rather than vanishes. */
 @page { @top-left { content: "The Software Factory"; font-family: Helvetica, Arial, sans-serif; font-size: 8.5pt; color: #948D80; } }
+/* Repeated after the rule above, because Chromium takes the last margin box it
+   is given rather than the most specific one, so the blank in teach.css loses to
+   this block and a title page prints with a running head across the top. */
+@page :first { @top-left { content: ""; } }
 .part-open { break-before: page; }
 </style>
 </head>
@@ -127,6 +131,7 @@ export function compose(): string {
 <dt>Built by</dt><dd><code>make book</code>, from the same pages the browser serves</dd>
 <dt>Checked by</dt><dd>its own text layer, read back with <code>pdftotext</code> after every build</dd>
 </dl>
+</header>
 
 ${partOne}
 
@@ -136,7 +141,6 @@ ${partOne}
 ${chapters}
 </ol>
 </nav>
-</header>
 
 ${spineBody}
 
