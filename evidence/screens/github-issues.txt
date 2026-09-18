@@ -19,9 +19,9 @@ Fork 0
  Star 0
 Code
 Issues
-6
+7
 Pull requests
-2
+3
 Actions
 Projects
 Security and quality
@@ -49,29 +49,34 @@ state:open
 Search results
 Open
 Closed
+Keep runs for longer than the console can show
+Status: Open.
+#644 
+In learnwithparam/agent-run-ledger;
+· Param-Harrison opened 
 Review the pull request that adds a saved view to the console
 Status: Open.
-#169 
+#643 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 Warn earlier when spend is heading for the limit
 Status: Open.
-#168 
+#642 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 Record how many tool calls a whole run made
 Status: Open.
-#167 
+#641 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 Show what a thousand tokens costs on each run
 Status: Open.
-#166 
+#640 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 A limit of zero is refused instead of returning nothing
 Status: Open.
-#165 
+#639 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 Add a Contributing section to the README
@@ -79,10 +84,10 @@ effort:low
 Low implementation effort
 impact:low
 Low user/business impact
-status: pending-close
-Issue completed, waiting for merge/close
+status: auto-triaged
+Issue has been triaged
 Status: Open.
-#164 
+#638 
 In learnwithparam/agent-run-ledger;
 · Param-Harrison opened 
 Footer

@@ -108,7 +108,7 @@ export const PHASES: Record<string, readonly Check[]> = {
 		unit('tests/platform.test.ts > the rule that nothing merges itself is stated on both substrates', 1),
 	],
 	'12 Example repository': [
-		unit('tests/example-repo.test.ts > claims every file it contains', 2),
+		unit('tests/example-repo.test.ts > claims every file it contains', 1),
 		unit('tests/example-repo.test.ts > gives every target a test command and a reason for its autonomy', 1),
 		unit('tests/example-repo.test.ts > protects the files that decide what every other rule means', 2),
 		unit('tests/example-repo.test.ts > carries a work item of every shape a session needs', 2),
@@ -119,6 +119,10 @@ export const PHASES: Record<string, readonly Check[]> = {
 		unit('tests/screenshot-guard.test.ts > is refused when the interface says it is loading', 1),
 		unit('tests/review-page.test.ts > accounts for every screenshot the manifest names', 1),
 		unit('tests/figures.test.ts > shows exactly what the record says', 1),
+		// The page may not drop a finding that reflects badly on the product. Worth a
+		// point taken from file ownership, because a surface that hides a measured
+		// failure is a worse fault than an example repository missing an owner line.
+		unit('tests/findings.test.ts > that did not hold on some run, appears on the page', 1),
 	],
 }
 

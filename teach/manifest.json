@@ -27,6 +27,7 @@
 		}
 	],
 	"patterns": [
+		"prompt-is-not-a-gate",
 		"executor-as-interface",
 		"deterministic-claim",
 		"fail-closed-gate",

@@ -19,10 +19,10 @@ import { route } from '../steps/03-context/router.ts'
 import { issuesIn } from '../steps/lib/issues.ts'
 import { filesIn, isConfigured, loadRepo, unowned } from '../steps/lib/repo.ts'
 
-const EXAMPLE = process.env.FACTORY_EXAMPLE ?? join(import.meta.dir, '..', '..', 'ledger')
+const EXAMPLE = process.env.FACTORY_EXAMPLE ?? join(import.meta.dirname, '..', '..', 'ledger')
 
 /** The graph the routes are written against. fixtures/ledger-baseline/README.md says why. */
-const BASELINE = join(import.meta.dir, '..', 'fixtures', 'ledger-baseline')
+const BASELINE = join(import.meta.dirname, '..', 'fixtures', 'ledger-baseline')
 const present = existsSync(EXAMPLE) && isConfigured(EXAMPLE)
 
 describe.if(present)('the example repository', () => {

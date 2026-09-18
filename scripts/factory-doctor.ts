@@ -14,7 +14,7 @@ import { issuesIn } from '../steps/lib/issues.ts'
 import { session } from './factory-connect.ts'
 
 export const SECRETS = join(homedir(), '.config', 'lwp-secrets', 'factory.env')
-const MASTRA = join(import.meta.dir, '..', '..', 'mastra')
+const MASTRA = join(import.meta.dirname, '..', '..', 'mastra')
 const FACTORY_URL = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
 
 interface Check {

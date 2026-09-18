@@ -1,0 +1,28 @@
+← every run
+contract-add-tool-calls
+
+PASSED 17m 20s from claim to stop, €1.68, 101,300 tokens.
+
+Stages
+
+Bars are shares of measured time, not of the wall clock, so a gap between stages is not quietly absorbed into the stage beside it.
+
+claim
+4s
+1 calls
+context
+35s
+5 calls
+implement
+6m 33s
+31 calls
+gates
+5m 28s
+9 calls
+verify
+4m 40s
+14 calls
+
+implement took 6m 33s, which is 38 percent of the measured time. Making the change inside an isolated workspace.
+
+Run run-105, claimed 2026-09-16T08:41:00Z.

@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
 export const WORKTREES =
-	process.env.FACTORY_WORKTREES ?? join(import.meta.dir, '..', '..', '.worktrees')
+	process.env.FACTORY_WORKTREES ?? join(import.meta.dirname, '..', '..', '.worktrees')
 
 export interface Workspace {
 	readonly item: string

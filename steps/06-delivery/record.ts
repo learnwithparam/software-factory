@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { StageName } from '../05-loop/loop.ts'
 
-export const RECORDS = process.env.FACTORY_RUNS ?? join(import.meta.dir, '..', '..', '.factory-runs')
+export const RECORDS = process.env.FACTORY_RUNS ?? join(import.meta.dirname, '..', '..', '.factory-runs')
 
 export type Outcome = 'passed' | 'failed' | 'refused' | 'escalated'
 

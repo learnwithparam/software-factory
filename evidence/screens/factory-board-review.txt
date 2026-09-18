@@ -8,25 +8,25 @@ Review
 Activity
 Audit log
 Work Sessions
+Issue #414: Keep runs for longer than the console can show
 Issue #1: Add a Contributing section to the README
-Issue #109: Show what a thousand tokens costs on each run
-Issue #99: Record how many tool calls a whole run made
-Issue #98: Show what each run cost in the console
-Issue #97: A limit of zero is refused instead of returning nothing
-Show 7 more
+Issue #630: Add a Contributing section to the README
+Issue #636: Keep runs for longer than the console can show
+Issue #634: Warn earlier when spend is heading for the limit
+Show 134 more
 Review Sessions
-PR #156: Remember the view the reader was on
-PR #149 saved-view review
-PR #142: Remember the view the reader was on
-PR #135: Remember the view the reader was on
-PR #128: Remember the view the reader was on
-Show 8 more
+PR #613: Remember the view the reader was on
+PR #599: Remember the view the reader was on
+PR #604: Never report a negative remaining balance
+PR #557: Remember the view the reader was on
+PR #543: Remember the view the reader was on
+Show 30 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-8
+63
 Workshop
 Settings
 Search cards
@@ -45,43 +45,53 @@ Planning
 Building
 0
 Review
-0
 Done
+1
 0
 Canceled
-#162 · Param-Harrison · 7m
+#644 · Param-Harrison · 22m
 Issue:
-Review the pull request that adds a saved view to the console
+Keep runs for longer than the console can show
 Suggested: Investigate
 Investigate
 Param-Harrison
-#160 · Param-Harrison · 7m
-Issue:
-Record how many tool calls a whole run made
-Suggested: Investigate
-Investigate
-Param-Harrison
-#161 · Param-Harrison · 7m
+#642 · Param-Harrison · 22m
 Issue:
 Warn earlier when spend is heading for the limit
 Suggested: Investigate
 Investigate
 Param-Harrison
-#159 · Param-Harrison · 7m
+#643 · Param-Harrison · 22m
+Issue:
+Review the pull request that adds a saved view to the console
+Suggested: Investigate
+Investigate
+Param-Harrison
+#641 · Param-Harrison · 22m
+Issue:
+Record how many tool calls a whole run made
+Suggested: Investigate
+Investigate
+Param-Harrison
+#640 · Param-Harrison · 22m
 Issue:
 Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#158 · Param-Harrison · 7m
+#639 · Param-Harrison · 22m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#157 · Param-Harrison · 7m
+#638 · Param-Harrison · 22m
+PR #647
 Issue:
 Add a Contributing section to the README
-Suggested: Investigate
-Investigate
-Param-Harrison
+effort:low
+impact:low
+Open session
+Workshop
+
+W

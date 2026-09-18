@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
-export const RECORDINGS = join(import.meta.dir, '..', '..', 'recordings')
+export const RECORDINGS = join(import.meta.dirname, '..', '..', 'recordings')
 
 export interface Request {
 	readonly repo: string

@@ -48,8 +48,8 @@ const repo = loadRepo()
  */
 const SHAPE = process.env.FACTORY_SHAPE
 const GRAPH = SHAPE === undefined
-	? join(import.meta.dir, '..', 'fixtures', 'ledger-baseline')
-	: join(import.meta.dir, '..', 'profiles', SHAPE)
+	? join(import.meta.dirname, '..', 'fixtures', 'ledger-baseline')
+	: join(import.meta.dirname, '..', 'profiles', SHAPE)
 if (!existsSync(join(GRAPH, 'targets.json'))) {
 	console.error(`FACTORY_SHAPE=${SHAPE} names no profile: ${GRAPH} has no targets.json`)
 	process.exit(1)

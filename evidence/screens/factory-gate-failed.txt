@@ -19,16 +19,16 @@ Fork 0
  Star 0
 Code
 Issues
-6
+7
 Pull requests
-3
+6
 Actions
 Projects
 Security and quality
 Insights
 Never report a negative remaining balance
-- #321
-#321
+- #604
+#604
 Open
 Param-Harrison
 wants to merge 1 commit into
@@ -38,8 +38,8 @@ gate/remaining-clamped
 +1
 -1
 Lines changed: 1 addition & 1 deletion
-Conversation1
- (1)
+Conversation2
+ (2)
 Commits1
  (1)
 Checks0
@@ -54,7 +54,7 @@ Contributor
 A run that overspends currently reports a negative remaining figure, which reads badly in the console. Clamps it at zero.
 
 Never report a negative remaining balance
-df3c281
+7046a8e
 Param-Harrison
 commented
 Contributor
@@ -63,57 +63,78 @@ Author
 Verdict: request changes
 
 Findings
+Correctness — blocking
 
-Correctness — The core intent is sound: a remainingMinor of -23000 in the JSON output is confusing when the state already says "breached". The change (limit_minor - spent_minor).max(0) is trivially correct Rust. The state_for() function independently detects breaches, so the breach signal is not lost by clamping the remainder.
+Two existing tests fail with this change, and their failure is not a fragile assertion — they encode the documented invariant of the module:
 
-Test gaps (blocking) — Two existing tests break with this change and are not updated:
+services/budget/tests/budget.rs:36-40 — overspend_is_reported_rather_than_clamped asserts remaining_minor == -23_000 when spending 73_000 against a 50_000 limit. The PR clamps remaining to 0, producing a test failure (left: 0, right: -23000).
 
-tests/budget.rs:36 — overspend_is_reported_rather_than_clamped asserts remaining_minor == -23_000; it gets 0. Needs to assert remaining_minor: 0 and verify state: Breached still holds.
-tests/budget.rs:4 — spent_plus_remaining_always_equals_the_limit asserts spent + remaining == limit for all test cases including spent=73_000 against limit=50_000. With clamping at 0, spent(73,000) + remaining(0) ≠ limit(50,000). The test needs to either limit its data set to non-overspent cases or the invariant needs a new formulation.
+services/budget/tests/budget.rs:4-13 — spent_plus_remaining_always_equals_the_limit asserts spent_minor + remaining_minor == limit_minor for every spend case. With remaining clamped at 0 and spent at 73_000, the invariant becomes 73_000 != 50_000 — the module-level invariant spent + remaining == limit (lib.rs:5-6) is broken.
 
-Documentation (blocking) — Two doc comments directly contradict the new behavior and must be updated:
+Documentation inconsistency
 
-services/budget/src/lib.rs:98-99 — "Overspend is reported as a negative remainder rather than clamped to zero, because hiding it is how a breach goes unnoticed." With the state field independently tracking breaches via state_for(), this rationale is obsolete.
-services/budget/src/lib.rs:5-6 — "spent + remaining == limit is an invariant the tests assert" — this invariant no longer holds for overspent budgets.
+The assess() docstring (lib.rs:98-99) explicitly states: "Overspend is reported as a negative remainder rather than clamped to zero, because hiding it is how a breach goes unnoticed." The PR changes the behavior without updating this docstring.
 
-Scope — Focused single-line change. No scope issues.
+Test gap
 
-Pattern-consistency — .max(0) is idiomatic Rust. No pattern concerns.
+No new tests cover the clamped-at-zero behavior. No existing tests are updated to match the changed semantics. No verification evidence is provided in the PR.
+
+Issue context gap
+
+The PR has no closing issue reference and no related issue that provides context or approval for this design change. The PR body describes it as a cosmetic improvement ("reads badly in the console"), but the existing design deliberately surfaces negative remaining as an explicit signal — the format_minor function already handles negative values.
+
+Charter considerations
+
+The charter marks services/budget/** as a protected path (the money path, never modified by an agent unattended). Weakening existing test assertions is also a protected operation per the charter. This change touches both.
 
 Issue and intent
-
-No closing issue is referenced. This is a small corrective PR by the repository owner (Param-Harrison, who authored every line of the crate in the initial commit 916f296). The PR body describes a clear problem (negative remaining reads badly in the console) and a clear solution (clamp at zero). The classification is a bug fix / maintenance change.
-
+Classification: Maintenance/behavior change (not a bug fix — the existing behavior is intentional and documented)
+Related issue: None. No closing issue or context issue exists.
+Labels: None on the PR.
+Scope match: The implemented behavior (clamping remaining to 0) does not match what would be expected from the existing documented contract. The PR title "Never report a negative remaining balance" is accurate for what the code does, but the existing test and doc contract explicitly expects negative reporting.
 Verification
 
-Executed in the session sandbox via env -u GH_TOKEN -u GITHUB_TOKEN cargo test (target: services/budget):
+Executed from services/budget/ on the PR head commit (7046a8e):
 
-9 tests passed
-2 failed (as detailed above)
+cargo build -p budget → builds successfully
+cargo test → 2 of 11 tests FAILED:
+overspend_is_reported_rather_than_clamped — panics at assertion left: 0, right: -23000
+spent_plus_remaining_always_equals_the_limit — panics at invariant broken at spend 73000, left: 73000, right: 50000
+9 tests pass (unaffected: validation, state logic, formatting, currency parsing)
 
-No CI checks are configured on the gate/remaining-clamped branch. The PR is MERGEABLE with a CLEAN merge state.
-
-The pre-PR base showed the original code at 916f296 with remaining_minor: limit_minor - spent_minor. The change was confirmed by comparing the diff and verifying the test failures originate from the new clamping logic.
+Commands run: env -u GH_TOKEN -u GITHUB_TOKEN cargo test (inside services/budget/)
 
 Existing review disposition
 
-No existing reviews, comments, or inline threads. No pending bot reviews detected.
+No existing reviews, comments, or review threads found on the PR.
 
 Requested changes
-Update overspend_is_reported_rather_than_clamped — change the remaining_minor assertion from -23_000 to 0. The state: Breached assertion already checks that the breach is not hidden.
-Fix the invariant test — spent_plus_remaining_always_equals_the_limit fails at spent=73_000. Either exclude overspent values from the test data or update the assertion to check spent + remaining == limit only when spent ≤ limit.
-Update services/budget/src/lib.rs:98-99 — Replace the doc comment on assess() to describe the clamping behavior and note that the state field carries the breach signal.
-Update services/budget/src/lib.rs:5-6 — Update the module-level doc comment to reflect that the spent + remaining == limit invariant holds only when spent_minor ≤ limit_minor.
-Assumptions
-The independent state field (computed by state_for() in the same assess() call) is sufficient to communicate over-budget status. Clamping remaining_minor to 0 does not lose the breach signal.
-The author (repository owner, initial crate author) intentionally changed this behavior; the doc comment on line 98-99 is simply stale and not a design axiom the author still holds.
-Open questions
 
-None.
+Update tests to match the new behavior. If the change is intentional, the two failing tests must be updated and a new test should verify the clamped-at-zero boundary (spent == limit should still yield remaining == 0 as it does today; spent > limit should yield remaining == 0). The spent_plus_remaining_always_equals_the_limit invariant test must be revised or removed — its assertion no longer holds for overspend cases, and removing it requires justification.
+
+Update the assess() docstring (lib.rs:98-99) to describe the clamped behavior instead of the negative-reporting behavior. Clarify why clamping is preferred over the previous explicitly-chosen design.
+
+Update the module-level invariant documentation (lib.rs:5-6) to reflect that spent + remaining == limit holds only when spend does not exceed the limit.
+
+Alternatively, if the existing design of negative remaining is intentional and correct (which the tests and docs assert), close this PR without merging.
+
+Assumptions
+The author's intent is cosmetic — "reads badly in the console" — not a correctness fix. The existing format_minor function already handles negative values, so this is a design preference, not a bug.
+The PR is a first-time contribution from this author (0 merged PRs), which warrants closer scrutiny of the design rationale.
+The absence of an issue means this design change was not discussed or approved before implementation.
+Open questions
+Should the console display logic be updated instead of the money path? For example, the console could format overspend as "€0.00 remaining (overspent by €230.00)" without changing the budget engine's invariant.
 
 Review runtime: openrouter/deepseek/deepseek-v4-flash, reasoning setting: off.
 
  Param-Harrison added the status:changes-requested label 
+Param-Harrison
+commented
+Contributor
+Author
+
+Nothing has changed since my last review pass. The previous verdict (request changes) still stands: 2 tests fail, the documented invariant is broken, and the design change lacks issue context. The three requested changes are still unaddressed.
+
 Sign up for free to join this conversation on GitHub. Already have an account? Sign in to comment
 Reviewers
 No reviews

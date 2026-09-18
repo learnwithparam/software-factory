@@ -19,32 +19,62 @@ Every one of the thirteen end-to-end specs has passed against the real model:
 the six issue routes, the staged gate recovery, the four company shapes, the
 plan revision, the board, and the click paths.
 
-## Not proven: the whole suite as one sequence
+## Proven: the whole suite as one sequence
 
-`make e2e` runs all thirteen specs in order. Every spec has passed on its own.
-**They have never run as one uninterrupted pass.**
+`make e2e` has run all thirteen specs as one uninterrupted pass. It took an hour
+and a quarter, and it found what running the specs separately could not:
 
-That gap is worth naming rather than rounding away, because the specs share one
-board and one repository, and four separate bugs during this build came from a
-spec finding the state a previous spec had left:
+- a shared sign-in bucket. Nine sign-ins inside ten seconds met Better Auth's
+  rate limit, which cannot see a client IP on localhost and so pools every
+  sign-in into one bucket. Six routes died in under two hundred milliseconds.
+  Fixed by signing in once per run in `e2e/global-setup.ts` and reusing the
+  saved session, including in `drive.ts`, which had been signing in separately
+- a board that draws its columns before its cards. `settleBoard` read zero cards
+  three times and called that settled, in a second and a half
+- a hard-coded issue count in two places, one of which had been red since the
+  seventh issue landed
+- `lab-reset` restoring the wrong ownership graph, which would have let the
+  refusal route build the money path
 
-- a route that insisted its item began in intake, after another route moved it
-- a review that reused a verdict from the run before
-- a fixture already repaired by the attempt that failed to read its own result
-- the company-shapes spec leaving the ledger in the last shape it applied, so
-  the cross-stack route was judged by a contract nobody chose
+Every one of those is fixed, and each now has a gate. What the sequence also
+produced is the set of prompt-level instructions the model did not follow, which
+`evidence/prompt-vs-gate.json` records and teach.html teaches rather than hides.
 
-Each is fixed, and each was found by accident rather than by running the
-sequence. A full pass is the only thing that would find the fifth.
+## Run it before the first live session
 
-It costs roughly ninety minutes of model spend and wall clock. Run it before the
-first live session, unattended:
+It costs roughly ninety minutes of model spend and wall clock, and the board has
+to start clean, which `make lab-reset` guarantees and `make e2e` now checks
+before it begins:
 
 ```bash
+make lab-reset
 nohup make e2e > artifacts/e2e.log 2>&1 &
 ```
 
 Then read `review.html`, which is regenerated at the end of that command.
+
+## Not enforced by the platform: the ownership graph
+
+This is the most important line in this file, because the material used to claim
+otherwise.
+
+Mastra Factory reads `AGENTS.md`, which states all three autonomy levels and
+names the file they live in. It has no knowledge of `.factory/` and no code that
+consults the graph before an agent writes a file. There is also no stage gate:
+nothing asks who is allowed to move an item, so an agent that judges its own plan
+finished moves itself into execute and starts building.
+
+On the recorded runs it did both. It modified a path the graph refuses on the
+clean route, and it wrote to a `propose` target with a plan nobody had accepted.
+Neither is a misconfiguration and neither was worked around: the agent was told,
+in the file the product reads, and nothing was there to stop it.
+
+So the graph is advisory on the platform and enforced in the hand-built pipeline,
+where `steps/01-boundary/policy.ts` is called before anything runs.
+`evidence/prompt-vs-gate.json` records every instruction a run did not follow,
+`tests/findings.test.ts` fails if teach.html omits one, and the page teaches the
+contrast rather than the ideal. If you carry one thing from this repository into
+your own, carry the check that reads the graph and refuses the diff.
 
 ## Not proven: approving a gate by clicking
 

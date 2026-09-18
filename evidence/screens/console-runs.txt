@@ -1,0 +1,30 @@
+AGENT RUN LEDGER
+
+Where the time and the money went
+
+Every run the factory finished, with its stages timed separately. The slow stage is rarely the one people expect, which is the whole reason this page exists.
+
+RUNS
+5
+1 refused by policy
+SPEND, 2026-09
+€7.24
+of €500.00 allowed
+BUDGET
+UNDER
+€492.76 remaining
+TOKENS
+433,060
+in and out, every run
+Runs
+
+Newest first. Every figure here was computed by the service that owns it: the ledger for runs and stages, the budget engine for anything denominated in money.
+
+ITEM	OUTCOME	TOOK	TOKENS	COST	RUN
+contract-add-tool-calls	PASSED	17m 20s	101,300	€1.68	run-105
+run-list-keyset-paging	ESCALATED	43m 00s	173,900	€2.96	run-104
+tier-discount-rounding	REFUSED	40s	3,360	€0.05	run-103
+stage-waterfall-overflow	FAILED	23m 10s	108,200	€1.81	run-102
+console-empty-state	PASSED	7m 30s	46,300	€0.74	run-101
+
+Runs come from the ingest service. Anything in money comes from the budget engine.

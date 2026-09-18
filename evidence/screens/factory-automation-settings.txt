@@ -8,22 +8,25 @@ Review
 Activity
 Audit log
 Work Sessions
+Issue #414: Keep runs for longer than the console can show
 Issue #1: Add a Contributing section to the README
-Issue #70: Warn earlier when spend is heading for the limit
-Issue #58: Add a Contributing section to the README
-Issue #50: Add a Contributing section to the README
-Issue #44: Add a Contributing section to the README
-Show 1 more
+Cost per thousand tokens rate column
+README Contributing section implementation
+Issue #575: Add a Contributing section to the README
+Show 116 more
 Review Sessions
-PR #65: Add Contributing section to the README
-PR #57: docs: add Contributing section to README
-PR #19: Add a Contributing section to the README
+PR #557: Remember the view the reader was on
+PR #543: Remember the view the reader was on
+PR #548: Never report a negative remaining balance
+PR #517: Remember the view the reader was on
+PR #509: Remember the view the reader was on
+Show 25 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-2
+57
 Workshop
 Settings
 Search cards
@@ -33,7 +36,7 @@ All labels
 Auto-start runs
 Auto-approve plans
 Intake
-6
+7
 0
 Triage
 0
@@ -46,37 +49,43 @@ Review
 Done
 0
 Canceled
-#92 · Param-Harrison · 3m
+#598 · Param-Harrison · just now
+Issue:
+Keep runs for longer than the console can show
+Suggested: Investigate
+Investigate
+Param-Harrison
+#596 · Param-Harrison · just now
 Issue:
 Warn earlier when spend is heading for the limit
 Suggested: Investigate
 Investigate
 Param-Harrison
-#93 · Param-Harrison · 3m
+#597 · Param-Harrison · just now
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#91 · Param-Harrison · 3m
+#595 · Param-Harrison · just now
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#90 · Param-Harrison · 3m
+#594 · Param-Harrison · just now
 Issue:
-Show what each run cost in the console
+Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#89 · Param-Harrison · 3m
+#593 · Param-Harrison · just now
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#88 · Param-Harrison · 3m
+#592 · Param-Harrison · just now
 Issue:
 Add a Contributing section to the README
 Suggested: Investigate

@@ -181,8 +181,16 @@ export function loadRepo(given?: string, defaults = defaultSkillsDir()): Repo {
 	}
 }
 
+/**
+ * Where the built-in skills live.
+ *
+ * `import.meta.dirname`, not `import.meta.dirname`. The second is Bun's and is
+ * undefined under Node, so a Playwright spec importing this got
+ * `join(undefined, ...)` and a TypeError about a path argument, a long way from
+ * the line that caused it. The first works under both.
+ */
 export function defaultSkillsDir(): string {
-	return join(import.meta.dir, '..', '..', 'skills')
+	return join(import.meta.dirname, '..', '..', 'skills')
 }
 
 /** Turn a glob such as `services/ingest/**` into a matcher. */

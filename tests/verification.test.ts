@@ -13,7 +13,7 @@ import { judge, weakenedTests, type Claimed, type Evidence } from '../steps/04-v
 import { issue } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 
-const SAMPLE = join(import.meta.dir, 'fixtures', 'sample')
+const SAMPLE = join(import.meta.dirname, 'fixtures', 'sample')
 const repo = loadRepo(SAMPLE)
 const item = issue(SAMPLE, '1')
 

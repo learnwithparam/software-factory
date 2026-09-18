@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { note, step, table, title, verdict } from '../lib/out.ts'
 import { loadRepo } from '../lib/repo.ts'
 
-const HERE = import.meta.dir
+const HERE = import.meta.dirname
 
 const MAPPING: Array<[string, string, string]> = [
 	['Boundary', ".factory/charter.md, read by policy.ts", 'transitionPolicy, allowing or rejecting a move'],

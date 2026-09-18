@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { handback, loadBudget, overBudget, run, type Attempt, type Failure } from '../steps/05-loop/loop.ts'
 import { issue } from '../steps/lib/issues.ts'
 
-const SAMPLE = join(import.meta.dir, 'fixtures', 'sample')
+const SAMPLE = join(import.meta.dirname, 'fixtures', 'sample')
 const budget = loadBudget()
 const item = issue(SAMPLE, '1')
 

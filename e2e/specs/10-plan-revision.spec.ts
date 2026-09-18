@@ -20,41 +20,11 @@ import { test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { expect, openBoard, openSession, showBoard } from '../lib/factory.ts'
 import { LEDGER } from '../lib/ledger.ts'
-import { advance, again, announceComment, decisionsFor, itemForRoute, sessionUrl, settleAfter, stageOf, startRun } from '../lib/drive.ts'
+import { advance, announceComment, decisionsFor, itemForRoute, reenterStage, sessionUrl, settleAfter, stageOf, startRun, waitForDecision } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
+import { observe } from '../lib/observe.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
-
-/**
- * What the factory wrote, excluding anything a person did.
- *
- * The first version of this read every comment, so the assertion that the second
- * plan took up the date range was satisfied by the rejection asking for it,
- * which this spec posts itself. A test that passes on its own words is worse
- * than no test: it reported a loop as proven when no second plan existed.
- */
-function factorySaid(issue: number, since: number): string {
-	try {
-		const out = execFileSync('gh', [
-			'api', `repos/${REPO}/issues/${issue}/comments`,
-			'--jq', `[.[] | select((.created_at | fromdateiso8601) > ${Math.floor(since / 1000)}) | select(.body | startswith("Sending this plan back") | not) | .body] | join("\\n")`,
-		], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
-		return out.trim()
-	} catch {
-		return ''
-	}
-}
-
-/** Wait for the factory to write something new, rather than assuming it has. */
-async function waitForPlan(issue: number, since: number, timeoutMs = 15 * 60 * 1000): Promise<string> {
-	const deadline = Date.now() + timeoutMs
-	while (Date.now() < deadline) {
-		const said = factorySaid(issue, since)
-		if (said.length > 200) return said
-		await new Promise((resolve) => setTimeout(resolve, 15_000))
-	}
-	throw new Error(`no second plan on issue #${issue} within ${Math.round(timeoutMs / 60000)} minutes`)
-}
 
 test('a plan is sent back, and the next one answers the objection', async ({ page }) => {
 	test.setTimeout(45 * 60 * 1000)
@@ -123,12 +93,33 @@ test('a plan is sent back, and the next one answers the objection', async ({ pag
 	// the flag the server accepts the request and returns without doing anything,
 	// which is how two runs waited fifteen minutes for a plan nobody had asked
 	// for a second time.
-	await again(item.id, 'planning', 'the plan was sent back, and the priority changed')
+	await reenterStage(item.id, 'planning', 'the plan was sent back, and the priority changed')
 
-	// The claim: the objection produced a second plan. Counted from the board's
-	// own record, because that is where a plan exists.
+	// The claim: the objection produced a second plan. Waiting for that plan
+	// rather than for the item to fall quiet, because a reenter starts every role
+	// the stage carries and the item does not go quiet while any of them is
+	// running or retrying.
+	const second = await waitForDecision(item.id, 'plan', sentBackAt)
+	expect(second.status, 'the objection should have produced a second plan').toBe('succeeded')
 	const after = (await decisionsFor(item.id)).filter((d) => d.role === 'plan').length
-	expect(after, 'the objection should have produced a second plan').toBeGreaterThan(before)
+	expect(after, 'the second plan should be a new decision, not the first one re-read').toBeGreaterThan(before)
+
+	// What else the reenter started. Asking for a stage again runs the whole
+	// stage, and on this run the triage decision it raised alongside the plan
+	// failed while the plan succeeded. Nothing surfaces that: the board shows the
+	// item in planning with a fresh plan, and the failure is only visible by
+	// reading the decision list.
+	const alsoRan = (await decisionsFor(item.id))
+		.filter((d) => Date.parse(d.createdAt) >= sentBackAt && d.role !== 'plan')
+	const failed = alsoRan.filter((d) => d.status === 'failed')
+	observe({
+		route: 'plan-revision',
+		asked: 'reentering a stage runs that stage, and nothing else fails quietly beside it',
+		held: failed.length === 0,
+		saw: failed.length === 0
+			? `${alsoRan.length} other decision(s) raised, none failed`
+			: `${failed.map((d) => `${d.role ?? 'unroled'} failed`).join(', ')} alongside a succeeding plan, reported nowhere`,
+	})
 
 	// Back to the same session by address. Plan and triage share one thread, so
 	// this is the conversation the second plan was written into, and the Open

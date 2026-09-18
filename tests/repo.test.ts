@@ -20,7 +20,7 @@ import {
 	unowned,
 } from '../steps/lib/repo.ts'
 
-const SAMPLE = join(import.meta.dir, 'fixtures', 'sample')
+const SAMPLE = join(import.meta.dirname, 'fixtures', 'sample')
 const repo = loadRepo(SAMPLE)
 
 it('a repository is described entirely by its own .factory directory', () => {
@@ -31,13 +31,13 @@ it('a repository is described entirely by its own .factory directory', () => {
 
 it('a repository with no .factory is refused rather than given defaults', () => {
 	// Guessing a policy is worse than having none, because nobody chose it.
-	expect(() => loadRepo(join(import.meta.dir, 'fixtures'))).toThrow(NotConfigured)
+	expect(() => loadRepo(join(import.meta.dirname, 'fixtures'))).toThrow(NotConfigured)
 })
 
 it('a charter that cannot be parsed refuses everything rather than permitting it', () => {
 	// Half a policy is not a policy. A charter missing its protected block must
 	// refuse, not proceed on the part it managed to read.
-	expect(() => readCharter(join(import.meta.dir, 'fixtures', 'broken'))).toThrow(NotConfigured)
+	expect(() => readCharter(join(import.meta.dirname, 'fixtures', 'broken'))).toThrow(NotConfigured)
 	expect(() => readCharter('/nonexistent')).toThrow(NotConfigured)
 })
 

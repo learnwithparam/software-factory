@@ -19,7 +19,7 @@ import { runGate } from './gate.ts'
 import { judge, weakenedTests, type Claimed, type Evidence } from './verifier.ts'
 
 const repo = loadRepo()
-const RECORDED_REVIEWS = join(import.meta.dir, 'reviews')
+const RECORDED_REVIEWS = join(import.meta.dirname, 'reviews')
 
 /** A tiny module and its test, written to a scratch directory so the proof is real. */
 function scratch(implementation: string, test: string): string {

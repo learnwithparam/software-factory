@@ -497,19 +497,6 @@ export async function announceComment(repo: string, issue: number, commentId: nu
 	await say(repo, issue, commentId, await installationFor(await cookie()))
 }
 
-/**
- * Run a stage again and wait for what it produces.
- *
- * advance() for the same stage, with the flag that stops the server accepting
- * the request and doing nothing.
- */
-export async function again(itemId: string, stage: string, cause: string): Promise<Settled> {
-	const current = (await items()).find((candidate) => candidate.id === itemId)
-	if (current === undefined) throw new Error(`work item ${itemId} vanished`)
-	const at = Date.now()
-	await redo(current, stage, cause)
-	return settleAfter(itemId, at)
-}
 
 /**
  * The address of a session, built rather than clicked.
@@ -523,4 +510,92 @@ export async function sessionUrl(item: WorkItem, role: string): Promise<string> 
 	const thread = item.sessions?.[role]?.threadId
 	if (thread === undefined) throw new Error(`${item.title} has no ${role} session`)
 	return `${BASE}/factories/${await projectId()}/workspaces/${thread}/threads/${thread}`
+}
+
+/**
+ * Who moved an item into a stage, as the board records it.
+ *
+ * The only place that says so. An operator's id, `factory-rule-dispatcher` when
+ * a rule fired, or `agent:<uuid>` when the agent advanced its own work.
+ */
+export function movedBy(item: WorkItem, stage: string): string | undefined {
+	return item.stageHistory?.filter((entry) => entry.stage === stage).pop()?.by
+}
+
+/**
+ * Accept work into the next stage, allowing for the agent having gone already.
+ *
+ * `advance` refuses a stage the item is already in, and it is right to: asking
+ * twice is silently ignored and three runs were spent waiting on work nobody
+ * had started. But the refusal also stopped the suite dead on the most
+ * interesting thing the factory does, which is move itself.
+ *
+ * The engine does not hold an item at a stage boundary waiting for a person.
+ * Nothing in the transition service asks who is allowed to advance, so an agent
+ * that decides its plan is ready moves to execute and starts building. On a
+ * `build` target that is the charter working as written. On a `propose` target
+ * it is the acceptance step going missing, and the caller wants to know which
+ * happened rather than to be handed an exception.
+ */
+export async function acceptInto(
+	itemId: string,
+	stage: string,
+	cause: string,
+): Promise<{ settled: Settled; by: string }> {
+	const current = (await items()).find((candidate) => candidate.id === itemId)
+	if (current === undefined) throw new Error(`work item ${itemId} vanished`)
+	if (stageOf(current) !== stage) {
+		await transition(current, stage, cause)
+		return { settled: await settle(itemId), by: 'person' }
+	}
+	const by = movedBy(current, stage) ?? 'unrecorded'
+	return { settled: await settle(itemId), by }
+}
+
+/**
+ * Wait for a stage to produce a finished decision, rather than for the item to
+ * go quiet.
+ *
+ * settle() asks whether anything on the item is busy, which is the right
+ * question when one stage runs at a time and the wrong one after a reenter.
+ * Reentering planning re-dispatches every role the stage carries: the run that
+ * proved this created a plan decision and a triage decision in the same second,
+ * the triage one failed, and the item never satisfied "nothing busy, something
+ * finished" inside fifteen minutes. The second plan had succeeded eleven seconds
+ * after the objection was posted.
+ *
+ * So wait for the artefact the claim is about. Anything else on the item is that
+ * stage's business, and the caller can look at it separately.
+ */
+export async function waitForDecision(
+	itemId: string,
+	role: Role,
+	since: number,
+	timeoutMs = 15 * 60 * 1000,
+): Promise<Decision> {
+	const deadline = Date.now() + timeoutMs
+	while (Date.now() < deadline) {
+		await approveWaiting(itemId)
+		const found = (await decisionsFor(itemId))
+			.filter((d) => d.role === role && Date.parse(d.createdAt) >= since)
+			.filter((d) => d.status === 'succeeded' || d.status === 'failed')
+			.pop()
+		if (found !== undefined) return found
+		await new Promise((resolve) => setTimeout(resolve, 5_000))
+	}
+	throw new Error(
+		`no ${role} decision finished on ${itemId} within ${Math.round(timeoutMs / 60000)} minutes of being asked for one`,
+	)
+}
+
+/**
+ * Ask for a stage again without waiting for the item to settle.
+ *
+ * `again` is this plus settle, and settle is what a reenter breaks. The caller
+ * pairs this with waitForDecision to wait on the stage it actually asked for.
+ */
+export async function reenterStage(itemId: string, stage: string, cause: string): Promise<void> {
+	const current = (await items()).find((candidate) => candidate.id === itemId)
+	if (current === undefined) throw new Error(`work item ${itemId} vanished`)
+	await redo(current, stage, cause)
 }

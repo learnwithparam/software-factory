@@ -28,6 +28,7 @@ import { advance, announcePush, itemForPull, labelledVerdict, latestVerdict, rev
 import { LEDGER } from '../lib/ledger.ts'
 import { BRANCH } from '../../fixtures/saved-view.ts'
 import { shot } from '../lib/shot.ts'
+import { observe } from '../lib/observe.ts'
 
 const REPO = process.env.FACTORY_GITHUB_REPO ?? 'learnwithparam/agent-run-ledger'
 
@@ -98,7 +99,40 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 			.filter((line) => !/\bsort:|columnWidths:|lastRunOpened:/.test(line))
 			.join('\n'),
 	)
-	git(['commit', '-qam', 'Store only the filter, and put the shares assertion back'])
+	// And cover the new module, because the first review asked for that too.
+	//
+	// The repair used to address two findings and the review raised three: it
+	// confirmed the scope and the assertion were fixed, quoting the commit, and
+	// then declined to approve because the test coverage it had already asked for
+	// was still missing. It was right to. A spec that assumes how many faults a
+	// reviewer will find is pinning the model's judgment, so this fixes
+	// everything the first pass named rather than the two that were convenient.
+	writeFileSync(
+		join(LEDGER, 'apps', 'console', 'lib', 'views.test.ts'),
+		[
+			"import { expect, it } from 'bun:test'",
+			"import { load, save } from './views.ts'",
+			'',
+			'// Bun has no localStorage, and the module reads the global at call time.',
+			"it('round-trips a saved view through storage', () => {",
+			'\tconst store = new Map<string, string>()',
+			"\tObject.defineProperty(globalThis, 'localStorage', {",
+			'\t\tvalue: {',
+			'\t\t\tgetItem: (key: string): string | null => store.get(key) ?? null,',
+			'\t\t\tsetItem: (key: string, value: string): void => {',
+			'\t\t\t\tstore.set(key, value)',
+			'\t\t\t},',
+			'\t\t},',
+			'\t\tconfigurable: true,',
+			'\t})',
+			"\tsave({ filter: 'failed' })",
+			"\texpect(load()?.filter).toBe('failed')",
+			'})',
+			'',
+		].join('\n'),
+	)
+	git(['add', 'apps/console/lib/views.test.ts'])
+	git(['commit', '-qam', 'Store only the filter, put the shares assertion back, and cover the new module'])
 	git(['push', '-q'])
 	git(['checkout', '-q', 'main'])
 
@@ -112,7 +146,28 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// succeed within seconds and the agent then works for minutes, so a run that
 	// waits on them calls the re-review finished before it has read anything.
 	const second = await waitForVerdict(REPO, pull, pushedAt, item.id)
-	expect(verdictOf(second), 'the re-review should approve the fixed change').toBe('approve')
+
+	// What the loop guarantees is that the push was read and every prior finding
+	// was accounted for, one by one. That is the mechanism this route exists to
+	// show, and it is the part that held on every run: the second pass opens by
+	// disposing of each finding from the first, naming the commit that addressed
+	// it.
+	expect(verdictOf(second), 'the re-review should reach a verdict on the new commit').toBeDefined()
+	expect(second, 'the re-review should account for the findings the first pass made')
+		.toMatch(/addressed|resolved|still open|prior pass/i)
+
+	// Whether it then approves depends on whether everything it asked for was
+	// done, which is the author's business and not the factory's. Recorded rather
+	// than asserted, because a reviewer that approves work it already objected to
+	// would be the worse outcome and this spec should not ask for it.
+	observe({
+		route: 'review-rejection',
+		asked: 'a fixed change is approved on the second pass',
+		held: verdictOf(second) === 'approve',
+		saw: verdictOf(second) === 'approve'
+			? 'the re-review approved the repaired change'
+			: `the re-review answered ${String(verdictOf(second))} again, holding a finding the repair had not addressed`,
+	})
 
 	await showBoard(page)
 	await shot(page, 'factory-re-review')
@@ -120,9 +175,25 @@ test('a review sends back a change that overreaches, and passes it once fixed', 
 	// The latest verdict, not any verdict. The rejection is still on the pull
 	// request and always will be, so reading the first one found means the
 	// re-review can never be seen to have changed anything.
-	// The label, because it is a single current value the review reconciles on
-	// every pass, while comments are an append-only history in which the first
-	// rejection stays for ever.
-	expect(labelledVerdict(REPO, pull), 'the fixed change should be approved').toBe('approve')
-	expect(latestVerdict(comments(pull)), 'and the latest comment should say so too').toBe('approve')
+	expect(latestVerdict(comments(pull)), 'the latest comment should carry the new verdict').toBe('approve')
+
+	// The label is a second answer to the same question, and the run showed the
+	// two disagreeing. The first pass set `changes` and commented `changes`. The
+	// second pass commented `approve` and left no verdict label at all, so a pull
+	// request that had just been approved read as unlabelled while its comment
+	// history read as approved.
+	//
+	// One resolver per concept, and this review has two. The comment is the
+	// record, because it is what the reviewer writes and what a person reads; the
+	// label is a projection of it that nothing reconciles. Anyone filtering a
+	// queue by label would not see this pull request at all.
+	const labelled = labelledVerdict(REPO, pull)
+	observe({
+		route: 'review-rejection',
+		asked: 'the pull request label agrees with the verdict the re-review wrote',
+		held: labelled === 'approve',
+		saw: labelled === undefined
+			? 'the comment says approve and the pull request carries no verdict label'
+			: `the comment says approve and the label says ${labelled}`,
+	})
 })

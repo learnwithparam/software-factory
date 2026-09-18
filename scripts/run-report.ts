@@ -18,9 +18,10 @@
  * a person stood in.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { session } from './factory-connect.ts'
+import { merge, runsCounted, uncounted, type Observation, type Record } from './lib/observations.ts'
 import { ROOT } from './tree-hash.ts'
 
 const BASE = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
@@ -120,3 +121,68 @@ const report: RunReport = {
 mkdirSync(join(ROOT, 'evidence'), { recursive: true })
 writeFileSync(join(ROOT, 'evidence', 'factory-run.json'), `${JSON.stringify(report, null, '\t')}\n`)
 console.log(`factory-run.json: ${stages.length} stages from ${finished.length} finished decisions, human wait ${report.humanWaitLabel}`)
+
+/**
+ * What the prompts asked for, against what the runs did.
+ *
+ * The suite asserts everything the engine enforces and records everything only
+ * a prompt requests, because those two fail for different reasons and a stack
+ * trace cannot tell them apart. This carries the second kind into evidence, so
+ * teach.html quotes measurements rather than recollection and a test can hold
+ * the page to them.
+ *
+ * Counted across runs rather than overwritten, which is the whole point. Two
+ * sequences against the same issues disagreed: on one the agent followed the
+ * branch convention, opened a pull request and named the path it refused, and
+ * on the other it did none of the three. A record holding only the latest
+ * reading would show a clean run and teach that everything is fine. What is
+ * worth teaching is that the same instruction is obeyed sometimes, so every
+ * claim carries how many runs held it and how many did not.
+ *
+ * Printed as well as written. A finding buried in a JSON file nobody opens is
+ * the same decoration as a gate wired to no command, so make e2e ends by saying
+ * out loud which instructions the model did not follow.
+ */
+const OBSERVED = join(ROOT, 'artifacts', 'observations.json')
+const RECORD = join(ROOT, 'evidence', 'prompt-vs-gate.json')
+
+const lines: string[] = existsSync(OBSERVED)
+	? readFileSync(OBSERVED, 'utf8').split('\n').filter((line) => line.trim() !== '')
+	: []
+
+{
+	const held: Record = existsSync(RECORD)
+		? (JSON.parse(readFileSync(RECORD, 'utf8')) as Record)
+		: { findings: [] }
+	const before = held.findings
+
+	// Only the lines written since this file was last counted. The observations
+	// file is append-only within a run and deleted by make e2e at the start of
+	// the next, so an offset says exactly what is new. Counting the whole file
+	// again would fold the sequence's readings into the rerun's and report two
+	// runs of everything where there was one of each, which is a fabricated
+	// number under a page that exists to stop fabricated numbers.
+	const observations = uncounted(held, lines).map((line) => JSON.parse(line) as Observation)
+	if (observations.length === 0) {
+		console.log(`prompt-vs-gate.json: nothing observed since it was last counted, left at ${before.length} claims`)
+		process.exit(0)
+	}
+
+	const findings = merge(held, observations)
+	const runs = runsCounted(findings)
+	writeFileSync(
+		RECORD,
+		`${JSON.stringify(
+			{ takenAt: report.takenAt, model: report.model, runs, countedLines: lines.length, countedFirst: lines[0], findings },
+			null,
+			'\t',
+		)}\n`,
+	)
+
+	const everMissed = findings.filter((finding) => finding.missedRuns > 0)
+	console.log(`prompt-vs-gate.json: ${findings.length} prompt-level claims over ${runs} run(s), ${everMissed.length} not always honoured`)
+	for (const finding of everMissed) {
+		console.log(`  ${finding.route}: ${finding.asked}`)
+		console.log(`    held ${finding.heldRuns}, missed ${finding.missedRuns}: ${finding.sawWhenMissed ?? finding.saw}`)
+	}
+}

@@ -13,7 +13,7 @@ import { replayExecutor } from '../steps/lib/executor.ts'
 import { issue, issuesIn } from '../steps/lib/issues.ts'
 import { loadRepo } from '../steps/lib/repo.ts'
 
-const SAMPLE = join(import.meta.dir, 'fixtures', 'sample')
+const SAMPLE = join(import.meta.dirname, 'fixtures', 'sample')
 const repo = loadRepo(SAMPLE)
 const executor = replayExecutor()
 const run = (id: string, extra = {}) =>

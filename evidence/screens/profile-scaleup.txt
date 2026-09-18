@@ -8,25 +8,25 @@ Review
 Activity
 Audit log
 Work Sessions
+Issue #414: Keep runs for longer than the console can show
 Issue #1: Add a Contributing section to the README
-Issue #285: Warn earlier when spend is heading for the limit
-Issue #278: Warn earlier when spend is heading for the limit
-Issue #272: Review the pull request that adds a saved view to the console
-Issue #271: Warn earlier when spend is heading for the limit
-Show 39 more
+Issue #626: Warn earlier when spend is heading for the limit
+Budget warning threshold issue #618 triage
+Issue #612: Keep runs for longer than the console can show
+Show 130 more
 Review Sessions
-PR #273: Remember the view the reader was on
-PR #237: Remember the view the reader was on
-PR #194: Remember the view the reader was on
-PR #171 factory review
-PR #163: Remember the view the reader was on
-Show 12 more
+PR #613: Remember the view the reader was on
+PR #599: Remember the view the reader was on
+PR #604: Never report a negative remaining balance
+PR #557: Remember the view the reader was on
+PR #543: Remember the view the reader was on
+Show 28 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-21
+60
 Workshop
 Settings
 Search cards
@@ -36,7 +36,7 @@ All labels
 Auto-start runs
 Auto-approve plans
 Intake
-5
+6
 Triage
 1
 0
@@ -49,37 +49,43 @@ Review
 Done
 0
 Canceled
-#286 · Param-Harrison · 4m
+#627 · Param-Harrison · 5m
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#284 · Param-Harrison · 4m
+#628 · Param-Harrison · 5m
+Issue:
+Keep runs for longer than the console can show
+Suggested: Investigate
+Investigate
+Param-Harrison
+#625 · Param-Harrison · 5m
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#283 · Param-Harrison · 4m
+#624 · Param-Harrison · 5m
 Issue:
 Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#282 · Param-Harrison · 4m
+#623 · Param-Harrison · 5m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#281 · Param-Harrison · 4m
+#622 · Param-Harrison · 5m
 Issue:
 Add a Contributing section to the README
 Suggested: Investigate
 Investigate
 Param-Harrison
-#285 · Param-Harrison · 4m
+#626 · Param-Harrison · 5m
 Issue:
 Warn earlier when spend is heading for the limit
 effort:low

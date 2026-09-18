@@ -20,7 +20,7 @@ import { session } from './factory-connect.ts'
 import { loadRepo, repoRoot } from '../steps/lib/repo.ts'
 
 const BASE = process.env.MASTRACODE_PUBLIC_URL ?? 'http://localhost:4111'
-const HERE = join(import.meta.dir, '..')
+const HERE = join(import.meta.dirname, '..')
 const SHAPES = ['solo', 'startup', 'scaleup', 'enterprise'] as const
 
 interface Board {

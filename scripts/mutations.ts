@@ -496,6 +496,40 @@ export const MUTATIONS: Record<string, Mutation> = {
 		because: 'the record stops carrying a figure the page is quoting, so the page is quoting nothing',
 	},
 
+	'tests/observations.test.ts > takes everything when a new run is longer than the count it replaces': {
+		file: 'scripts/lib/observations.ts',
+		find: 'record.countedFirst === lines[0] && ',
+		replace: '',
+		because: 'a new run is told from an appended one by length alone, so a sequence longer than the running total loses its first readings and the findings table under-reports',
+	},
+	'tests/observations.test.ts > keeps both sides when a later run behaves differently': {
+		file: 'scripts/lib/observations.ts',
+		find: '(prior?.missedRuns ?? 0) + (entry.held ? 0 : 1)',
+		replace: '(entry.held ? 0 : 1)',
+		because: 'a later run that behaves clears the record of the one that did not, which is how a demonstration comes to teach that everything is fine',
+	},
+
+	'tests/platform.test.ts > uses no runtime-specific path helper that breaks under Node': {
+		file: 'steps/lib/executor.ts',
+		find: 'join(import.meta.dirname,',
+		replace: 'join(import.meta.dir,',
+		because: 'a library file returns to the Bun-only path helper, which is undefined under the Node that runs the Playwright suite',
+	},
+
+	'tests/findings.test.ts > that did not hold on some run, appears on the page': {
+		edits: [
+			{ file: 'teach.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an underspecified issue', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an underspecified issue' },
+			{ file: 'teach.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an unanswered question', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an unanswered question' },
+		],
+		because: 'the page drops the one finding the record has watched fail on every run it counted, which is the failure mode of anybody writing up their own demonstration',
+	},
+	'tests/findings.test.ts > is described on the page in the words the run used': {
+		file: 'teach.html',
+		find: 'an agent changes only paths the ownership graph allows it to change',
+		replace: 'an agent behaves itself around the ownership graph',
+		because: 'the page softens what was asked for until the finding it recorded no longer says anything',
+	},
+
 	// 12 Example repository
 	'tests/example-repo.test.ts > claims every file it contains': {
 		file: 'example:.factory/targets.json',

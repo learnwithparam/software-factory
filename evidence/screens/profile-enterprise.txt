@@ -8,25 +8,25 @@ Review
 Activity
 Audit log
 Work Sessions
+Issue #414: Keep runs for longer than the console can show
 Issue #1: Add a Contributing section to the README
-Issue #292: Warn earlier when spend is heading for the limit
-Issue #285: Warn earlier when spend is heading for the limit
-Issue #278: Warn earlier when spend is heading for the limit
-Issue #272: Review the pull request that adds a saved view to the console
-Show 40 more
+Issue #634: Warn earlier when spend is heading for the limit
+Issue #626: Warn earlier when spend is heading for the limit
+Budget warning threshold issue #618 triage
+Show 131 more
 Review Sessions
-PR #273: Remember the view the reader was on
-PR #237: Remember the view the reader was on
-PR #194: Remember the view the reader was on
-PR #171 factory review
-PR #163: Remember the view the reader was on
-Show 12 more
+PR #613: Remember the view the reader was on
+PR #599: Remember the view the reader was on
+PR #604: Never report a negative remaining balance
+PR #557: Remember the view the reader was on
+PR #543: Remember the view the reader was on
+Show 28 more
 User Sessions
 
 No sessions yet
 
 Needs attention
-24
+61
 Workshop
 Settings
 Search cards
@@ -36,7 +36,7 @@ All labels
 Auto-start runs
 Auto-approve plans
 Intake
-5
+6
 Triage
 1
 0
@@ -49,40 +49,48 @@ Review
 Done
 0
 Canceled
-#293 · Param-Harrison · 4m
+#636 · Param-Harrison · 5m
+Issue:
+Keep runs for longer than the console can show
+Suggested: Investigate
+Investigate
+Param-Harrison
+#635 · Param-Harrison · 5m
 Issue:
 Review the pull request that adds a saved view to the console
 Suggested: Investigate
 Investigate
 Param-Harrison
-#290 · Param-Harrison · 4m
-Issue:
-Show what a thousand tokens costs on each run
-Suggested: Investigate
-Investigate
-Param-Harrison
-#291 · Param-Harrison · 4m
+#633 · Param-Harrison · 5m
 Issue:
 Record how many tool calls a whole run made
 Suggested: Investigate
 Investigate
 Param-Harrison
-#288 · Param-Harrison · 4m
+#632 · Param-Harrison · 5m
 Issue:
-Add a Contributing section to the README
+Show what a thousand tokens costs on each run
 Suggested: Investigate
 Investigate
 Param-Harrison
-#289 · Param-Harrison · 4m
+#631 · Param-Harrison · 5m
 Issue:
 A limit of zero is refused instead of returning nothing
 Suggested: Investigate
 Investigate
 Param-Harrison
-#292 · Param-Harrison · 4m
+#630 · Param-Harrison · 5m
+Issue:
+Add a Contributing section to the README
+Suggested: Investigate
+Investigate
+Param-Harrison
+#634 · Param-Harrison · 5m
 Issue:
 Warn earlier when spend is heading for the limit
-Feature request · needs your approval
+effort:low
+impact:low
+Maintenance · needs your approval
 Accept
 Open session
 Workshop

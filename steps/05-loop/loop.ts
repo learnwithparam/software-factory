@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Issue } from '../lib/issues.ts'
 
-export const BUDGET = join(import.meta.dir, 'budget.json')
+export const BUDGET = join(import.meta.dirname, 'budget.json')
 
 export type StageName = 'claim' | 'context' | 'implement' | 'gates' | 'verify' | 'human'
 
