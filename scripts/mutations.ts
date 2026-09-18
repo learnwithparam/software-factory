@@ -97,8 +97,8 @@ export const MUTATIONS: Record<string, Mutation> = {
 	},
 	'tests/gate.test.ts > the tree stamp excludes prose and includes code': {
 		file: 'scripts/tree-hash.ts',
-		find: '\t/\\.(md|html|pdf)$|^teach\\/(teach|tokens)\\.css$|^scripts\\/(book|build-book)\\.ts$|^scripts\\/pdf-freshness\\.json$|^tests\\/book\\.test\\.ts$/',
-		replace: '\t/^$/',
+		find: '\treturn STAMPED.some(([prefix]) => matches(file, prefix))',
+		replace: '\treturn true',
 		because: 'the two stamps stop differing, so any e2e result looks fresh',
 	},
 

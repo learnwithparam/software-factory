@@ -13,6 +13,7 @@ import { idOf } from '../scripts/junit.ts'
 import { MUTATIONS } from '../scripts/mutations.ts'
 import { listTests } from '../scripts/run-tests.ts'
 import { TOTAL_POINTS, allChecks, declaredPoints } from '../scripts/rubric.ts'
+import { isStamped, makefileSlice, trackedFiles, unclassified } from '../scripts/tree-hash.ts'
 import { ROOT, treeHash } from '../scripts/tree-hash.ts'
 
 const makefile = readFileSync(join(ROOT, 'Makefile'), 'utf8')
@@ -93,4 +94,42 @@ it('the prose check is wired into make check', () => {
 it('the tree stamp excludes prose and includes code', () => {
 	// Two hashes that never differ would silently make every e2e result look fresh.
 	expect(treeHash(true)).not.toEqual(treeHash(false))
+
+	// And the split has to be the real one rather than any split at all. Prose out,
+	// because editing a run sheet must not invalidate a fifteen-minute run; the
+	// harness in, because editing what the run executes must.
+	const stamped = trackedFiles().filter(isStamped)
+	expect(stamped.filter((file) => file.startsWith('teach')), 'prose is inside the stamp').toEqual([])
+	expect(stamped.some((file) => file.startsWith('steps/')), 'the harness is outside the stamp').toBe(true)
+})
+
+it('every tracked path is on one side of the end-to-end stamp', () => {
+	// The stamp used to be "everything except a pattern matching prose", so a file
+	// nobody thought about was stamped by default: a new teaching page silently
+	// invalidated every recorded run, and an unrelated Makefile target cost a full
+	// rerun. Nothing is on either side by default now, and this is what makes
+	// somebody choose.
+	const orphans = unclassified(trackedFiles())
+	expect(
+		orphans.slice(0, 3),
+		`claimed by neither STAMPED nor NOT_STAMPED in scripts/tree-hash.ts. Say which side, with the reason`,
+	).toEqual([])
+})
+
+it('the stamp covers what an end-to-end run loads, and not what it cannot reach', () => {
+	expect(isStamped('steps/04-verification/gate.ts'), 'a step the harness runs is not stamped').toBe(true)
+	expect(isStamped('e2e/specs/01-clean-path.spec.ts'), 'a spec is not stamped').toBe(true)
+	expect(isStamped('scripts/run-report.ts'), 'a script the e2e recipe calls is not stamped').toBe(true)
+	expect(isStamped('teach/teach.css'), 'a print stylesheet cannot change what a run proved').toBe(false)
+	expect(isStamped('tests/book.test.ts'), 'a unit test is not loaded by a spec').toBe(false)
+	expect(isStamped('scripts/build-book.ts'), 'the PDF builder is not loaded by a spec').toBe(false)
+})
+
+it('the Makefile is stamped by recipe, and the recipe still exists', () => {
+	// If a rename made the extraction return nothing, the stamp would still look
+	// healthy while covering less than it claims, so a missing recipe throws.
+	const slice = makefileSlice()
+	expect(slice).toContain('e2e:')
+	expect(slice, 'the slice does not contain the command that runs the specs').toContain('playwright test')
+	expect(slice, 'a target that cannot touch the harness is inside the stamp').not.toContain('book:')
 })

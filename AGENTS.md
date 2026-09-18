@@ -29,6 +29,10 @@ A factory whose own suite knows the codebase it was written against is a script 
 
 ## Rules
 
+- **The end-to-end stamp covers what a run loads, and nothing else.** `scripts/tree-hash.ts` carries
+  two lists with a reason per entry, the Makefile is stamped recipe by recipe, and
+  `tests/gate.test.ts` fails when a tracked path is claimed by neither. Adding a target that cannot
+  reach the harness must not cost a rerun; a change to a step must.
 - **The score is the definition of done.** Every point in `scripts/rubric.ts` is bound to one test,
   and `tests/gate.test.ts` fails when the rubric names a test that does not exist. Add the test and
   the rubric line in the same change.
