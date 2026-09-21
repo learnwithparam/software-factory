@@ -1,0 +1,22 @@
+{
+  "shape": "flow",
+  "alt": "The agent investigates freely, ordinary code reads what the run left on disk, and the verdict can only get stricter.",
+  "caption": "Freedom where judgement helps, none in the sentence a person acts on.",
+  "per": 3,
+  "steps": [
+    {
+      "title": "Agent",
+      "note": "free to explore"
+    },
+    {
+      "title": "Code reads the run",
+      "tone": "dark",
+      "note": "ordinary code"
+    },
+    {
+      "title": "Verdict",
+      "tone": "mark",
+      "note": "only stricter"
+    }
+  ]
+}

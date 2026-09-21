@@ -1,0 +1,20 @@
+{
+  "shape": "fan",
+  "alt": "The cold reviewer on the left and three defects it finds on the right.",
+  "caption": "Not syntax. The change that passes its tests while doing something nobody asked.",
+  "from": {
+    "title": "Cold reviewer",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "Extra files touched"
+    },
+    {
+      "title": "More data stored"
+    },
+    {
+      "title": "Assertion weakened"
+    }
+  ]
+}

@@ -14,13 +14,16 @@ import { describe, expect, it } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from '../scripts/tree-hash.ts'
-import { orgShapes } from '../scripts/org-shapes.ts'
+import { SPEC, orgShapes } from '../scripts/org-shapes.ts'
 
-const page = readFileSync(join(ROOT, 'teach.html'), 'utf8')
+const page = readFileSync(join(ROOT, 'workbook.html'), 'utf8')
 
 describe('the four company shapes', () => {
 	it('are drawn from the profiles, not written down beside them', () => {
-		expect(page).toContain(orgShapes())
+		// The description on disk is what the drawing tool reads, so it has to be the
+		// one the profiles produce, and the workbook has to place it.
+		expect(JSON.parse(readFileSync(SPEC, 'utf8'))).toEqual(orgShapes())
+		expect(page).toContain('data-diagram="org-shapes"')
 	})
 
 	it('disagree about the money path, or there is nothing to teach', () => {

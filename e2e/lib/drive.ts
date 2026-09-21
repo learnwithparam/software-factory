@@ -504,7 +504,7 @@ export async function announceComment(repo: string, issue: number, commentId: nu
  * Which button opens a session depends on the stage: a resting card offers
  * Investigate, one in planning offers Build, and Open session comes and goes.
  * Four runs were spent waiting for a button whose label changes underneath the
- * run sheet, when the work item has carried the thread id all along.
+ * guide, when the work item has carried the thread id all along.
  */
 export async function sessionUrl(item: WorkItem, role: string): Promise<string> {
 	const thread = item.sessions?.[role]?.threadId

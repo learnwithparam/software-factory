@@ -1,0 +1,20 @@
+{
+  "shape": "fan",
+  "alt": "One skill on the left feeding tasks in three repositories on the right.",
+  "caption": "Improve it once and every task in every repository gets the improvement.",
+  "from": {
+    "title": "One skill",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "Task in repo A"
+    },
+    {
+      "title": "Task in repo B"
+    },
+    {
+      "title": "Task in repo C"
+    }
+  ]
+}

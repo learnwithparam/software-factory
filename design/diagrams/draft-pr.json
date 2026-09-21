@@ -1,0 +1,26 @@
+{
+  "shape": "stack",
+  "alt": "A draft pull request carries the gate verdict, the independent verdict, the negative proof and the timings and cost.",
+  "caption": "A reviewer opens one thing and can see whether the work was checked before deciding whether it is right.",
+  "labelWidth": 130,
+  "layers": [
+    {
+      "title": "Draft",
+      "tone": "mark",
+      "note": "no person yet"
+    },
+    {
+      "title": "Gate verdict",
+      "note": "the exact line"
+    },
+    {
+      "title": "Independent verdict"
+    },
+    {
+      "title": "Negative proof"
+    },
+    {
+      "title": "Timings and cost"
+    }
+  ]
+}

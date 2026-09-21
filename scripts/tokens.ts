@@ -1,10 +1,8 @@
 /**
- * Read design/tokens.json and render the CSS every surface imports.
+ * Read design/tokens.json and render the CSS the workbook and the guide import.
  *
- * Both the teach surfaces and the console read a generated file rather than
- * importing across the factory and target boundary. tests/design.test.ts fails
- * when a generated file on disk differs from what this renders, so the copies
- * cannot drift apart without the gate saying so.
+ * tests/design.test.ts fails when the generated file on disk differs from what
+ * this renders, so the copy cannot drift from the source without the gate saying so.
  */
 
 import { readFileSync } from 'node:fs'
@@ -12,12 +10,13 @@ import { join } from 'node:path'
 import { ROOT } from './tree-hash.ts'
 
 export interface Tokens {
-	color: Record<string, { value: string; use: string; role: 'text' | 'surface' | 'border' | 'state' }>
+	sampled: string
+	color: Record<string, { value: string; use: string; source: string; role: 'text' | 'surface' | 'border' | 'state' | 'fill' }>
 	contrast: { pairs: Array<{ fg: string; bg: string; level: 'AA' | 'AAA' | 'AA-large' }> }
 	font: Record<string, { value: string; use: string }>
 	size: Record<string, string>
-	/** Reading measures. Prose is read and takes the narrower one; furniture is scanned. */
-	measure: Record<string, string>
+	/** Print geometry in millimetres. The canvas is in diagram units, about one printed point each. */
+	page: { width: number; canvas: number }
 	space: Record<string, string>
 	radius: Record<string, string>
 	surfaces: Array<{ name: string; out: string }>
@@ -57,7 +56,7 @@ export function renderCss(t: Tokens, surface: string): string {
 		lines.push(`\t--font-${name}: ${token.value};`)
 	}
 	for (const [name, value] of Object.entries(t.size)) lines.push(`\t--${name}: ${value};`)
-	for (const [name, value] of Object.entries(t.measure)) lines.push(`\t--measure-${name}: ${value};`)
+	for (const [name, value] of Object.entries(t.page).filter(([key]) => !key.startsWith('$'))) lines.push(`\t--page-${name}: ${value}${name === 'canvas' ? '' : 'mm'};`)
 	for (const [name, value] of Object.entries(t.space)) lines.push(`\t--space-${name}: ${value};`)
 	for (const [name, value] of Object.entries(t.radius)) lines.push(`\t--radius-${name}: ${value};`)
 	lines.push('}', '')

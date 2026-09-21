@@ -156,7 +156,7 @@ export async function openSession(page: Page, title: string): Promise<string> {
 	// on screen. And found by the text a person reads rather than by aria-label,
 	// because the first click this suite ever attempted timed out waiting for
 	// [aria-label="<title>"] on a card that plainly showed the title. Every click
-	// path in the run sheets was written from reading the interface rather than
+	// path in the guide was written from reading the interface rather than
 	// driving it, and this is the first one to be driven.
 	// Go back to the board, not reload whatever is on screen. After one session is
 	// open the page is on the session, and reloading it stays there, so the second

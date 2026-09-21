@@ -1,0 +1,27 @@
+{
+  "shape": "fan",
+  "alt": "The project graph on the left and four targets on the right, each with an autonomy level.",
+  "caption": "Each target owns paths and names the commands that check them.",
+  "from": {
+    "title": "Project graph",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "Console",
+      "note": "build"
+    },
+    {
+      "title": "Ingest",
+      "note": "build"
+    },
+    {
+      "title": "Contracts",
+      "note": "propose"
+    },
+    {
+      "title": "Budget",
+      "note": "refuse"
+    }
+  ]
+}

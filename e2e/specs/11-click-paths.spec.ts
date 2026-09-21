@@ -1,5 +1,5 @@
 /**
- * The interface has the controls the run sheets send people to, and a person can
+ * The interface has the controls the guide sends people to, and a person can
  * start a run by clicking.
  *
  * Every approval in this repository went through the API. The twelve sheets tell
@@ -20,7 +20,7 @@ import { LEDGER } from '../lib/ledger.ts'
 import { itemForRoute, setAutomation, stageOf } from '../lib/drive.ts'
 import { shot } from '../lib/shot.ts'
 
-test('every control the run sheets name is on the page', async ({ page }) => {
+test('every control the guide names is on the page', async ({ page }) => {
 	await openBoard(page)
 
 	for (const item of NAV) {

@@ -21,9 +21,10 @@ language or directory of a real project; tests use `tests/fixtures/sample`.
   trivially true is a broken mutation.
 - The writer never grades: a verifier reads the diff cold and reverts the fix to see red.
 - Deterministic code downgrades a verdict whose evidence is missing. Merge is never automated.
-- `teach.html` holds each idea once; run sheets in `teach/` cite concepts by id.
+- Two teaching documents, nothing else: `workbook.html` (attendees) and `guide.html` (facilitators, one part per session, each starts a fresh page). The workbook holds each idea once, drawn as a diagram; the guide cites concepts by id. `teach/` keeps only `sessions.json` and `manifest.json`.
+- Diagrams are drawn by `scripts/diagram.mjs` from `design/diagrams/*.json` (`make diagrams`); a hand edit to a figure, a label under 7.5pt on paper, or a concept with no diagram and no reason in `design/diagrams/exempt.json` fails `make check`. Colours are tokens from `design/tokens.json`, explained in `design/BRAND.md`, never a hex.
 - `make book` records source hashes; `make check` names a stale PDF. Never judge a PDF by eye: the text
-  layer resets live in `teach/teach.css` (`tests/design.test.ts`) and `make book` reads back with `pdftotext`.
+  layer resets live in `design/book.css` (`tests/book.test.ts`) and `make book` reads back with `pdftotext`.
 - Every external claim cites `sources.json` (`tests/sources.test.ts`); links are checked weekly, never in `make check`.
 - No em dashes (`scripts/check-prose.ts`). Secrets never go on a command line.
 - Test worktrees go to a temp dir (`tests/setup.ts`); session sandboxes live in `~/.cache/software-factory/sandboxes`.

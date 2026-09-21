@@ -1,0 +1,35 @@
+/* Generated from design/tokens.json for the book surface. Do not edit.
+ * Change design/tokens.json and run `make tokens`. A stale copy fails make check. */
+:root {
+	--c-paper: #FAFAFA; /* the page */
+	--c-card: #FFFFFF; /* a raised block: a diagram, a table, a command */
+	--c-ink: #151515; /* body text and headings */
+	--c-ink-2: #414141; /* the opening line of a chapter */
+	--c-muted: #606060; /* captions, notes and labels */
+	--c-faint: #808080; /* figure numbers. Large or bold only */
+	--c-line: #DFDFDF; /* hairlines and box outlines */
+	--c-accent: #FAFF69; /* a fill only, with ink on top: the one marked box in a diagram, a highlight bar. Never text on paper */
+	--c-accent-deep: #4F5101; /* text or a rule that has to be yellow-toned on paper */
+	--c-fill-dark: #1F1F1C; /* the one dark box in a diagram, and command blocks on screen. Paper text on top */
+	--c-pass: #008138; /* it worked */
+	--c-fail: #BF000F; /* it was refused or it broke */
+	--c-wait: #B75000; /* waiting on a person */
+	--font-sans: Inter, Helvetica, Arial, sans-serif;
+	--font-mono: Inconsolata, "Courier New", Courier, monospace;
+	--step--2: 8.5pt;
+	--step--1: 9.5pt;
+	--step-0: 11.5pt;
+	--step-1: 14pt;
+	--step-2: 17pt;
+	--step-3: 24pt;
+	--step-4: 34pt;
+	--page-width: 174mm;
+	--page-canvas: 504;
+	--space-1: 2mm;
+	--space-2: 4mm;
+	--space-3: 6mm;
+	--space-4: 9mm;
+	--space-5: 14mm;
+	--radius-sm: 2px;
+	--radius-md: 4px;
+}

@@ -1,0 +1,34 @@
+{
+  "shape": "pair",
+  "alt": "A skill that lists keystrokes compared with one that states the outcome.",
+  "caption": "The version that holds up says what and why, and leaves the how to the agent.",
+  "labelWidth": 80,
+  "left": {
+    "title": "Keystrokes",
+    "tone": "quiet"
+  },
+  "right": {
+    "title": "Outcome",
+    "tone": "mark"
+  },
+  "rows": [
+    {
+      "label": "Says",
+      "left": "Press this, then that",
+      "right": "What good looks like",
+      "changed": true
+    },
+    {
+      "label": "Breaks when",
+      "left": "Anything moves",
+      "right": "Rarely",
+      "changed": true
+    },
+    {
+      "label": "Ends with",
+      "left": "Nothing",
+      "right": "Proof required",
+      "changed": true
+    }
+  ]
+}

@@ -6,7 +6,7 @@
  * medians across every recorded run because that is what they are. Nothing
  * here filters by time, deliberately.
  *
- * teach.html says every figure it quotes is read from this record by a test.
+ * workbook.html says every figure it quotes is read from this record by a test.
  * That sentence was false when it was written: the stage waterfall carried
  * numbers somebody made up, which is exactly the failure the rest of this
  * repository exists to argue against.
@@ -128,7 +128,7 @@ console.log(`factory-run.json: ${stages.length} stages from ${finished.length} f
  * The suite asserts everything the engine enforces and records everything only
  * a prompt requests, because those two fail for different reasons and a stack
  * trace cannot tell them apart. This carries the second kind into evidence, so
- * teach.html quotes measurements rather than recollection and a test can hold
+ * workbook.html quotes measurements rather than recollection and a test can hold
  * the page to them.
  *
  * Counted across runs rather than overwritten, which is the whole point. Two

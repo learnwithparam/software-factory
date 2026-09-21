@@ -1,0 +1,25 @@
+{
+  "shape": "flow",
+  "alt": "A prompt goes in on standard input to any command, which works in a folder and exits.",
+  "caption": "Anything that fits these four parts can stand in as the agent.",
+  "per": 4,
+  "steps": [
+    {
+      "title": "Prompt",
+      "note": "on standard input"
+    },
+    {
+      "title": "Any command",
+      "tone": "dark",
+      "note": "the agent"
+    },
+    {
+      "title": "A folder",
+      "note": "where it works"
+    },
+    {
+      "title": "Exit",
+      "note": "done or failed"
+    }
+  ]
+}

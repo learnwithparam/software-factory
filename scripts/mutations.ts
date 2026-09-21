@@ -105,67 +105,67 @@ export const MUTATIONS: Record<string, Mutation> = {
 	// 2 Design system
 	'tests/design.test.ts > every declared contrast pair reaches the level it claims': {
 		file: 'design/tokens.json',
-		find: '{ "fg": "wait", "bg": "bg", "level": "AA" }',
-		replace: '{ "fg": "wait", "bg": "bg", "level": "AAA" }',
+		find: '{ "fg": "wait", "bg": "paper", "level": "AA" }',
+		replace: '{ "fg": "wait", "bg": "paper", "level": "AAA" }',
 		because: 'a colour claims a level its ratio does not reach',
 	},
-	'tests/design.test.ts > every text and state colour has a contrast pair': {
+	'tests/design.test.ts > every text, state and fill colour has a contrast pair': {
 		file: 'design/tokens.json',
-		find: '{ "fg": "refuse", "bg": "bg", "level": "AA" },\n      ',
+		find: '{ "fg": "fail", "bg": "paper", "level": "AA" },\n      { "fg": "fail", "bg": "card", "level": "AA" },\n      ',
 		replace: '',
 		because: 'a colour that renders words has no pair checking it',
 	},
 	'tests/design.test.ts > every generated stylesheet matches the token source': {
-		file: 'teach/tokens.css',
+		file: 'design/tokens.css',
 		find: '\t--c-accent:',
 		replace: '\t--c-accent-edited-by-hand: #000;\n\t--c-accent:',
 		because: 'a generated stylesheet is edited by hand and drifts from its source',
 	},
-	'tests/design.test.ts > the accent colour is never claimed as body text': {
+	'tests/design.test.ts > the yellow is a fill and never the colour of words': {
 		file: 'design/tokens.json',
-		find: '{ "fg": "accent", "bg": "bg", "level": "AA-large" }',
-		replace: '{ "fg": "accent", "bg": "bg", "level": "AA" }',
+		find: '{ "fg": "ink", "bg": "paper", "level": "AAA" },',
+		replace: '{ "fg": "ink", "bg": "paper", "level": "AAA" },\n      { "fg": "accent", "bg": "paper", "level": "AA-large" },',
 		because: 'the palette claims a large-text-only colour is safe for body text',
 	},
 
 	// 3 Teach surfaces
-	'tests/teach.test.ts > every session has exactly one run sheet': {
+	'tests/teach.test.ts > the guide carries every session exactly once, and the teaching folder is gone': {
 		file: 'teach/sessions.json',
 		find: '"sessions": [',
 		replace:
 			'"sessions": [\n    { "key": "ghost", "kind": "lesson", "title": "Unwritten", "minutes": 60, "covers": [], "steps": [] },',
-		because: 'a session is scheduled with no run sheet behind it',
+		because: 'a session is scheduled with no part of the guide behind it',
 	},
-	'tests/teach.test.ts > every concept a run sheet cites is declared by the spine': {
-		file: 'teach/lesson-2-execution.html',
-		find: 'data-concept="worktree"',
-		replace: 'data-concept="worktrees-plural"',
-		because: 'a run sheet points at an explanation that was never written',
+	'tests/teach.test.ts > every concept the guide cites is declared by the workbook': {
+		file: 'guide.html',
+		find: 'href="workbook.html#c-worktree" data-concept="worktree">worktree per task',
+		replace: 'href="workbook.html#c-worktree" data-concept="worktrees-plural">worktree per task',
+		because: 'the guide points at an explanation that was never written',
 	},
-	'tests/teach.test.ts > every concept the spine declares is taught by a session': {
+	'tests/teach.test.ts > every concept the workbook declares is taught by a session': {
 		file: 'teach/sessions.json',
 		find: '"evidence-rule", "contract-drift"',
 		replace: '"evidence-rule"',
 		because: 'an explanation exists that no session is responsible for delivering',
 	},
-	'tests/teach.test.ts > every run sheet segment is complete': {
-		file: 'teach/module-5-loop.html',
+	'tests/teach.test.ts > every guide segment is complete': {
+		file: 'guide.html',
 		find: '<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which stage would you attack first',
 		replace: '<div class="part ask"><h3>Ask</h3><p>Which stage would you attack first',
 		because: 'a segment loses the question the facilitator is meant to put to the room',
 	},
 	'tests/teach.test.ts > every command and file a teach surface names exists': {
-		file: 'teach/module-1-boundary.html',
+		file: 'guide.html',
 		find: 'data-file="steps/01-boundary/policy.ts"',
 		replace: 'data-file="steps/01-boundary/rules.ts"',
-		because: 'a run sheet sends the facilitator to a file that is not there',
+		because: 'the guide sends the facilitator to a file that is not there',
 	},
 	'tests/teach.test.ts > no prose is duplicated across teach surfaces': {
-		file: 'teach/office-hours.html',
+		file: 'guide.html',
 		find: '<p>Contributes one line each',
 		replace:
-			'<p>Boundary says what may be attempted. Context says what the task gets to know. Contributes one line each',
-		because: 'an explanation is restated in a run sheet instead of being pointed at',
+			'<p>The binding constraint is one person understanding a change well enough to stand behind it. Contributes one line each',
+		because: 'an explanation is restated in the guide instead of being pointed at',
 	},
 	'tests/teach.test.ts > no surface states how many issues or items there are': {
 		file: 'profiles/README.md',
@@ -518,13 +518,13 @@ export const MUTATIONS: Record<string, Mutation> = {
 
 	'tests/findings.test.ts > that did not hold on some run, appears on the page': {
 		edits: [
-			{ file: 'teach.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an underspecified issue', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an underspecified issue' },
-			{ file: 'teach.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an unanswered question', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an unanswered question' },
+			{ file: 'workbook.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an underspecified issue', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an underspecified issue' },
+			{ file: 'workbook.html', find: '<tr data-finding="question">\n<td class="k">question</td>\n<td>an unanswered question', replace: '<tr data-omitted="question">\n<td class="k">question</td>\n<td>an unanswered question' },
 		],
 		because: 'the page drops the one finding the record has watched fail on every run it counted, which is the failure mode of anybody writing up their own demonstration',
 	},
 	'tests/findings.test.ts > is described on the page in the words the run used': {
-		file: 'teach.html',
+		file: 'workbook.html',
 		find: 'an agent changes only paths the ownership graph allows it to change',
 		replace: 'an agent behaves itself around the ownership graph',
 		because: 'the page softens what was asked for until the finding it recorded no longer says anything',

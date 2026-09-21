@@ -12,7 +12,8 @@ on:
   push:
     paths:
       - sources.json
-      - teach.html
+      - workbook.html
+      - guide.html
       - teach/**
       - scripts/check-links.ts
   workflow_dispatch:

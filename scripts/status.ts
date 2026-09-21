@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { bold, dim, failed, note, table, title, waiting } from '../steps/lib/out.ts'
-import { sessions, type Session } from './teach.ts'
+import { GUIDE, sessionText, sessions, type Session } from './teach.ts'
 import { ROOT } from './tree-hash.ts'
 
 interface Manifest {
@@ -37,7 +37,7 @@ export interface Deliverable {
 	readonly detail: string
 }
 
-const spine = (): string => (existsSync(join(ROOT, 'teach.html')) ? readFileSync(join(ROOT, 'teach.html'), 'utf8') : '')
+const workbook = (): string => (existsSync(join(ROOT, 'workbook.html')) ? readFileSync(join(ROOT, 'workbook.html'), 'utf8') : '')
 
 function specFiles(): Set<string> {
 	const dir = join(ROOT, 'e2e/specs')
@@ -64,7 +64,7 @@ function shotsCaptured(): Set<string> {
 export function deliverables(): Deliverable[] {
 	const m = manifest()
 	const out: Deliverable[] = []
-	const text = spine()
+	const text = workbook()
 	const specs = specFiles()
 	const captured = shotsCaptured()
 
@@ -148,14 +148,13 @@ export function deliverables(): Deliverable[] {
 	return out
 }
 
-/** A session is ready when its run sheet exists and shows what it promises. */
+/** A session is ready when the guide has its part and the part shows what it promises. */
 function sessionReady(session: Session): boolean {
-	const path = join(ROOT, `teach/${session.key}.html`)
+	const path = join(ROOT, GUIDE)
 	if (!existsSync(path)) return false
-	const text = readFileSync(path, 'utf8')
-	// Every run sheet must show at least one screenshot, which is what makes it a
-	// sheet for a session rather than a page of notes.
-	return /src="\.\.\/evidence\/screens\//.test(text)
+	// Every session must show at least one screenshot, which is what makes it a
+	// plan for a session rather than a page of notes.
+	return /src="evidence\/screens\//.test(sessionText(readFileSync(path, 'utf8'), session.key))
 }
 
 if (import.meta.main) {

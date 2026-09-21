@@ -269,7 +269,8 @@
 		"enterprise"
 	],
 	"surfaces": [
-		"teach.html",
+		"workbook.html",
+		"guide.html",
 		"review.html"
 	],
 	"$sessions": "Sessions come from teach/sessions.json, which is already the one list. status.ts reads it rather than restating it."

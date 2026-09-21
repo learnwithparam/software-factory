@@ -1,106 +1,27 @@
 {
-	"software-factory-book.pdf": {
-		"teach.html": "04ffbe0b50e3862e",
-		"teach/lesson-1-architecture.html": "62cde7d236a9cd65",
-		"teach/lesson-2-execution.html": "1d032cc242bd6db6",
-		"teach/lesson-3-verification.html": "76e4de639bb43c65",
-		"teach/lesson-4-delivery.html": "323f31cba1209679",
-		"teach/module-1-boundary.html": "8db87284a290465a",
-		"teach/module-2-execution.html": "9bb8038399451fe6",
-		"teach/module-3-context.html": "6ff2a5f832e644a0",
-		"teach/module-4-verification.html": "0e60c386ab933452",
-		"teach/module-5-loop.html": "eb2cdc72620ea246",
-		"teach/module-6-delivery.html": "37078c75947ba4ca",
-		"teach/workshop-operating-model.html": "ab8a5466f3877387",
-		"teach/office-hours.html": "d6098d7d5faedbab",
+	"software-factory-workbook.pdf": {
+		"workbook.html": "1251450c39da62ad",
+		"design/book.css": "e5918f20cb8dadea",
+		"design/tokens.css": "512c253692965507",
+		"design/fonts/inter-700.woff2": "6f56409fd3d64bb8",
+		"design/fonts/inter-400.woff2": "8909904ab6c872eb",
+		"design/fonts/inconsolata-400.woff2": "9d5a0480d2bd3e43",
+		"design/fonts/inconsolata-700.woff2": "a9d822c4d749ab07",
+		"scripts/build-book.ts": "5aec10c624e31f96",
+		"scripts/book.ts": "926315a62108af41",
+		"scripts/diagram.mjs": "5d0d514381d1a5c7"
+	},
+	"software-factory-guide.pdf": {
+		"guide.html": "9c6f198eb898de79",
 		"teach/sessions.json": "1598bcff63981be5",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/lesson-1-architecture.pdf": {
-		"teach/lesson-1-architecture.html": "62cde7d236a9cd65",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/lesson-2-execution.pdf": {
-		"teach/lesson-2-execution.html": "1d032cc242bd6db6",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/lesson-3-verification.pdf": {
-		"teach/lesson-3-verification.html": "76e4de639bb43c65",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/lesson-4-delivery.pdf": {
-		"teach/lesson-4-delivery.html": "323f31cba1209679",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-1-boundary.pdf": {
-		"teach/module-1-boundary.html": "8db87284a290465a",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-2-execution.pdf": {
-		"teach/module-2-execution.html": "9bb8038399451fe6",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-3-context.pdf": {
-		"teach/module-3-context.html": "6ff2a5f832e644a0",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-4-verification.pdf": {
-		"teach/module-4-verification.html": "0e60c386ab933452",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-5-loop.pdf": {
-		"teach/module-5-loop.html": "eb2cdc72620ea246",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/module-6-delivery.pdf": {
-		"teach/module-6-delivery.html": "37078c75947ba4ca",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/workshop-operating-model.pdf": {
-		"teach/workshop-operating-model.html": "ab8a5466f3877387",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
-	},
-	"teach/pdf/office-hours.pdf": {
-		"teach/office-hours.html": "d6098d7d5faedbab",
-		"teach/teach.css": "c7c523b90fff53e4",
-		"teach/tokens.css": "d685bae27ca76a66",
-		"scripts/build-book.ts": "ad21203e205d289c",
-		"scripts/book.ts": "bf4f750cd1a26113"
+		"design/book.css": "e5918f20cb8dadea",
+		"design/tokens.css": "512c253692965507",
+		"design/fonts/inter-700.woff2": "6f56409fd3d64bb8",
+		"design/fonts/inter-400.woff2": "8909904ab6c872eb",
+		"design/fonts/inconsolata-400.woff2": "9d5a0480d2bd3e43",
+		"design/fonts/inconsolata-700.woff2": "a9d822c4d749ab07",
+		"scripts/build-book.ts": "5aec10c624e31f96",
+		"scripts/book.ts": "926315a62108af41",
+		"scripts/diagram.mjs": "5d0d514381d1a5c7"
 	}
 }

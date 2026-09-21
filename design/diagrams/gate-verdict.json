@@ -1,0 +1,26 @@
+{
+  "shape": "fan",
+  "alt": "One gate script on the left, and the three verdicts it can end with.",
+  "caption": "Nothing may paraphrase the last line. A missing check is not a pass and not a failure.",
+  "from": {
+    "title": "Gate script",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "PASS",
+      "note": "exit 0",
+      "tone": "pass"
+    },
+    {
+      "title": "FAIL",
+      "note": "exit 1",
+      "tone": "fail"
+    },
+    {
+      "title": "MISCONFIGURED",
+      "note": "exit 2",
+      "tone": "wait"
+    }
+  ]
+}

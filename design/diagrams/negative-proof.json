@@ -1,0 +1,22 @@
+{
+  "shape": "flow",
+  "alt": "Write the test, undo the change, run the test and require it to be red, then restore the change.",
+  "caption": "The strongest check available, and no gate can make it for you.",
+  "per": 4,
+  "steps": [
+    {
+      "title": "New test"
+    },
+    {
+      "title": "Undo the change"
+    },
+    {
+      "title": "Run it",
+      "tone": "mark",
+      "note": "must be red"
+    },
+    {
+      "title": "Restore"
+    }
+  ]
+}

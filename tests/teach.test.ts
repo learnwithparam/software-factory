@@ -2,8 +2,8 @@
  * Phase 3: the teaching surfaces hold one copy of each idea, and everything they
  * tell a facilitator to run is real.
  *
- * These tests are written before the content they check, so authoring the run
- * sheets is driven by them rather than audited after the fact.
+ * These tests are written before the content they check, so authoring the guide is
+ * driven by them rather than audited after the fact.
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -12,14 +12,15 @@ import { expect, it } from 'bun:test'
 import {
 	PARTS,
 	SHINGLE,
-	SPINE,
+	GUIDE,
+	WORKBOOK,
 	attributeValues,
 	citedConcepts,
 	declaredConcepts,
 	namedMakeTargets,
 	read,
 	sessions,
-	sheetPath,
+	sessionText,
 	shingles,
 	teachFiles,
 } from '../scripts/teach.ts'
@@ -28,29 +29,24 @@ import { ROOT } from '../scripts/tree-hash.ts'
 const makefile = readFileSync(join(ROOT, 'Makefile'), 'utf8')
 const makeTargets = new Set([...makefile.matchAll(/^([a-z][a-z0-9-]*):/gm)].map((m) => m[1] as string))
 
-it('every session has exactly one run sheet', () => {
-	const missing = sessions()
-		.filter((session) => !existsSync(join(ROOT, sheetPath(session))))
-		.map(sheetPath)
-	expect(missing, 'sessions declared with no run sheet').toEqual([])
+it('the guide carries every session exactly once, and the teaching folder is gone', () => {
+	const guide = read(GUIDE)
+	const opened = [...guide.matchAll(/class="session opens" id="s-([a-z0-9-]+)"/g)].map((m) => m[1] as string)
+	expect(opened, 'sessions in sessions.json order').toEqual(sessions().map((session) => session.key))
 
-	// And no orphan sheet, which would be a session nobody is scheduled to teach.
-	const expected = new Set(sessions().map(sheetPath))
-	const onDisk = readdirSync(join(ROOT, 'teach'))
-		.filter((name) => name.endsWith('.html'))
-		.map((name) => `teach/${name}`)
-	expect(onDisk.filter((file) => !expected.has(file)), 'run sheets with no session').toEqual([])
+	// One guide and one workbook. A stray page here is a third document nobody prints.
+	const stray = readdirSync(join(ROOT, 'teach')).filter((name) => name.endsWith('.html') || name.endsWith('.pdf'))
+	expect(stray, 'pages left in teach/').toEqual([])
 })
 
-it('every concept a run sheet cites is declared by the spine', () => {
-	const declared = declaredConcepts(read(SPINE))
-	expect(declared.size, 'the spine declares no concepts').toBeGreaterThan(0)
+it('every concept the guide cites is declared by the workbook', () => {
+	const declared = declaredConcepts(read(WORKBOOK))
+	expect(declared.size, 'the workbook declares no concepts').toBeGreaterThan(0)
 
 	const dangling: string[] = []
 	for (const session of sessions()) {
-		const file = sheetPath(session)
-		for (const concept of citedConcepts(read(file))) {
-			if (!declared.has(concept)) dangling.push(`${file} cites ${concept}`)
+		for (const concept of citedConcepts(sessionText(read(GUIDE), session.key))) {
+			if (!declared.has(concept)) dangling.push(`${session.key} cites ${concept}`)
 		}
 		for (const concept of session.covers) {
 			if (!declared.has(concept)) dangling.push(`sessions.json says ${session.key} covers ${concept}`)
@@ -59,20 +55,20 @@ it('every concept a run sheet cites is declared by the spine', () => {
 	expect(dangling).toEqual([])
 })
 
-it('every concept the spine declares is taught by a session', () => {
+it('every concept the workbook declares is taught by a session', () => {
 	// A concept no session covers is an explanation nobody delivers.
 	const covered = new Set(sessions().flatMap((session) => session.covers))
-	const orphans = [...declaredConcepts(read(SPINE))].filter((concept) => !covered.has(concept))
+	const orphans = [...declaredConcepts(read(WORKBOOK))].filter((concept) => !covered.has(concept))
 	expect(orphans).toEqual([])
 })
 
-it('every run sheet segment is complete', () => {
+it('every guide segment is complete', () => {
 	const incomplete: string[] = []
 	for (const session of sessions()) {
-		const text = read(sheetPath(session))
+		const text = sessionText(read(GUIDE), session.key)
 		const segments = [...text.matchAll(/data-segment="([^"]+)"([\s\S]*?)(?=data-segment="|$)/g)]
 		if (segments.length === 0) {
-			incomplete.push(`${sheetPath(session)} has no segments`)
+			incomplete.push(`${session.key} has no segments`)
 			continue
 		}
 		for (const [, name, body] of segments) {
@@ -80,9 +76,7 @@ it('every run sheet segment is complete', () => {
 				[...(body as string).matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1] as string),
 			)
 			const absent = PARTS.filter((part) => !present.has(part))
-			if (absent.length > 0) {
-				incomplete.push(`${sheetPath(session)} segment ${name} lacks ${absent.join(', ')}`)
-			}
+			if (absent.length > 0) incomplete.push(`${session.key} segment ${name} lacks ${absent.join(', ')}`)
 		}
 	}
 	expect(incomplete).toEqual([])
@@ -104,7 +98,7 @@ it('every command and file a teach surface names exists', () => {
 
 it('no prose is duplicated across teach surfaces', () => {
 	// One resolver per concept, applied to writing. An explanation belongs to the
-	// spine; a run sheet points at it. Code and commands are exempt.
+	// workbook; the guide points at it. Code and commands are exempt.
 	const seen = new Map<string, string>()
 	const duplicates: string[] = []
 	for (const file of teachFiles()) {
@@ -122,7 +116,7 @@ it('no prose is duplicated across teach surfaces', () => {
 
 it('no surface states how many issues or items there are', () => {
 	// The ledger grew a seventh issue and four places went stale at once: the
-	// board spec, the doctor's own check, a run sheet caption and the manifest
+	// board spec, the doctor's own check, a guide caption and the manifest
 	// all said six. Nothing was wrong, and `make e2e` opened on a red assertion
 	// while `make factory-doctor` reported a repository in the wrong state.
 	//
@@ -152,4 +146,14 @@ it('no surface states how many issues or items there are', () => {
 		.map((found) => `${found.file} says "${found.hit}": count .factory/issues instead`)
 
 	expect(stated, 'a count the repository can change, written down outside it').toEqual([])
+})
+
+it('every segment heading is held with its first row, so none is left at the foot of a page', () => {
+	// Chromium does not honour break-after on a grid item, so a heading that is a grid item
+	// of its own strands. The pair sits in one div.lead, which cannot split.
+	const guide = read(GUIDE)
+	const heads = guide.match(/<div class="head">/g)?.length ?? 0
+	const held = guide.match(/<div class="lead">\s*<div class="head">/g)?.length ?? 0
+	expect(heads).toBeGreaterThan(0)
+	expect(held, 'segment headings not held with their first row').toBe(heads)
 })

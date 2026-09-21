@@ -1,0 +1,22 @@
+{
+  "shape": "stack",
+  "alt": "One file per run holds what was tried, the files changed, every verdict quoted, and the timings and cost.",
+  "caption": "Appended to, never rewritten. The tenth run is compared with the first.",
+  "labelWidth": 120,
+  "layers": [
+    {
+      "title": "What was tried"
+    },
+    {
+      "title": "Files changed"
+    },
+    {
+      "title": "Every verdict",
+      "note": "quoted"
+    },
+    {
+      "title": "Timings and cost",
+      "tone": "mark"
+    }
+  ]
+}

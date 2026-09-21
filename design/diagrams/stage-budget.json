@@ -1,0 +1,51 @@
+{
+  "shape": "matrix",
+  "alt": "The seconds each stage may spend before it stops, and the human wait which is not bounded.",
+  "caption": "Read from budget.json. Human wait is recorded and never bounded, so it stops being invisible.",
+  "corner": "Stage",
+  "labelWidth": 90,
+  "cols": [
+    "Seconds"
+  ],
+  "rows": [
+    {
+      "label": "Claim",
+      "cells": [
+        "30"
+      ]
+    },
+    {
+      "label": "Context",
+      "cells": [
+        "60"
+      ]
+    },
+    {
+      "label": "Implement",
+      "cells": [
+        "900"
+      ]
+    },
+    {
+      "label": "Gates",
+      "cells": [
+        "600"
+      ]
+    },
+    {
+      "label": "Verify",
+      "cells": [
+        "300"
+      ]
+    },
+    {
+      "label": "Human",
+      "cells": [
+        {
+          "text": "not bounded",
+          "tone": "wait"
+        }
+      ]
+    }
+  ]
+}

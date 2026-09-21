@@ -1,7 +1,7 @@
 /**
  * The page may not quietly drop a finding it finds inconvenient.
  *
- * teach.html teaches that a rule written in a prompt is a request and a rule
+ * workbook.html teaches that a rule written in a prompt is a request and a rule
  * written in a gate is a limit. That lesson is only worth anything if the page
  * carries every instruction the run ignored, including the ones that make the
  * product look worse, so this test reads evidence/prompt-vs-gate.json and
@@ -30,7 +30,7 @@ const present = existsSync(RECORD)
 
 describe.if(present)('every prompt-level finding', () => {
 	const { findings } = JSON.parse(readFileSync(RECORD, 'utf8')) as { findings: Finding[] }
-	const page = readFileSync(join(ROOT, 'teach.html'), 'utf8')
+	const page = readFileSync(join(ROOT, 'workbook.html'), 'utf8')
 	const quoted = [...page.matchAll(/data-finding="([^"]+)"/g)].map((match) => match[1] as string)
 
 	it('is recorded against a route the run actually took', () => {
@@ -41,7 +41,7 @@ describe.if(present)('every prompt-level finding', () => {
 
 	it('that the page quotes, resolves in the record', () => {
 		const unknown = quoted.filter((key) => !findings.some((finding) => finding.route === key))
-		expect(unknown, 'teach.html cites a finding no run recorded').toEqual([])
+		expect(unknown, 'workbook.html cites a finding no run recorded').toEqual([])
 	})
 
 	// Ever missed, not missed most recently. A claim the agent honoured on the

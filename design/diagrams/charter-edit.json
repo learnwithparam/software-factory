@@ -1,0 +1,23 @@
+{
+  "shape": "gate",
+  "alt": "An agent's proposed change to the charter becomes a pull request. Editing the file directly is refused.",
+  "caption": "A limit the agent can edit is not a limit.",
+  "path": [
+    {
+      "title": "Agent wants a change"
+    },
+    {
+      "title": "Pull request"
+    },
+    {
+      "title": "Person merges",
+      "tone": "mark"
+    }
+  ],
+  "gates": [
+    {
+      "after": 0,
+      "refuse": "Direct edit"
+    }
+  ]
+}

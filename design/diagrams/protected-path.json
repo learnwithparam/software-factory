@@ -1,0 +1,23 @@
+{
+  "shape": "gate",
+  "alt": "A task naming a protected path is refused before the agent starts, with the reason on the issue.",
+  "caption": "A refusal is a visible outcome. The task is not lost and not quietly rewritten.",
+  "path": [
+    {
+      "title": "Task arrives"
+    },
+    {
+      "title": "Charter read"
+    },
+    {
+      "title": "Agent starts",
+      "tone": "mark"
+    }
+  ],
+  "gates": [
+    {
+      "after": 1,
+      "refuse": "Protected path"
+    }
+  ]
+}

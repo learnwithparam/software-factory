@@ -15,7 +15,7 @@
  *
  * So a prompt-level claim is recorded rather than asserted. It lands in
  * artifacts/observations.json, make e2e prints the ones that did not hold, and
- * evidence/prompt-vs-gate.json carries them into teach.html, where a test binds
+ * evidence/prompt-vs-gate.json carries them into workbook.html, where a test binds
  * the page to this record the same way figures are bound to the run.
  *
  * The rule for choosing: if you can name the file that enforces it, use

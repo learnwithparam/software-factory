@@ -1,0 +1,21 @@
+{
+  "shape": "stack",
+  "alt": "State lives in the issue tracker: a label for the stage, a comment for the handoff, a branch for the claim.",
+  "caption": "No database and no dashboard to keep alive. Nothing is lost when a session ends.",
+  "labelWidth": 90,
+  "layers": [
+    {
+      "title": "Stage",
+      "note": "an issue label"
+    },
+    {
+      "title": "Handoff",
+      "note": "a structured comment"
+    },
+    {
+      "title": "Claim",
+      "tone": "mark",
+      "note": "a branch"
+    }
+  ]
+}

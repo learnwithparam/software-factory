@@ -108,24 +108,25 @@ const page = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Software Factory: what the run produced</title>
 <meta name="description" content="Every screenshot the end-to-end run took, in the order it took them, with what each is meant to show and whether the page said so.">
-<link rel="stylesheet" href="teach/teach.css">
+<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="design/book.css">
 <style>
 /* This page is a contact sheet rather than a chapter, so it sets its own grid
    and borrows everything else from the book. Hairlines, never a fill. */
-.shots { display: grid; gap: var(--space-8); }
+.shots { display: grid; gap: var(--space-5); }
 .shot { margin: 0; }
 .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--c-line); border-radius: var(--radius-md); }
 .shot figcaption { margin-top: var(--space-3); }
-.shot h3 { margin: 0 0 var(--space-1); font-family: var(--font-serif); font-size: var(--step-0); }
-.shot .meta, .shot .claim { margin: 0; color: var(--c-ink-muted); font-size: var(--step--1); }
-.shot .gap { margin: 0; padding: var(--space-8) 0; border-top: 1px solid var(--c-line); color: var(--c-ink-muted); }
+.shot h3 { margin: 0 0 var(--space-1); font-size: var(--step-0); font-weight: 700; }
+.shot .meta, .shot .claim { margin: 0; color: var(--c-muted); font-size: var(--step--1); }
+.shot .gap { margin: 0; padding: var(--space-5) 0; border-top: 1px solid var(--c-line); color: var(--c-muted); }
 .verdict { font-weight: 600; }
 .proven .verdict { color: var(--c-pass); }
 .unproven .verdict, .missing .verdict { color: var(--c-fail); }
-.tally { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); margin: var(--space-6) 0 var(--space-12); padding-top: var(--space-4); border-top: 1px solid var(--c-line); font-family: var(--font-sans); font-size: var(--step--1); color: var(--c-ink-muted); }
+.tally { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin: var(--space-4) 0 var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--c-line); font-family: var(--font-sans); font-size: var(--step--1); color: var(--c-muted); }
 .tally b { display: block; font-family: var(--font-mono); font-size: var(--step-2); font-variant-numeric: tabular-nums; color: var(--c-ink); }
-main > section { padding-top: var(--space-12); }
-main > section > h2 { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-ink-muted); font-weight: 400; margin: 0 0 var(--space-6); }
+main > section { padding-top: var(--space-5); }
+main > section > h2 { font-family: var(--font-mono); font-size: var(--step--1); color: var(--c-muted); font-weight: 400; margin: 0 0 var(--space-4); }
 </style>
 </head>
 <body>

@@ -1,0 +1,20 @@
+{
+  "shape": "fan",
+  "alt": "Your own checkout on the left, and the three things that go wrong when an agent works in it.",
+  "caption": "The easy default is also the reason people stop trusting background work.",
+  "from": {
+    "title": "Your checkout",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "Experiment gets committed"
+    },
+    {
+      "title": "Branch switched under a run"
+    },
+    {
+      "title": "Two tasks collide"
+    }
+  ]
+}

@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
+import { violations, rulesStale } from '../scripts/check-prose.ts'
 import { idOf } from '../scripts/junit.ts'
 import { MUTATIONS } from '../scripts/mutations.ts'
 import { listTests } from '../scripts/run-tests.ts'
@@ -89,6 +90,10 @@ it('CI stops tolerating unbound points once every point is bound', () => {
 
 it('the prose check is wired into make check', () => {
 	expect(makefile).toMatch(/^check:[\s\S]*?check-prose\.ts/m)
+	// Its word lists are a committed copy of the house rules. Empty lists would pass everything,
+	// and where the rules live the copy must match them.
+	expect(violations("It is a game-changer. Let's dive in.").length).toBeGreaterThan(0)
+	expect(rulesStale()).toBeNull()
 })
 
 it('the tree stamp excludes prose and includes code', () => {
@@ -96,10 +101,10 @@ it('the tree stamp excludes prose and includes code', () => {
 	expect(treeHash(true)).not.toEqual(treeHash(false))
 
 	// And the split has to be the real one rather than any split at all. Prose out,
-	// because editing a run sheet must not invalidate a fifteen-minute run; the
+	// because editing the guide must not invalidate a fifteen-minute run; the
 	// harness in, because editing what the run executes must.
 	const stamped = trackedFiles().filter(isStamped)
-	expect(stamped.filter((file) => file.startsWith('teach')), 'prose is inside the stamp').toEqual([])
+	expect(stamped.filter((file) => file === 'guide.html' || file === 'workbook.html' || file.startsWith('teach/')), 'prose is inside the stamp').toEqual([])
 	expect(stamped.some((file) => file.startsWith('steps/')), 'the harness is outside the stamp').toBe(true)
 })
 
@@ -120,7 +125,7 @@ it('the stamp covers what an end-to-end run loads, and not what it cannot reach'
 	expect(isStamped('steps/04-verification/gate.ts'), 'a step the harness runs is not stamped').toBe(true)
 	expect(isStamped('e2e/specs/01-clean-path.spec.ts'), 'a spec is not stamped').toBe(true)
 	expect(isStamped('scripts/run-report.ts'), 'a script the e2e recipe calls is not stamped').toBe(true)
-	expect(isStamped('teach/teach.css'), 'a print stylesheet cannot change what a run proved').toBe(false)
+	expect(isStamped('design/book.css'), 'a print stylesheet cannot change what a run proved').toBe(false)
 	expect(isStamped('tests/book.test.ts'), 'a unit test is not loaded by a spec').toBe(false)
 	expect(isStamped('scripts/build-book.ts'), 'the PDF builder is not loaded by a spec').toBe(false)
 })

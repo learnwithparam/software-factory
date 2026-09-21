@@ -1,0 +1,24 @@
+{
+  "shape": "stack",
+  "alt": "What the charter file holds: the tier, the autonomy per area, the protected paths and the stop rules.",
+  "caption": "One short file, owned by a person and read before every run.",
+  "labelWidth": 110,
+  "layers": [
+    {
+      "title": "Tier",
+      "note": "supervised or controlled"
+    },
+    {
+      "title": "Autonomy",
+      "note": "per area of the code"
+    },
+    {
+      "title": "Protected paths",
+      "note": "never touched"
+    },
+    {
+      "title": "Stop rules",
+      "note": "such as the queue cap"
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 /**
  * No figure on a teaching page may disagree with the run that produced it.
  *
- * teach.html says so in a caption, which is a claim, and a claim the code does
+ * workbook.html says so in a caption, which is a claim, and a claim the code does
  * not assert is the thing this whole repository argues against. Before this
  * test the stage waterfall carried five numbers nobody had measured, under a
  * sentence promising a test had read them.
  *
- * Every figure the surfaces quote carries `data-figure`, and every one of those
- * keys has to resolve in evidence/factory-run.json to exactly the text shown.
+ * The waterfall is drawn from evidence/factory-run.json by scripts/waterfall.ts, and the
+ * timings on the page have to be the ones the record carries.
  */
 
 import { describe, expect, it } from 'bun:test'
@@ -19,38 +19,30 @@ import type { RunReport } from '../scripts/run-report.ts'
 const REPORT = join(ROOT, 'evidence', 'factory-run.json')
 const present = existsSync(REPORT)
 
-/** The value a key names, or undefined when the record does not carry it. */
-function figure(report: RunReport, key: string): string | undefined {
-	if (key === 'humanWait') return report.humanWaitLabel
-	const stage = /^stage\.(.+)$/.exec(key)?.[1]
-	if (stage === undefined) return undefined
-	const names: Record<string, string> = { triage: 'triage', plan: 'plan', implement: 'work', review: 'review' }
-	const role = names[stage] ?? stage
-	return report.stages.find((entry) => entry.role === role)?.label
+/** The picture of the stage timings, as the workbook carries it. */
+function waterfallFigure(page: string): string {
+	return /<figure class="diagram" data-diagram="stage-waterfall">[\s\S]*?<\/figure>/.exec(page)?.[0] ?? ''
 }
 
-describe.if(present)('every quoted figure', () => {
+describe.if(present)('the stage waterfall', () => {
 	const report = JSON.parse(readFileSync(REPORT, 'utf8')) as RunReport
-	const page = readFileSync(join(ROOT, 'teach.html'), 'utf8')
-	const quoted = [...page.matchAll(/data-figure="([^"]+)"[^>]*>([^<]*)</g)].map((m) => ({
-		key: m[1] as string,
-		shown: (m[2] as string).trim(),
-	}))
+	const page = readFileSync(join(ROOT, 'workbook.html'), 'utf8')
+	const shown = waterfallFigure(page)
+	// String() so a missing field becomes the word undefined and fails by name. An undefined
+	// element inside an array is one Bun's toEqual does not count against an empty array.
+	const quoted = [...report.stages.map((stage) => stage.label), report.humanWaitLabel].map((label) => String(label))
 
-	it('is bound to a key the record carries', () => {
-		expect(quoted.length).toBeGreaterThan(0)
-		const unknown = quoted.filter((entry) => figure(report, entry.key) === undefined)
-		expect(unknown.map((entry) => entry.key)).toEqual([])
+	it('is placed, and quotes a timing for every stage and the wait', () => {
+		expect(shown).not.toBe('')
+		expect(quoted.filter((label) => label === 'undefined' || label === '')).toEqual([])
 	})
 
 	it('shows exactly what the record says', () => {
-		const drifted = quoted
-			.filter((entry) => figure(report, entry.key) !== entry.shown)
-			.map((entry) => `${entry.key}: page says ${entry.shown}, the run says ${figure(report, entry.key)}`)
-		expect(drifted).toEqual([])
+		const drifted = quoted.filter((label) => !shown.includes(`>${label}<`))
+		expect(drifted, 'timings the record carries that the picture does not show').toEqual([])
 	})
 
 	it('names the model the run was made on', () => {
-		expect(page).toContain(report.model)
+		expect(shown).toContain(report.model)
 	})
 })

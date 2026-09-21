@@ -38,7 +38,7 @@ and a quarter, and it found what running the specs separately could not:
 
 Every one of those is fixed, and each now has a gate. What the sequence also
 produced is the set of prompt-level instructions the model did not follow, which
-`evidence/prompt-vs-gate.json` records and teach.html teaches rather than hides.
+`evidence/prompt-vs-gate.json` records and workbook.html teaches rather than hides.
 
 ## Run it before the first live session
 
@@ -72,7 +72,7 @@ in the file the product reads, and nothing was there to stop it.
 So the graph is advisory on the platform and enforced in the hand-built pipeline,
 where `steps/01-boundary/policy.ts` is called before anything runs.
 `evidence/prompt-vs-gate.json` records every instruction a run did not follow,
-`tests/findings.test.ts` fails if teach.html omits one, and the page teaches the
+`tests/findings.test.ts` fails if workbook.html omits one, and the page teaches the
 contrast rather than the ideal. If you carry one thing from this repository into
 your own, carry the check that reads the graph and refuses the diff.
 

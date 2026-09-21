@@ -1,17 +1,18 @@
 /**
- * Read the teaching surfaces.
+ * Read the teaching documents.
  *
- * Two surfaces with one copy of each idea. `teach.html` is the concept spine and
- * the only place an explanation is written. `teach/<key>.html` is a run sheet: it
- * carries the talk track and the commands for one live session, and points at
- * concepts by id rather than restating them.
+ * Two documents with one copy of each idea. `workbook.html` is the attendee workbook
+ * and the only place an explanation is written. `guide.html` is the facilitator guide:
+ * one part per session, carrying the talk track and the commands, pointing at ideas by
+ * id rather than restating them.
  */
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './tree-hash.ts'
 
-export const SPINE = 'teach.html'
+export const WORKBOOK = 'workbook.html'
+export const GUIDE = 'guide.html'
 
 export type SessionKind = 'lesson' | 'module' | 'workshop' | 'office-hours'
 
@@ -26,7 +27,7 @@ export interface Session {
 	readonly steps: readonly string[]
 }
 
-/** Parts every run sheet segment must carry. */
+/** Parts every guide segment must carry. */
 export const PARTS = ['when', 'goal', 'say', 'run', 'expect', 'ask'] as const
 
 export function sessions(): Session[] {
@@ -34,26 +35,30 @@ export function sessions(): Session[] {
 	return raw.sessions
 }
 
-export function sheetPath(session: Session): string {
-	return `teach/${session.key}.html`
-}
-
 export function teachFiles(): string[] {
-	return [SPINE, ...sessions().map(sheetPath)]
+	return [WORKBOOK, GUIDE]
 }
 
 export function read(file: string): string {
 	return readFileSync(join(ROOT, file), 'utf8')
 }
 
-/** Concept ids declared by the spine. */
+/** Concept ids declared by the workbook. */
 export function declaredConcepts(text: string): Set<string> {
 	return new Set([...text.matchAll(/id="c-([a-z0-9-]+)"/g)].map((m) => m[1] as string))
 }
 
-/** Concept ids cited anywhere, spine included, through data-concept. */
+/** Concept ids cited anywhere through data-concept. */
 export function citedConcepts(text: string): Set<string> {
 	return new Set([...text.matchAll(/data-concept="([a-z0-9-]+)"/g)].map((m) => m[1] as string))
+}
+
+/** The part of the guide that belongs to one session, from its opening to the next one. */
+export function sessionText(guide: string, key: string): string {
+	const start = guide.indexOf(`id="s-${key}"`)
+	if (start === -1) return ''
+	const next = guide.indexOf('class="session opens"', start)
+	return guide.slice(start, next === -1 ? undefined : next)
 }
 
 export function attributeValues(text: string, attribute: string): Set<string> {

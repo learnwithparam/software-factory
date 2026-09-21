@@ -1,5 +1,5 @@
 /**
- * The controls a run sheet may send a presenter to.
+ * The controls the guide may send a presenter to.
  *
  * A click path is written as a list of steps. A step that starts with a capital
  * is a control in the interface and has to exist; a step in lower case is a

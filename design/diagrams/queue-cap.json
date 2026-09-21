@@ -1,0 +1,19 @@
+{
+  "shape": "growth",
+  "alt": "Pull requests waiting on a person against afternoons of work. Generation keeps climbing while reading stays flat.",
+  "caption": "Generation is cheap and keeps climbing. A person's attention does not.",
+  "ylabel": "Waiting",
+  "xlabel": "Afternoons",
+  "mark": {
+    "at": 0.45,
+    "label": "Cap reached"
+  },
+  "rising": {
+    "label": "Generated",
+    "tone": "fail"
+  },
+  "flat": {
+    "label": "A person can read",
+    "tone": "pass"
+  }
+}

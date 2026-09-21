@@ -33,7 +33,16 @@ check: e2e/node_modules ## Prose, types, unit and structural tests. No model, no
 	bun test --reporter=junit --reporter-outfile=artifacts/junit.xml
 
 
-book: e2e/node_modules ## Render the bound book and every run sheet to PDF, then read them back
+# A separate line, because the head of this file is part of the e2e stamp and a target
+# that only draws figures must not cost a rerun of the harness.
+.PHONY: diagrams
+
+diagrams: ## Draw every figure from design/diagrams and colour every code block
+	@node scripts/diagram.mjs
+	@node scripts/highlight.mjs
+
+book: diagrams e2e/node_modules ## Render the workbook and the guide to PDF, then read them back
+	@bun scripts/contents.ts
 	@bun scripts/build-book.ts
 
 links: ## Resolve every source the teaching pages cite. Needs the network, so it is not in check
@@ -71,7 +80,7 @@ e2e: ## Real model, real repository, real pull requests. Writes the run report
 	@bun scripts/run-report.ts
 	@bun scripts/waterfall.ts
 	@bun scripts/org-shapes.ts
-	@bun scripts/spine-rail.ts
+	@node scripts/diagram.mjs
 	@bun scripts/review-page.ts
 
 finish: ## Run only the specs whose evidence is missing, until nothing more can be produced

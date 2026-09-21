@@ -8,12 +8,11 @@
  * `make check` can assert with neither, on a machine that only has the files.
  */
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
-import { BOOK, pdfSources, sheetPdf } from '../scripts/book.ts'
-import { sessions } from '../scripts/teach.ts'
+import { MARGIN_BOXES_FROM, PDFS, pdfSources } from '../scripts/book.ts'
 import { ROOT } from '../scripts/tree-hash.ts'
 
 const FRESHNESS = join(ROOT, 'scripts/pdf-freshness.json')
@@ -25,12 +24,15 @@ function sha256(path: string): string {
 	return createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 16)
 }
 
-it('every session has a printable sheet, and every sheet has a session', () => {
-	const expected = [BOOK, ...sessions().map((session) => sheetPdf(session.key))].sort()
-	expect(Object.keys(pdfSources()).sort()).toEqual(expected)
+it('the workbook and the guide are the only PDFs, and both are built', () => {
+	expect(Object.keys(pdfSources()).sort()).toEqual(['software-factory-guide.pdf', 'software-factory-workbook.pdf'])
 
-	const missing = expected.filter((pdf) => !existsSync(join(ROOT, pdf)))
+	const missing = Object.keys(PDFS).filter((pdf) => !existsSync(join(ROOT, pdf)))
 	expect(missing, 'declared but never built: run make book').toEqual([])
+
+	// A third PDF is a document nobody asked for. The old sheets lived in teach/pdf.
+	const stray = readdirSync(join(ROOT, 'teach')).filter((name) => name === 'pdf')
+	expect(stray, 'the per-session PDFs are gone').toEqual([])
 })
 
 it('no PDF is older than anything it was built from', () => {
@@ -62,12 +64,10 @@ it('the print block still resets every trap that breaks a text layer', () => {
 	// Each of these renders perfectly and extracts as garbage. They were isolated
 	// one at a time, by experiment, and every one of them is a property somebody
 	// would reasonably add back for the screen.
-	const css = readFileSync(join(ROOT, 'teach/teach.css'), 'utf8')
+	const css = readFileSync(join(ROOT, 'design/book.css'), 'utf8')
 	const print = css.slice(css.indexOf('@media print'))
 	const required: Array<[string, string]> = [
-		['--font-sans: Helvetica', 'the printed sans stack must not resolve to SF Pro'],
-		['--font-serif: Georgia', 'the printed serif stack must be one that embeds space glyphs'],
-		['--font-mono: "Courier New"', 'the printed mono stack must not be ui-monospace'],
+		['overflow: visible !important', 'overflow-x on a command clips it on paper, in the text layer too'],
 		['letter-spacing: normal !important', 'tracking both over-splits and glues runs'],
 		['font-weight: 700 !important', 'a variable face at 900 glues its run and drops a character'],
 		['position: static !important', 'a positioned list item paints last and detaches from its heading'],
@@ -81,9 +81,14 @@ it('the page inset is declared in one place', () => {
 	// both only hides which one is live. And it must not be padding on a wrapper:
 	// block padding insets the start and end of a block, leaving page two onward
 	// flush against the paper edge.
-	const css = readFileSync(join(ROOT, 'teach/teach.css'), 'utf8')
-	expect(css).toContain('@page {')
+	const css = readFileSync(join(ROOT, 'design/book.css'), 'utf8')
 	expect(/@page\s*\{[^}]*margin:/.test(css), '@page declares no margin').toBe(true)
 	const builder = readFileSync(join(ROOT, 'scripts/build-book.ts'), 'utf8')
 	expect(builder).toContain("margin: { top: '0', bottom: '0', left: '0', right: '0' }")
+})
+
+it('the builder refuses a Chromium without margin boxes', () => {
+	// Without them the book prints with no page numbers and nothing says so.
+	expect(MARGIN_BOXES_FROM).toBe(131)
+	expect(readFileSync(join(ROOT, 'scripts/build-book.ts'), 'utf8')).toContain('version < MARGIN_BOXES_FROM')
 })

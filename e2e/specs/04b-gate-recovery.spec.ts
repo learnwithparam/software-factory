@@ -10,7 +10,7 @@
  *
  * So the gate is broken deliberately, the way `make prove` breaks every other
  * gate in this repository. The failure is real, the reason it gives is real, and
- * the cause is ours. The run sheet says so rather than implying the model
+ * the cause is ours. The guide says so rather than implying the model
  * stumbled, because teaching that agents are unreliable when the evidence says
  * otherwise is the wrong lesson.
  *

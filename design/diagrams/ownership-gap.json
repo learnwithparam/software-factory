@@ -1,0 +1,23 @@
+{
+  "shape": "gate",
+  "alt": "A new directory nobody owns fails the owner lookup and the run is refused.",
+  "caption": "A directory with no owner has no checks and no rule, so the build fails instead of guessing.",
+  "path": [
+    {
+      "title": "New directory"
+    },
+    {
+      "title": "Owner lookup"
+    },
+    {
+      "title": "Task runs",
+      "tone": "mark"
+    }
+  ],
+  "gates": [
+    {
+      "after": 1,
+      "refuse": "No owner"
+    }
+  ]
+}

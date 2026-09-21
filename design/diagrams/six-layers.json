@@ -1,0 +1,33 @@
+{
+  "shape": "stack",
+  "alt": "Six layers around a coding agent: boundary, context, skills, execution, verification, delivery, each with the one thing it decides.",
+  "caption": "Six jobs around the agent. Each decides one thing, and each fails in its own way.",
+  "labelWidth": 100,
+  "layers": [
+    {
+      "title": "Boundary",
+      "note": "What may be tried"
+    },
+    {
+      "title": "Context",
+      "note": "What the task knows"
+    },
+    {
+      "title": "Skills",
+      "note": "How we do things"
+    },
+    {
+      "title": "Execution",
+      "note": "Where it works"
+    },
+    {
+      "title": "Verification",
+      "note": "What must be proven"
+    },
+    {
+      "title": "Delivery",
+      "tone": "mark",
+      "note": "Who decides it ships"
+    }
+  ]
+}

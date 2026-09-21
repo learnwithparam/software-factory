@@ -1,0 +1,58 @@
+{
+  "shape": "matrix",
+  "alt": "Six phases of a hosted factory, the layer built by hand that matches each, and the decision a person makes there.",
+  "caption": "The names differ and the shape does not. The last column never transfers: which decisions stay with a person is yours to state on either substrate.",
+  "corner": "Phase",
+  "labelWidth": 80,
+  "cols": [
+    "Layer built here",
+    "Person decides"
+  ],
+  "rows": [
+    {
+      "label": "Intake",
+      "cells": [
+        "Boundary",
+        {
+          "text": "Start a run",
+          "tone": "mark"
+        }
+      ]
+    },
+    {
+      "label": "Triage",
+      "cells": [
+        "None",
+        "Accept the task"
+      ]
+    },
+    {
+      "label": "Planning",
+      "cells": [
+        "Context",
+        "Approve the plan"
+      ]
+    },
+    {
+      "label": "Building",
+      "cells": [
+        "Execution",
+        "Nobody"
+      ]
+    },
+    {
+      "label": "Review",
+      "cells": [
+        "Verification",
+        "Read the diff"
+      ]
+    },
+    {
+      "label": "Done",
+      "cells": [
+        "Delivery",
+        "Merge it"
+      ]
+    }
+  ]
+}

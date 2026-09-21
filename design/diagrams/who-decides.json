@@ -1,0 +1,54 @@
+{
+  "shape": "matrix",
+  "alt": "Who accepts the plan, who starts the run and who merges, under each of four company shapes.",
+  "caption": "Three decisions and the person who makes each one. The merge row never moves: nobody has built a shape where a machine merges.",
+  "corner": "Decision",
+  "labelWidth": 90,
+  "cols": [
+    "Solo",
+    "Startup",
+    "Scaleup",
+    "Enterprise"
+  ],
+  "rows": [
+    {
+      "label": "Accept plan",
+      "cells": [
+        "Nobody",
+        "Teammate",
+        "Owning team",
+        "Approver"
+      ]
+    },
+    {
+      "label": "Start run",
+      "cells": [
+        "Arrival",
+        "Arrival",
+        "Person",
+        "Person"
+      ]
+    },
+    {
+      "label": "Merge",
+      "cells": [
+        {
+          "text": "Person",
+          "tone": "wait"
+        },
+        {
+          "text": "Person",
+          "tone": "wait"
+        },
+        {
+          "text": "Person",
+          "tone": "wait"
+        },
+        {
+          "text": "Person",
+          "tone": "wait"
+        }
+      ]
+    }
+  ]
+}

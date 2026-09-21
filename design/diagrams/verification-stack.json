@@ -1,0 +1,28 @@
+{
+  "shape": "stack",
+  "alt": "Six checks a change survives before a person reads it: gate, holdout, cold review, negative proof, evidence rules.",
+  "caption": "The checks this chapter builds, from the cheapest to the most independent.",
+  "labelWidth": 110,
+  "layers": [
+    {
+      "title": "Gate verdict",
+      "note": "one exact line"
+    },
+    {
+      "title": "Holdout tests",
+      "note": "never seen"
+    },
+    {
+      "title": "Cold review",
+      "note": "diff and task only"
+    },
+    {
+      "title": "Negative proof",
+      "note": "red without the change"
+    },
+    {
+      "title": "Evidence rules",
+      "note": "code limits the claim"
+    }
+  ]
+}

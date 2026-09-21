@@ -1,0 +1,20 @@
+{
+  "shape": "fan",
+  "alt": "One task on the left, and the three things it receives on the right.",
+  "caption": "The router works from the files a task will touch.",
+  "from": {
+    "title": "One task",
+    "tone": "dark"
+  },
+  "to": [
+    {
+      "title": "Rules for its files"
+    },
+    {
+      "title": "Skills for its work"
+    },
+    {
+      "title": "The task itself"
+    }
+  ]
+}

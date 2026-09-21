@@ -166,19 +166,19 @@ function paint(text: string): string {
 /** Render real command output as a typeset block and photograph it. */
 export async function shotTerminal(page: Page, name: string, ran: Ran, caption?: string): Promise<void> {
 	mkdirSync(SCREENS, { recursive: true })
-	const tokens = readFileSync(join(ROOT, 'teach', 'tokens.css'), 'utf8')
+	const tokens = readFileSync(join(ROOT, 'design', 'tokens.css'), 'utf8')
 	const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 ${tokens}
-body { margin: 0; padding: 28px; background: var(--c-bg); font-family: var(--font-sans); }
+body { margin: 0; padding: 28px; background: var(--c-paper); font-family: var(--font-sans); }
 .card { border-radius: 10px; overflow: hidden; border: 1px solid var(--c-line); max-width: 1040px; }
-.bar { background: var(--c-bg-inset); padding: 10px 16px; font-family: var(--font-mono); font-size: 13px; color: var(--c-ink-muted); }
+.bar { background: var(--c-card); padding: 10px 16px; font-family: var(--font-mono); font-size: 13px; color: var(--c-muted); }
 /* Wrapped, not clipped. A finding that runs off the right edge of a slide is a
    finding the room does not read, and these lines are the point of the picture. */
-pre { margin: 0; background: var(--c-term-bg); color: var(--c-term-ink); padding: 20px 24px;
+pre { margin: 0; background: var(--c-fill-dark); color: var(--c-paper); padding: 20px 24px;
       font-family: var(--font-mono); font-size: 14px; line-height: 1.55;
       white-space: pre-wrap; word-break: break-word; overflow: visible; }
 .pass { color: #7ee3b0; } .fail { color: #ff9c92; } .wait { color: #f0cf6b; } .refuse { color: #b9aeff; }
-p.cap { margin: 14px 2px 0; color: var(--c-ink-muted); font-size: 13px; max-width: 1040px; }
+p.cap { margin: 14px 2px 0; color: var(--c-muted); font-size: 13px; max-width: 1040px; }
 </style></head><body>
 <div class="card"><div class="bar">$ ${escapeHtml(ran.command)}</div><pre>${paint(ran.output)}</pre></div>
 ${caption ? `<p class="cap">${escapeHtml(caption)}</p>` : ''}

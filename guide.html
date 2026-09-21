@@ -1,0 +1,2062 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Software Factory: facilitator guide</title>
+<meta name="description" content="Every Software Factory session in one guide: what to say, what to run, what the room does, and what to ask. Each session starts on its own page.">
+<link rel="stylesheet" href="design/tokens.css">
+<link rel="stylesheet" href="design/book.css">
+</head>
+<body>
+<main class="doc">
+
+<header class="cover">
+<p class="series">Software Factory · facilitator guide</p>
+<h1>Software Factory facilitator guide</h1>
+<p class="deck">One guide for every session. Each session starts on its own page, so you can print one and hand it over. A session lists what to say, what to run, what the room does and what to ask, and it names the ideas it teaches. The attendee workbook explains each of those ideas once.</p>
+<dl class="facts">
+<dt>Read for</dt><dd>whoever is running a lesson, a module, the leadership workshop or office hours</dd>
+<dt>Proven by</dt><dd><code>make check</code>, <code>make prove</code> and <code>make e2e</code> in this repository</dd>
+<dt>Printed by</dt><dd><code>make book</code>, one part per session, each on a fresh page</dd>
+</dl>
+</header>
+
+<nav class="contents" aria-label="Contents">
+<h2>Contents</h2>
+<ol>
+<li><span class="no">01</span><a href="#before">Follow the card, not the label<span class="what">Before any session</span></a></li>
+<li><span class="no">02</span><a href="#s-lesson-1-architecture">Design a Software Factory for Your Coding Agents<span class="what">Lightning lesson, sixty minutes</span></a></li>
+<li><span class="no">03</span><a href="#s-lesson-2-execution">Build Your First Software Factory Execution Harness<span class="what">Lightning lesson, sixty minutes</span></a></li>
+<li><span class="no">04</span><a href="#s-lesson-3-verification">Enforce Code Quality with Automated Agent Verifiers<span class="what">Lightning lesson, sixty minutes</span></a></li>
+<li><span class="no">05</span><a href="#s-lesson-4-delivery">Automate Pull Requests with Background Coding Agents<span class="what">Lightning lesson, sixty minutes</span></a></li>
+<li><span class="no">06</span><a href="#s-module-1-boundary">Design Your Software Factory Architecture<span class="what">Cohort module one, two hours</span></a></li>
+<li><span class="no">07</span><a href="#s-module-2-execution">Isolate Agent Work with an Execution Harness<span class="what">Cohort module two, two hours</span></a></li>
+<li><span class="no">08</span><a href="#s-module-3-context">Route the Right Context to Every Task<span class="what">Cohort module three, two hours</span></a></li>
+<li><span class="no">09</span><a href="#s-module-4-verification">Make Agents Prove Their Work<span class="what">Cohort module four, two hours</span></a></li>
+<li><span class="no">10</span><a href="#s-module-5-loop">Build Self-Healing Engineering Loops<span class="what">Cohort module five, two hours</span></a></li>
+<li><span class="no">11</span><a href="#s-module-6-delivery">Orchestrate and Ship Verified PRs<span class="what">Cohort module six, two hours</span></a></li>
+<li><span class="no">12</span><a href="#s-workshop-operating-model">Design an AI-Native Software Factory for Your Organization<span class="what">Leadership workshop, one day</span></a></li>
+<li><span class="no">13</span><a href="#s-office-hours">Office hours and capstone demo day<span class="what">Weekly hour, plus the final session</span></a></li>
+</ol>
+</nav>
+
+<section class="before" id="before">
+<div class="lead">
+<div class="head"><p class="when">Before any session</p><h2>Follow the card, not the label</h2></div>
+<div class="part"><h3>Note</h3><div>
+<p>The button that opens a session is not always called the same thing. A resting card offers Investigate, a card the factory is working offers Build, and Open session appears once a session exists and is idle. Whichever button is on the card is the one that opens what the run is doing. A guide that named a fixed button sent a presenter hunting for one that was not there.</p>
+</div></div>
+</div>
+</section>
+
+<div class="session opens" id="s-lesson-1-architecture">
+<header>
+<p class="series">Lightning lesson, sixty minutes</p>
+<h2>Design a Software Factory for Your Coding Agents</h2>
+<p class="deck">Architecture session. No live coding. The room leaves with a map they can hold against their own repository, and one named gap.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-six-layers" data-concept="six-layers">six layers</a>, <a class="concept-link" href="workbook.html#c-boundary" data-concept="boundary">boundary</a>, <a class="concept-link" href="workbook.html#c-context" data-concept="context">context</a>, <a class="concept-link" href="workbook.html#c-skills" data-concept="skills">skills</a>, <a class="concept-link" href="workbook.html#c-execution" data-concept="execution">execution</a>, <a class="concept-link" href="workbook.html#c-verification" data-concept="verification">verification</a>, <a class="concept-link" href="workbook.html#c-delivery" data-concept="delivery">delivery</a>, <a class="concept-link" href="workbook.html#c-mega-prompt" data-concept="mega-prompt">the growing prompt</a>.</p>
+</header>
+
+<section class="segment" data-segment="0-before">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">Twenty minutes ahead, alone</p><h2>Before anyone joins</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The demo is warm and the console has data in it. Nothing here happens while people watch.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div><p>Nothing. This segment is setup.</p></div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> check
+<span class="hl-c">$ </span><span class="hl-k">make</span> score
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06</pre>
+</div></div>
+
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>The score prints and every phase is green.</li>
+<li>The console is serving and lists finished runs with their timings.</li>
+<li>Your editor is on a clean branch, because the harness will create worktrees and you want that visible.</li>
+</ul>
+</div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Confirm the room can read a terminal at the back before you start.</p></div>
+</section>
+
+<section class="segment" data-segment="1-problem">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:08</p><h2>The afternoon that disappears</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone recognises the problem as theirs before any architecture appears.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Open with the shape of the day, not the technology. The function took seconds. Then came re-explaining the codebase, checking what else moved, and tidying the pull request.</li>
+<li>Name the wrong conclusion out loud: that the model needs to improve. Ask who has responded to a bad result by adding another paragraph to their instructions.</li>
+<li>Land the reframe: the generator is not the missing piece. There is nowhere safe for it to run and no reliable way to brief it. Nothing checks its work before it reaches you.</li>
+</ul>
+</div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing yet. Resist opening a terminal here.</p></div></div>
+
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>Slides or a whiteboard only. Faces, not a screen.</p></div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How long is your instructions file now, and when did you last read all of it?</p></div>
+</section>
+
+<section class="segment" data-segment="2-map">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:08 to 0:28</p><h2>The map</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can name all six jobs and say which failure each one removes.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Walk the six in order, giving each one a single sentence and a symptom. Do not define them abstractly; define them by what goes wrong when they are missing.</li>
+<li>Spend the longest on the second and fifth, because those are where the room's pain actually is.</li>
+<li>Say the sentence that reframes the hour. These fail separately, so the fix depends on which one is missing.</li>
+</ul>
+</div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Show the map in the workbook and scroll through it.</p></div></div>
+
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The six-layer diagram, one heading at a time.</li>
+<li>The symptom under each, said aloud rather than written on the slide.</li>
+</ul>
+</div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Pick the symptom you had this week. Which job was missing?</p></div>
+</section>
+
+<section class="segment" data-segment="3-routing">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:28 to 0:40</p><h2>Routing beats piling</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The room understands why their instructions file stopped helping, and what replaces it.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Describe the growth curve honestly. Each addition works, which is why it keeps happening, and accuracy still falls.</li>
+<li>Explain the competition for attention. The sentence that matters is now one of forty, and thirty-nine do not apply to this task.</li>
+<li>Show the alternative as a calculation rather than a philosophy. Files to be touched, owners of those files, rules for those owners, skills for that kind of work.</li>
+</ul>
+</div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=03</pre>
+</div></div>
+
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Two tasks, side by side, receiving visibly different material.</li>
+<li>The frontend task never being shown the money rules, and the reason why printed next to it.</li>
+</ul>
+</div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What does a new engineer get told on day one that your agent is never told?</p></div>
+</section>
+
+<section class="segment" data-segment="4-tour">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:40 to 0:52</p><h2>The whole loop, once</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They see the finished thing move, so the layers stop being a diagram.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Narrate the stages as they happen and keep naming which job is doing the work.</li>
+<li>Stop on the refusal and give it a beat. A run declining to touch the money path is the most important thing on the screen, and it looks like nothing.</li>
+<li>Close the loop at the pull request and say plainly that this is where the machine stops.</li>
+</ul>
+</div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06</pre>
+</div></div>
+
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>An item claimed, a worktree created, checks running, a verdict, a draft pull request.</li>
+<li>A second item stopping with a policy reason instead of a change.</li>
+<li>The console updating with the stage timings for the run that just finished.</li>
+</ul>
+</div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of those stages would you have let run unattended on your repository this morning?</p></div>
+</section>
+
+<section class="segment" data-segment="5-close">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:52 to 1:00</p><h2>One gap each</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Nobody leaves with a reading list. Everybody leaves with one named absence.</p></div>
+</div>
+
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask them to write down which of the six they do not have, in their own words, before the call ends.</li>
+<li>Say where the next sessions go and what each one builds, briefly, without selling.</li>
+</ul>
+</div></div>
+
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Leave the console on screen while taking questions.</p></div></div>
+
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div><p>The repository address, and the workbook open at the overview.</p></div></div>
+
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Name the one you are missing. Type it in the chat so the room sees the spread.</p></div>
+</section>
+
+<section class="segment" data-segment="7-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>The same policy, read by a product</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They have seen the charter they just wrote being obeyed by software none of us built.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Point out that the board is reading the same `.factory` directory the hand-built loop reads.</li>
+<li>The value of a written policy is that a second implementation can honour it without being told anything else.</li>
+<li>Name what is missing on purpose: nothing has run yet, so nothing on screen is a claim about quality.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> factory<span class="hl-n">-up</span>
+<span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span></pre>
+<figure class="shot">
+<img src="evidence/screens/factory-intake.png" alt="Every declared issue waiting on the Intake board">
+<figcaption>Every issue the repository declares arrives from one place. Nothing has started, and both switches are off.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>Intake</li>
+<li class="arrow">to</li>
+<li>a card</li>
+<li class="arrow">to</li>
+<li>Investigate</li>
+</ul>
+<div class="where">
+<div><h4>The charter is not read by magic</h4><p>Mastra Factory has no knowledge of a .factory directory. What it reads is AGENTS.md, and the only reason these rules bind anything is that the file points at them and repeats the protected list. Delete it and every limit here becomes a comment.</p></div>
+<div><h4>Both switches are off, deliberately</h4><p>Arrival and action are separate. An issue landing on Intake is not a run starting, and the gap between those two is where a person decides whether this is work at all.</p></div>
+<div><h4>Six cards, one repository</h4><p>Nothing on this board knows what the ledger is. It knows a repository was connected and that its issues arrive here.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches six cards appear without anybody filing them.</li>
+<li>Notices that Auto-start runs is off, so arrival and action are separate things.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>If your policy file vanished, which of these six would a stranger get wrong first?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-lesson-2-execution">
+<header>
+<p class="series">Lightning lesson, sixty minutes</p>
+<h2>Build Your First Software Factory Execution Harness</h2>
+<p class="deck">Hands on. Attendees follow along in their own repository and finish with an isolated place for agent work.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-worktree" data-concept="worktree">worktree per task</a>, <a class="concept-link" href="workbook.html#c-branch-claim" data-concept="branch-claim">the branch as claim</a>, <a class="concept-link" href="workbook.html#c-sandbox-limits" data-concept="sandbox-limits">limits</a>, <a class="concept-link" href="workbook.html#c-executor-interface" data-concept="executor-interface">executor interface</a>.</p>
+</header>
+
+<section class="segment" data-segment="0-before">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">Thirty minutes ahead</p><h2>Setup you do alone</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Nothing is left over from an earlier rehearsal, and only the main checkout is listed.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Nothing. Preparation only.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span>
+<span class="hl-c">$ </span><span class="hl-k">git</span> <span class="hl-n">-C</span> ../ledger worktree list</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>Only the main checkout is listed before you begin.</li>
+<li>A rehearsal leaves nothing behind, so the list is the same afterwards.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Widen the terminal font now, because the room watches three runs and reads what they print.</p></div>
+</section>
+
+<section class="segment" data-segment="1-problem">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:08</p><h2>The bug you handed to an agent</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone recognises an agent that edited a checkout they were working in, before any mechanism appears.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Say what you are working on before how. The ledger is a screen that shows what each agent run cost, where its time went and how it ended. A page asks it for zero rows and gets an error, not an empty list. The terminal will name it as issue 2.</li>
+<li>Put the comparison up. You hand it to an agent and carry on. By evening your files are half edited and your branch has moved.</li>
+<li>Show the six layers with the execution layer lit. Boundary, context and skills come before it builds. Execution, verification and delivery come while it builds and after.</li>
+<li>Say the session works alone and anyone can follow it. Then show the finished harness drawn whole.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Slides only. Terminal open, nothing typed.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The comparison between what you filed and what you found by evening.</li>
+<li>One drawing of the six layers, with execution lit.</li>
+<li>One drawing of the finished harness, before any part of it.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Who has lost work to a background run? What did it cost to recover?</p></div>
+</section>
+
+<section class="segment" data-segment="2-worktree">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:08 to 0:21</p><h2>A worktree for every task</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has watched a task get its own worktree, a file written in it, and the main checkout stay clean.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Collect the war stories first, then draw the shared checkout and the branch that moved. Each story is a missing place, not a misbehaving tool.</li>
+<li>Run the demo for six minutes. Write a file in the new worktree, then show git status clean in the main checkout.</li>
+<li>Open worktree.ts beside the terminal: the name comes from the item, so the same item always maps to the same branch.</li>
+<li>Put the decision to the room: one shared checkout, or a worktree per task. Free and collides, against disk and an install and never.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=02 create 2
+<span class="hl-c">$ </span><span class="hl-k">git</span> <span class="hl-n">-C</span> ../ledger worktree list
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=02 remove 2</pre>
+<p>The implementation is <code data-file="steps/02-execution/worktree.ts">steps/02-execution/worktree.ts</code>. Ignore the make line that follows each run, it is make reading the argument as a target.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Branch fq-2, a path under .worktrees, and the workspace count going from 0 to 1.</li>
+<li>Two entries in the worktree list, then one again after the remove.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many agent tasks would you run while you sleep, and where would each one install its dependencies?</p></div>
+</section>
+
+<section class="segment" data-segment="3-claim">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:21 to 0:34</p><h2>Two runs, one item</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand how ownership is settled without anything new to operate.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pose the collision before showing the answer: two scheduled runs wake up, both see issue 2, both want to push a fix.</li>
+<li>Let someone propose a lock service, then price it: something to run, its uptime, and what happens when the holder dies.</li>
+<li>Run the demo for six minutes. The remote is a throwaway bare repository, so the race is real.</li>
+<li>Put the decision to the room: a lock service, or the branch you already have.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=02 race 2</pre>
+<p>Read it in <code data-file="steps/02-execution/claim.ts">steps/02-execution/claim.ts</code>: the push is never forced.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>Both runs computing fq-2, run 1 continuing, run 2 stopping with the remote's own rejected line.</li>
+<li>A verdict saying exactly one run owns the work.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What else in your pipeline would be simpler if the coordination lived in a tool you already run?</p></div>
+</section>
+
+<section class="segment" data-segment="4-limits">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:34 to 0:47</p><h2>What it can reach from in there</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can state limits for one task in their own repository and know what happens when one is exceeded.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Separate the two questions. A worktree answers where the work happens. Sandbox limits answer what it can touch once it is there.</li>
+<li>Run the demo for six minutes. Read the profile table first, then the four refusals one at a time.</li>
+<li>Insist on the ending: exceeding a limit stops the run, and a warning in a log is not a limit.</li>
+<li>Put the decision to the room: limits the agent can edit, or limits it cannot.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=02 limits</pre>
+<p>Declared in <code data-file="steps/02-execution/limits.ts">steps/02-execution/limits.ts</code>, where a reviewer can read them.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A table of profiles, one per kind of task, and a display task writing inside its limits.</li>
+<li>A write to services/budget, a path out of the worktree, curl and the network each refused, with the reason.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>List three commands you would never want a background run to execute. Why those three?</p></div>
+</section>
+
+<section class="segment" data-segment="5-whole">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:47 to 1:00</p><h2>Issue 2, start to finish</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say what the harness gives, and what it does not, in one sentence each.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Walk the whole drawing: claimed, a worktree, sandbox limits on, an agent inside them, a fix on its own branch. The agent is the one part you can swap.</li>
+<li>Put the honest limit on screen. A worktree is not a sandbox. An allowed command can still be the wrong one, and nothing in this hour has read a line of the change.</li>
+<li>Say the offer once, then finish on the closing question.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Leave the worktree list and a clean status side by side on screen.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The repository address and the three files worth reading first.</li>
+<li>The closing question on the last slide.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Where would your checkout not work? Type it in the chat.</p></div>
+</section>
+
+<section class="segment" data-segment="7-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>Somebody else's sandbox, same rule</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say why an isolated checkout is a property of the harness rather than a courtesy.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Two harnesses now: the one built in this lesson and the one inside the product.</li>
+<li>Both give a run its own tree, for the same reason. In a shared tree you cannot tell two runs apart when one breaks.</li>
+<li>Show where the checkout lives, and that deleting it costs nothing.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">ls</span> ../mastra/.sandboxes || true</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-building.png" alt="The session working in its sandbox">
+<figcaption>A run holds a checkout of its own. The repository on your disk is untouched while it works.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>a card in Building</li>
+<li class="arrow">to</li>
+<li>its session</li>
+<li class="arrow">to</li>
+<li>the file tree</li>
+</ul>
+<div class="where">
+<div><h4>A checkout of its own, every time</h4><p>The session holds a clone under .sandboxes. Delete it while the run is going and the run dies; delete your own working tree and nothing happens, which is the whole point of the boundary.</p></div>
+<div><h4>The one that cost me an evening</h4><p>A review once checked a pull request out in the Factory server's own directory rather than a sandbox. The files docker-compose.yml and package.json vanished, and the only symptom was "compose file is invalid". Ask the room where they would have looked first.</p></div>
+<div><h4>Sandboxes are cattle</h4><p>They are named by run, not by branch, and nothing in them is worth keeping once the pull request exists.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens the sandbox directory and confirms it is a real clone.</li>
+<li>Confirms their own working tree has no new branch.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What breaks first if two runs share one checkout: the build, the test, or the diff?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-lesson-3-verification">
+<header>
+<p class="series">Lightning lesson, sixty minutes</p>
+<h2>Enforce Code Quality with Automated Agent Verifiers</h2>
+<p class="deck">The session that changes how people review. Most of the hour is spent on one idea: undo the change and watch the test go red.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-gate-verdict" data-concept="gate-verdict">the verdict line</a>, <a class="concept-link" href="workbook.html#c-holdout-test" data-concept="holdout-test">holdout tests</a>, <a class="concept-link" href="workbook.html#c-cold-verifier" data-concept="cold-verifier">the cold reviewer</a>, <a class="concept-link" href="workbook.html#c-negative-proof" data-concept="negative-proof">the negative proof</a>, <a class="concept-link" href="workbook.html#c-doer-tester" data-concept="doer-tester">Doer and Tester</a>.</p>
+</header>
+
+<section class="segment" data-segment="0-before">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">Thirty minutes ahead</p><h2>Setup you do alone</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Every command has run once, so nothing is compiling on stage.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Nothing. Preparation only.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span>
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 gate
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 negative<span class="hl-n">-proof</span>
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 verify
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 holdout</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>The gate ends in one verdict line and nothing summarises it afterwards.</li>
+<li>verify names the two findings on the saved-view change, with its reason.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Have fixtures/saved-view.ts open in a second window, ready to show.</p></div>
+</section>
+
+<section class="segment" data-segment="1-problem">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:08</p><h2>The pull request you approved</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone recognises a green pull request that was still wrong, before any mechanism appears.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Say what you are working on before how. The ledger is a screen that shows what each agent run cost, where its time went and how it ended. Someone asked for a small feature: remember the filter a reader has set. The terminal will name it as issue 6.</li>
+<li>Put the comparison up: the agent wrote it and its tests, the suite was green and you approved. A month later it stores more than was asked and an old test had been weakened.</li>
+<li>Show the six layers with the verification layer lit. Boundary, context and skills come before it builds. Execution, verification and delivery come while it builds and after.</li>
+<li>Say the session works alone and anyone can follow it. Then show the finished verifier drawn whole.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Slides only. No commands yet.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The comparison between green and approved, and a month later.</li>
+<li>One drawing of the six layers, with verification lit.</li>
+<li>One drawing of the finished verifier: a gate, tests proven to bite, a cold reader, one verdict.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Who has approved a green pull request that was wrong?</p></div>
+</section>
+
+<section class="segment" data-segment="2-verdict">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:08 to 0:21</p><h2>One line nobody rewords</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Attendees can state why a missing check must be louder than a failing one.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Draw green as a claim, not a proof: the tests pass, and the writer chose the tests.</li>
+<li>Run the demo for six minutes. Read the verdict line aloud, then the note under it. A summary of the line is a claim. The line is evidence.</li>
+<li>Run it again with the required check removed. It does not pass and it does not fail, it says misconfigured.</li>
+<li>Put the decision to the room: pass or fail, or a third state for nothing ran.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 gate</pre>
+<p>The three outcomes are in <code data-file="steps/04-verification/gate.ts">steps/04-verification/gate.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>VERDICT: PASS after the repository's own test command ran.</li>
+<li>The same gate with the check removed ending in MISCONFIGURED, with no test command run.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>If your pipeline lost its test step tonight, how long before anyone noticed?</p></div>
+</section>
+
+<section class="segment" data-segment="3-teeth">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:21 to 0:34</p><h2>Undo the change and watch</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone leaves able to apply this to code that has no agents anywhere near it.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Show the pull request replacing an assertion in apps/console with one that passes for any input. The suite is green because the test was changed.</li>
+<li>Run the demo for six minutes. Green with the change, red with it undone and the test kept, green again restored.</li>
+<li>Then run it under a test that checks nothing and let the FAIL sit on screen. Same suite, a minute apart.</li>
+<li>Put the decision to the room: undo every test, or a sample.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 negative<span class="hl-n">-proof</span>
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 negative<span class="hl-n">-proof</span> <span class="hl-n">--toothless</span></pre>
+<p>The revert, rerun and restore are in <code data-file="steps/04-verification/verifier.ts">steps/04-verification/verifier.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The change reverted, the test going red, the change restored.</li>
+<li>The second run failing: the suite passes and it proves nothing.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Take the last test you wrote. Would it have gone red without your change?</p></div>
+</section>
+
+<section class="segment" data-segment="4-cold">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:34 to 0:47</p><h2>A reader who was never told the story</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand why the reviewer is deliberately denied the story of the work, and why some checks are hidden from the writer.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Tell the anchoring story from human review, which everyone recognises, then apply it to a second reader.</li>
+<li>Run verify for six minutes. Show what the cold reader is given, the issue and the diff, then what it is not given, then its findings.</li>
+<li>Read the two findings aloud. The change also stores the sort order, column widths and last run opened. And a weakened assertion is why the suite is green.</li>
+<li>Run holdout: five checks that live outside the target, none of them visible to the writer.</li>
+<li>Put the decision to the room: the writer's own tests, or a suite it cannot read.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 verify
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=04 holdout</pre>
+<p>The diff the cold reader sees is <code data-file="fixtures/saved-view.ts">fixtures/saved-view.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A verdict of fail on a change whose own suite was green, with both findings quoted.</li>
+<li>Five independent checks, each saying what it protects.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your services would you write five holdout tests for first?</p></div>
+</section>
+
+<section class="segment" data-segment="5-whole">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:47 to 1:00</p><h2>Pull request to verdict</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say what a verdict proves, and what it cannot judge.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Walk the whole drawing. Green on its own tests, then the gate's line, each test undone and the holdout tests. A cold reader follows, and the verdict is FAIL with both reasons quoted.</li>
+<li>Put the honest limit on screen. A gate cannot judge whether the design is right. A cold reader will sometimes reject good work. A holdout suite starts ageing the day it is written.</li>
+<li>Say the offer once, then finish on the closing question.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Leave the verdict on screen while taking questions.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The verdict line with both findings beneath it.</li>
+<li>The closing question on the last slide.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Would your last test have gone red without your change? Type it in the chat.</p></div>
+</section>
+
+<section class="segment" data-segment="7-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>A reviewer that can say no</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They accept that a reviewer which never rejects anything has not been tested.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>The interesting artefact is the refusal, not the approval.</li>
+<li>Read the two findings aloud and note that one of them is a weakened assertion, which no path rule could have caught.</li>
+<li>This is why the charter forbids editing a test to turn a suite green. It is a property of the change, not of a filename.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span></pre>
+<figure class="shot">
+<img src="evidence/screens/factory-review-changes.png" alt="A reviewer sending work back with findings">
+<figcaption>The verdict line, with the two findings that produced it.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>the pull request</li>
+<li class="arrow">to</li>
+<li>Conversation</li>
+<li class="arrow">to</li>
+<li>the verdict line</li>
+</ul>
+<div class="where">
+<div><h4>The verdict is the first line, on purpose</h4><p>A reviewer that buries its conclusion in prose cannot be checked by anything. One line, one of two values, and everything after it is the argument for it.</p></div>
+<div><h4>A weakened assertion is not a path rule</h4><p>Changing toBeCloseTo(1, 10) to toBeGreaterThanOrEqual(0) touches no protected file. No glob catches it, which is why the charter forbids it in words and the reviewer has to be the thing that notices.</p></div>
+<div><h4>A picture is the one artefact a test cannot read</h4><p>Four screenshots in this repository were a loading spinner, and every assertion around them passed. Show the room the guard that refuses to photograph a page still saying it is loading.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads the verdict line and both findings.</li>
+<li>Identifies which finding a glob could have prevented and which it could not.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Your suite went green after an edit to a test. What would tell you which kind of edit it was?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-lesson-4-delivery">
+<header>
+<p class="series">Lightning lesson, sixty minutes</p>
+<h2>Automate Pull Requests with Background Coding Agents</h2>
+<p class="deck">A live run from an untouched issue to a reviewable pull request. The demonstration is the session; commentary fits around it.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-work-queue" data-concept="work-queue">the queue</a>, <a class="concept-link" href="workbook.html#c-draft-pr" data-concept="draft-pr">a request with its evidence</a>, <a class="concept-link" href="workbook.html#c-human-merge-gate" data-concept="human-merge-gate">the merge gate</a>, <a class="concept-link" href="workbook.html#c-run-record" data-concept="run-record">the run record</a>.</p>
+</header>
+
+<section class="segment" data-segment="0-before">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">Thirty minutes ahead</p><h2>Reset the board</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Every command has run once, so nothing is compiling on stage, and the board is reset.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Nothing. Preparation only.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span>
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 triage
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 run 5
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 refused
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 try<span class="hl-n">-merge</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Check</h3><div>
+<ul>
+<li>triage prints a table with a column for what may be done and a column for why.</li>
+<li>run 5 ends in refused, with zero files changed.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Nobody. Decide now what you will do if the network drops, and keep the recording as the fallback.</p></div>
+</section>
+
+<section class="segment" data-segment="1-problem">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:08</p><h2>What waited three weeks for you</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone recognises the issue nobody owns, before any mechanism appears.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Say what you are working on before how. The ledger is a screen that shows what each agent run cost, where its time went and how it ended. One total on it can be wrong, and the fix touches four languages. The terminal will name it as issue 4.</li>
+<li>Put the comparison up: filed, and three weeks later still open, with the console adding the numbers itself.</li>
+<li>Show the six layers with the delivery layer lit. Boundary, context and skills come before it builds. Execution, verification and delivery come while it builds and after.</li>
+<li>Say the session works alone and anyone can follow it. Then show the finished pipeline drawn whole.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Slides only. Resist opening a terminal here.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The comparison between an issue filed and an issue forgotten.</li>
+<li>One drawing of the six layers, with delivery lit.</li>
+<li>One drawing of the finished pipeline, ending at a person.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the oldest cross-team issue in your tracker?</p></div>
+</section>
+
+<section class="segment" data-segment="2-sort">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:08 to 0:21</p><h2>Sort before anything runs</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The room can say why every item is sorted, with a reason beside it, before an agent starts.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Draw issue 4: it sounds like one field and it touches the schema, the Go service, the TypeScript package and the console.</li>
+<li>Run the demo for six minutes. Read the table: what each item may do, and why. Issue 2 builds, issue 4 is a proposal naming three targets, issue 5 is refused.</li>
+<li>Read the two lines under the table. Triage touched no file.</li>
+<li>Put the decision to the room: a queue service, or the labels and branches you already have.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 triage</pre>
+<p>Ignore the make line that follows, it is make reading the argument as a target.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A table with a column for what it may do and a column for why.</li>
+<li>Issue 5 refused, and the reason is the protected path services/budget.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What would you want a queue to do that your issue tracker cannot?</p></div>
+</section>
+
+<section class="segment" data-segment="3-refuse">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:21 to 0:34</p><h2>Refused before a file is touched</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They see a refusal that writes nothing, with the rule quoted, and can say why that is the successful outcome.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set it up: issue 5 asks for an earlier spend warning in the Rust budget service. The change is one number, and that number decides when the money stops.</li>
+<li>Run issue 5 for six minutes. Ask the room what they expected, then point at the zero.</li>
+<li>Run refused to show the rule and its reason in plain words.</li>
+<li>Put the decision to the room: refuse outright, or propose a plan to a person.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 run 5
+<span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 refused</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The verdict quoted, REFUSED protected: services/budget, and a last line of zero files changed and zero cost.</li>
+<li>The README item refused because the factory's own configuration is off limits.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your paths would you refuse outright, and which would you only ask a person about?</p></div>
+</section>
+
+<section class="segment" data-segment="4-land">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:34 to 0:47</p><h2>What a person receives</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say what is in the draft a reviewer opens, and why nothing merges without a named person.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Show the draft: every file that changed, every verdict quoted, time and cost, and what a person still decides. Open record.ts and show the function that writes the body.</li>
+<li>Say plainly that a run to a draft needs a recorded or live agent. So the draft is on the slide and in the code, and is not run here.</li>
+<li>Run try-merge for six minutes: a merge attempted, the hook catching it, and the refusal.</li>
+<li>Say the hook is a guardrail, and a guardrail an agent can edit is not a boundary. The enforcement that counts is branch protection on the remote.</li>
+<li>Put the decision to the room: every run is a draft, or a low tier merges itself.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06 try<span class="hl-n">-merge</span></pre>
+<p>The draft body is written in <code data-file="steps/06-delivery/record.ts">steps/06-delivery/record.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>A merge attempted and refused: nothing merges without a named engineer, on any tier.</li>
+<li>The function that writes the draft body, with every verdict quoted rather than summarised.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the smallest change you would let merge with nobody looking?</p></div>
+</section>
+
+<section class="segment" data-segment="5-whole">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:47 to 1:00</p><h2>Issue to draft</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can say where the ceiling is, and it is not the number of agents.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Walk the whole drawing. The review queue has room, then the boundary decides. Issue 5 stops. Issue 4 is proposed, and once a person accepts the plan it is built, checked and opened as a draft.</li>
+<li>Put the honest limit on screen. Nothing here judges whether a plan is right. More agents cannot cut a wait that is a person reading.</li>
+<li>Say the offer once, then finish on the closing question. Give the take-home last: the smallest factory is one signal, one agent and one gate.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<p>Leave the pull request list on screen while taking questions.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room sees</h3><div>
+<ul>
+<li>The whole run as one drawing, ending at a named person.</li>
+<li>The closing question on the last slide.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many pending decisions can you absorb in a week? Type it in the chat.</p></div>
+</section>
+
+<section class="segment" data-segment="7-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:35 to 0:45</p><h2>The pull request as the interface</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can describe the hand-off point between a machine and a person in one sentence.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Every route in this material ends at a draft, on every tier, without exception.</li>
+<li>The pull request is where the evidence lives, which is what makes it reviewable by someone who watched none of the run.</li>
+<li>Contrast that with a chat transcript, which nobody can audit six weeks later.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">gh</span> pr list <span class="hl-n">--repo</span> learnwithparam/agent<span class="hl-n">-run-ledger</span></pre>
+<figure class="shot">
+<img src="evidence/screens/factory-pr-opened.png" alt="The pull request the run opened">
+<figcaption>The change, its evidence, and nothing merged.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>the pull request</li>
+<li class="arrow">to</li>
+<li>Files changed</li>
+<li class="arrow">to</li>
+<li>the plan artefact</li>
+</ul>
+<div class="where">
+<div><h4>The evidence travels with the change</h4><p>The plan the run wrote is committed beside the diff, so a reviewer who watched none of it can see what was intended before reading what was done.</p></div>
+<div><h4>Nothing merges itself, on any tier</h4><p>Every route in this material ends at an open pull request. The charter says so and the four shapes do not argue about it.</p></div>
+<div><h4>A decision is not the work</h4><p>The board records a decision succeeding within seconds while the agent goes on working for minutes. Anyone timing a stage from the decision record will report a factory four times faster than it is.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens the pull request and finds the commands the run actually executed.</li>
+<li>Confirms nothing was merged by anything except a person.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What in this pull request would you need if you were reviewing it a month from now?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-1-boundary">
+<header>
+<p class="series">Cohort module one, two hours</p>
+<h2>Design Your Software Factory Architecture</h2>
+<p class="deck">Everyone arrives with a repository they are allowed to change. They leave with a written policy for it that a run can read, and that they could defend in a design review.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-charter" data-concept="charter">the charter</a>, <a class="concept-link" href="workbook.html#c-autonomy-tier" data-concept="autonomy-tier">autonomy by consequence</a>, <a class="concept-link" href="workbook.html#c-protected-path" data-concept="protected-path">protected paths</a>, <a class="concept-link" href="workbook.html#c-queue-cap" data-concept="queue-cap">back-pressure</a>, <a class="concept-link" href="workbook.html#c-ownership-graph" data-concept="ownership-graph">the ownership graph</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-orient">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:20</p><h2>Their repository, not mine</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has named the area of their codebase where an error would be most expensive.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set the rule in the first minute. Every exercise happens on their code. The lab only shows a worked example.</li>
+<li>Ask them to write down the single directory they would least like a machine to edit, and why it earns that.</li>
+<li>Collect three answers aloud. The reasons differ, and hearing that is what stops the policy becoming a template they copy.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">git</span> clone &lt;their repository&gt; &amp;&amp; cd &lt;repository&gt;
+<span class="hl-c">$ </span><span class="hl-k">ls</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Opens their own project beside the lab.</li>
+<li>Writes one directory name and one sentence of justification in the shared document.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Would a small edit there be safer than a large one somewhere else? Say why out loud.</p></div>
+</section>
+
+<section class="segment" data-segment="2-tier">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:20 to 0:45</p><h2>Grading freedom by consequence</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend a tier for their repository using recoverability rather than size.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Offer the two candidate axes and let the cohort argue for a few minutes before you settle it.</li>
+<li>Use the comparison that ends the argument. Set a huge rewrite on a project nobody uses against a tiny edit to a payment path.</li>
+<li>Then complicate it usefully. One tier for a whole repository is too blunt once areas differ, which is why the next exercise is per area.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">cat</span> $REPO/.factory/charter.md</pre>
+<p>The rules live in the repository they govern. The code that reads them is <code data-file="steps/01-boundary/policy.ts">steps/01-boundary/policy.ts</code>, and it names no project.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Drafts a tier line for their own repository.</li>
+<li>Argues one case with a neighbour, which surfaces the disagreements early.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the worst thing an unattended run could do to you, and how long would undoing it take?</p></div>
+</section>
+
+<section class="segment" data-segment="3-graph">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:45 to 1:20</p><h2>Who owns which paths</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a graph where every directory has exactly one owner, and the build refuses when one does not.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Introduce the graph as the thing that makes policy specific rather than vague. Areas, the paths they own, and the commands that check them.</li>
+<li>Build the lab's version live, then break it by adding an unclaimed directory so the room sees the refusal.</li>
+<li>Insist on the property that matters. Guessing an owner is worse than failing, because a wrong guess is silent.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts graph
+<span class="hl-c">$ </span><span class="hl-k">mkdir</span> <span class="hl-n">-p</span> target/services/orphan &amp;&amp; touch target/services/orphan/main.go
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts graph</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees every area listed with its paths and its checks.</li>
+<li>Sees the second run refuse and name the directory nobody claimed.</li>
+<li>Writes the first version of their own graph.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which directory in your project was hardest to assign, and what does that tell you?</p></div>
+</section>
+
+<section class="segment" data-segment="4-capacity">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:20 to 1:45</p><h2>The number that stops production</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has committed to a limit on pending decisions, chosen from their own week.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask how many changes they genuinely absorb in a week, then ask them to halve it for anything they did not write.</li>
+<li>Explain what the limit protects: not the machine, the person. When it is reached, starting more work is the wrong move.</li>
+<li>Show the refusal in the lab so the number is visibly load bearing rather than advisory.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts capacity</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a run decline to start because the review queue is full.</li>
+<li>Puts a number in their own charter and says it aloud.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What happens today when that number is exceeded, and who notices first?</p></div>
+</section>
+
+<section class="segment" data-segment="5-homework">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Before Wednesday</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a committed policy file in their own repository before the next session.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Set the deliverable precisely: committed, not drafted, because the next session reads it.</li>
+<li>Warn about the common mistake, which is writing something so cautious that nothing can ever run.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts lint<span class="hl-n">-charter</span> &lt;path to theirs&gt;</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the check against their own draft and fixes what it names.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Bring the line you are least sure about to Friday.</p></div>
+</section>
+
+<section class="segment" data-segment="6-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Watching a limit hold</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has seen their own class of protected path refused rather than described.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>A limit that has never stopped anything is a sentence, not a limit.</li>
+<li>Walk the evidence backwards: no branch on the remote, no pull request, and a written reason that names the path.</li>
+<li>Then the uncomfortable part. Ask whether the refusal came from the charter or from the wording of the issue, because only one of those generalises.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> profile NAME=enterprise
+<span class="hl-c">$ </span><span class="hl-k">make</span> lab<span class="hl-n">-reset</span></pre>
+<figure class="shot">
+<img src="evidence/screens/factory-refused.png" alt="A run stopping on the money path, before touching a file">
+<figcaption>The item reaches planning and stops. No branch, no pull request, no edit.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>the money item</li>
+<li class="arrow">to</li>
+<li>Planning</li>
+<li class="arrow">to</li>
+<li>its session</li>
+</ul>
+<div class="where">
+<div><h4>Read the reason, not just the refusal</h4><p>A run that stops because the issue said "a person decides this one" looks identical to one that stops because the charter protects the path. Only the second generalises to their repository, and the difference is a sentence in the record.</p></div>
+<div><h4>Nothing was written</h4><p>Check the remote for a branch, then for a pull request. A refusal that leaves either behind is not a refusal, and this is the check to run on their own factory.</p></div>
+<div><h4>Protected and refuse are different stops</h4><p>A refused target stops after planning with a plan nobody may act on. A protected path stops before planning starts. Enterprise uses both and scaleup uses one.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Applies a shape to their own repository and names one path it would refuse.</li>
+<li>Checks the remote afterwards and confirms nothing was created.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your protected paths has ever actually stopped a change? If none, is it protecting anything?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-2-execution">
+<header>
+<p class="series">Cohort module two, two hours</p>
+<h2>Isolate Agent Work with an Execution Harness</h2>
+<p class="deck">The build session. By the end an agent can change code in their repository while their own branch stays exactly as they left it.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-worktree" data-concept="worktree">the worktree</a>, <a class="concept-link" href="workbook.html#c-branch-claim" data-concept="branch-claim">claiming by branch</a>, <a class="concept-link" href="workbook.html#c-sandbox-limits" data-concept="sandbox-limits">declared limits</a>, <a class="concept-link" href="workbook.html#c-executor-interface" data-concept="executor-interface">the executor</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-charters">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:15</p><h2>Reading each other's policies</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>The homework gets read by someone other than its author, which is where the vague lines get found.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pair them and give a single instruction: find one line you could not act on without asking the author a question.</li>
+<li>Bring two examples back to the whole group and rewrite them live.</li>
+<li>Make the standard explicit. A policy is finished when a stranger could apply it the same way you would.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. Documents on screen, in pairs.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Edits at least one line based on somebody else's confusion.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which line did your partner read differently from how you meant it?</p></div>
+</section>
+
+<section class="segment" data-segment="2-build">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:15 to 1:00</p><h2>Building it together</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has a working create and remove cycle in their own project, written by them.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Write it in front of them from an empty file rather than opening the finished version. The cohort types along.</li>
+<li>Stop at each decision and name the alternative. A clone instead of a worktree. A random name instead of a derived one. A global cleanup instead of a per-task one.</li>
+<li>Have everyone prove the same property on their own repository before moving on. A harness nobody has proven is one nobody trusts.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts create 7
+<span class="hl-c">$ </span><span class="hl-k">git</span> <span class="hl-n">-C</span> .worktrees/fq-7 status
+<span class="hl-c">$ </span><span class="hl-k">git</span> status
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts remove 7</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Creates a workspace, writes into it, and confirms the main checkout is untouched.</li>
+<li>Removes it and confirms nothing is left behind.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How long did the first one take on your project, and what dominated that time?</p></div>
+</section>
+
+<section class="segment" data-segment="3-limits">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:00 to 1:35</p><h2>Reach, declared per task</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has limits their own reviewer could read, and has watched one stop a run.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Insist on the placement before the content. Limits go where a reviewer will see them, not inside instructions to the agent.</li>
+<li>Work through a task that legitimately needs more reach, so the rule is not simply deny everything.</li>
+<li>Show the enforcement path and be honest about where it is advisory and where it is real.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts limits
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts limits <span class="hl-n">--violate</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a refused write name the path and the rule behind it.</li>
+<li>Writes limits for one real task in their own project.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your tasks genuinely needs the network, and how would you keep that from becoming the default?</p></div>
+</section>
+
+<section class="segment" data-segment="4-project">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 2:00</p><h2>This week's build</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone knows exactly what to produce and what will be checked on Monday.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>State the deliverable as something observable: a task that runs start to finish in isolation on their repository.</li>
+<li>Predict the two failures they will hit, so neither costs an evening. Dependencies are not installed in the new workspace. Generated files are ignored by the clone.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts selftest</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the self-check against their own harness and reads what it reports.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Post your isolation time in the channel when you have it running. We compare on Monday.</p></div>
+</section>
+
+<section class="segment" data-segment="5-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Many runs, one board</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can explain why a queue limit is about attention rather than machine capacity.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Generation is cheap and review is not, so the constraint worth declaring is how many things may be waiting on a person.</li>
+<li>Show the cap in the charter beside the board and let them find the mismatch if there is one.</li>
+<li>A factory producing faster than a team can read is not more productive, it is further behind.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">cat</span> $REPO/.factory/charter.md</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-board-work.png" alt="The Work board with items across its phases">
+<figcaption>Several items in flight at once, each in a different phase.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>the board header</li>
+<li class="arrow">to</li>
+<li>the phase counts</li>
+<li class="arrow">to</li>
+<li>Settings</li>
+</ul>
+<div class="where">
+<div><h4>Work items come from events, never from polling</h4><p>The reconcile sweep patches and closes items that exist; its counts have no created. The board fills because a webhook arrived, which is why a lab GitHub cannot reach delivers those events to itself.</p></div>
+<div><h4>The cap is about reading, not generating</h4><p>Compare the number waiting with the stop condition in the charter. Generation is cheap; the constraint worth declaring is how many things may be queued against one person's attention.</p></div>
+<div><h4>Two boards, not one</h4><p>Issues live on Work and pull requests live on Review, with their own phases. Teams that conflate them report a week of finished work that nobody has read.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Finds the stop condition in the charter.</li>
+<li>Counts what is waiting on the board and compares the two numbers.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>At what number of open pull requests does your team stop reading them properly?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-3-context">
+<header>
+<p class="series">Cohort module three, two hours</p>
+<h2>Route the Right Context to Every Task</h2>
+<p class="deck">The session where the instructions file gets taken apart. Everyone leaves with a router they can test, and two skills lifted out of prompts they were rewriting by hand.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-context-router" data-concept="context-router">the router</a>, <a class="concept-link" href="workbook.html#c-reusable-skill" data-concept="reusable-skill">writing a skill</a>, <a class="concept-link" href="workbook.html#c-mega-prompt" data-concept="mega-prompt">why prompts grow</a>, <a class="concept-link" href="workbook.html#c-affected-targets" data-concept="affected-targets">affected areas</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-autopsy">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:20</p><h2>An autopsy on your instructions</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has sorted their own instructions into three piles and seen how little of it any one task needs.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give them three piles and let them sort. Facts about this repository. Ways of working. Things that apply to one task only.</li>
+<li>Ask for a show of hands on how much landed in the third pile. It is usually most of it, and seeing that is the argument.</li>
+<li>Name what each pile becomes before moving on, so the rest of the session has somewhere to put things.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">wc</span> <span class="hl-n">-l</span> &lt;their instructions file&gt;</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Annotates their own file with three markers and reports the split.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which line in there was added after one bad result and never revisited?</p></div>
+</section>
+
+<section class="segment" data-segment="2-router">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:20 to 1:05</p><h2>Assembling context as a calculation</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has a function that turns a task into its material, and a test that pins what it returned.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Derive the inputs with the room rather than presenting them. What does the task say it will touch, who owns those paths, what rules apply there.</li>
+<li>Build the lab's router live and keep it small. If it needs a diagram it has become a framework.</li>
+<li>Write the test immediately after, because the point of code over prose is that it can be asserted. Give the router a task and pin what came back.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/03<span class="hl-n">-context</span>/demo.ts route 12
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/03<span class="hl-n">-context</span>/demo.ts route 31</pre>
+<p>The router is <code data-file="steps/03-context/router.ts">steps/03-context/router.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees two tasks receive visibly different material, with the reason for each inclusion.</li>
+<li>Writes a first router against their own ownership graph.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did your router include that the task did not need? Remove it and say what broke.</p></div>
+</section>
+
+<section class="segment" data-segment="3-skills">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:05 to 1:40</p><h2>Lifting a procedure out of a prompt</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has written one skill that states an outcome and its evidence, without scripting the keystrokes.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what they have retyped more than three times this month. That is the first skill, and they already know what it is.</li>
+<li>Show the failure before the good version. A long procedure is worse than the agent's own judgement, and it goes stale within a month.</li>
+<li>Give the three parts and hold them to it. The outcome, the constraints that are not obvious from the code, and what proves it is done.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">ls</span> steps/03<span class="hl-n">-context</span>/skills
+<span class="hl-c">$ </span><span class="hl-k">cat</span> steps/03<span class="hl-n">-context</span>/skills/change<span class="hl-n">-the-shared-contract</span>.md</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads one worked example, then closes it and writes their own.</li>
+<li>Swaps with a neighbour to check the outcome is stated clearly enough to act on.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Could this skill be copied to a different repository unchanged? If not, some of it is context.</p></div>
+</section>
+
+<section class="segment" data-segment="4-affected">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:40 to 2:00</p><h2>The shared definition trap</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They understand why a naive mapping of files to areas ships a break, and have the dependency edge that fixes it.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Pose it as a puzzle. One file changed, one area owns it, one suite ran, everything green, production broken. What happened?</li>
+<li>Draw out the edge: three areas are built against that definition, so all three are affected.</li>
+<li>Note the second use of the same graph. It also tells the router which rules a task needs, so this is one calculation serving two purposes.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> target/tools/affected.mjs <span class="hl-n">--since</span> HEAD~1</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Sees one edited definition select three areas and three different check commands.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Where is your shared definition, and how many places restate it today?</p></div>
+</section>
+
+<section class="segment" data-segment="5-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>What it read before it decided</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can tell an assessment grounded in the repository from one grounded in the issue text.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Read the file paths in the assessment and check every one exists.</li>
+<li>An assessment that names line numbers has opened the file; one that paraphrases the issue has not.</li>
+<li>This is the cheapest quality signal available before any code is written, and it costs one read.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> status</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-triage.png" alt="The agent's assessment of an issue, before anyone accepts it">
+<figcaption>The assessment, with the files it names and the confidence it claims.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>a triaged card</li>
+<li class="arrow">to</li>
+<li>its session</li>
+<li class="arrow">to</li>
+<li>the assessment table</li>
+</ul>
+<div class="where">
+<div><h4>Every path it names, check one</h4><p>An assessment that cites a file and a line number has opened the file. One that restates the issue in different words has not, and the two read alike until somebody checks.</p></div>
+<div><h4>The best outcome is sometimes no change</h4><p>One run here answered a request for a cost column by proving the column already existed. It showed line numbers and five real currency values read from a live service. The issue was wrong and the run was right.</p></div>
+<div><h4>Confidence is a claim, not a feeling</h4><p>The table states high or low confidence. Ask what evidence would have to be missing for that word to be wrong, and whether the run went and looked for it.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Verifies two cited paths against the repository.</li>
+<li>Marks the assessment as grounded or not, and says which evidence decided it.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which sentence in this assessment could have been written without opening the repository?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-4-verification">
+<header>
+<p class="series">Cohort module four, two hours</p>
+<h2>Make Agents Prove Their Work</h2>
+<p class="deck">The longest build of the course. Everyone finishes with checks that fail closed and a reviewer that reads their diffs without being told the story.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-gate-verdict" data-concept="gate-verdict">the result line</a>, <a class="concept-link" href="workbook.html#c-holdout-test" data-concept="holdout-test">held-out checks</a>, <a class="concept-link" href="workbook.html#c-cold-verifier" data-concept="cold-verifier">an independent read</a>, <a class="concept-link" href="workbook.html#c-negative-proof" data-concept="negative-proof">proving the test bites</a>, <a class="concept-link" href="workbook.html#c-evidence-rule" data-concept="evidence-rule">evidence rules</a>, <a class="concept-link" href="workbook.html#c-contract-drift" data-concept="contract-drift">one definition</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-failclosed">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:30</p><h2>One script, one result line</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone's checks are behind one command that says one thing, and a missing check is louder than a failing one.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Start from where they are. Most have commands scattered across a pipeline file, a readme and somebody's shell history.</li>
+<li>Gather them into one script live. Then add the ending that makes it useful: one exact line that nothing may restate.</li>
+<li>Do the deletion demonstration on their own project, not the lab. Remove a required command and show that the result is neither green nor a failure.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">bash</span> steps/04<span class="hl-n">-verification</span>/gates.sh
+<span class="hl-c">$ </span><span class="hl-k">bash</span> steps/04<span class="hl-n">-verification</span>/gates.sh <span class="hl-n">--without-tests</span>
+<span class="hl-c">$ </span><span class="hl-k">echo</span> $?</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Writes one script for their own repository with the same ending.</li>
+<li>Confirms three distinct exit codes for passing, failing and misconfigured.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which of your checks is currently optional, and who decided that?</p></div>
+</section>
+
+<section class="segment" data-segment="2-holdout">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:30 to 1:00</p><h2>Tests the writer never sees</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person has a small set of behavioural checks kept out of the implementing agent's reach.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Explain the circularity plainly: when the same run writes the tests and the code, green means the code agrees with itself.</li>
+<li>Choose what to hold out together. The contract and the behaviour a user would notice, not the internals.</li>
+<li>Head off the objection before it arrives. This is a sample, not a second suite, and a handful is enough.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">ls</span> steps/04<span class="hl-n">-verification</span>/holdout
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/04<span class="hl-n">-verification</span>/demo.ts holdout</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees the holdout set run after the change, against work that never saw it.</li>
+<li>Picks three behaviours in their own project worth holding out.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What behaviour would embarrass you most if it broke quietly? Start there.</p></div>
+</section>
+
+<section class="segment" data-segment="3-negative">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:00 to 1:30</p><h2>The check no gate can make</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has run it against a test they already trusted, and some of them are surprised.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Have them pick a test they wrote themselves and are confident in. The confidence is the point.</li>
+<li>Walk the sequence together: undo the change it covers, run it, expect red, restore.</li>
+<li>Ask who found one that stayed green. There is usually at least one, and that discovery does more teaching than the explanation.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/04<span class="hl-n">-verification</span>/demo.ts negative<span class="hl-n">-proof</span>
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/04<span class="hl-n">-verification</span>/demo.ts negative<span class="hl-n">-proof</span> <span class="hl-n">--toothless</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Applies the sequence to one of their own tests by hand.</li>
+<li>Wires it into their loop so it happens on every change rather than when remembered.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many of your tests have never once been red? What does that number mean?</p></div>
+</section>
+
+<section class="segment" data-segment="4-evidence">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:30 to 2:00</p><h2>Deciding what a result may claim</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Their pipeline downgrades a conclusion whose evidence is missing, without consulting what the agent said.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Separate the two jobs sharply. Investigation is where judgement helps. The sentence a person will act on gets no freedom at all.</li>
+<li>Write the rules as ordinary code in front of them, reading the artifacts the run left behind.</li>
+<li>Connect it to the cross-language case. A definition changes in one place. The proof is three suites agreeing, not one claim that it went fine.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/04<span class="hl-n">-verification</span>/demo.ts evidence
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/04<span class="hl-n">-verification</span>/demo.ts evidence <span class="hl-n">--lost-artifact</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees a confident conclusion downgraded because its proof could not be found.</li>
+<li>Writes one such rule for their own repository.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your pipeline currently believe purely because something reported it?</p></div>
+</section>
+
+<section class="segment" data-segment="5-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>A gate failing in one language</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can defend running only the checks a change reaches, and name what that misses.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>The ownership graph decides which suites a change is measured by, so a schema edit is judged by all three.</li>
+<li>Show the failure and note that the language it failed in is not the language the issue named.</li>
+<li>Then name the cost honestly: a wrong graph means a real failure nobody ran.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> check</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-gate-failed.png" alt="A check failing in one of three languages">
+<figcaption>One change, three suites, and only one of them red.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>the cross-stack item</li>
+<li class="arrow">to</li>
+<li>its session</li>
+<li class="arrow">to</li>
+<li>three suites, one change</li>
+</ul>
+<div class="where">
+<div><h4>Only the suites a change reaches</h4><p>The ownership graph decides what runs. A schema edit is judged by all three languages; a console change is judged by one. Show which ran and which did not.</p></div>
+<div><h4>A wrong graph is a failure nobody sees</h4><p>If a directory is claimed by the wrong target, its suite never runs against changes that reach it. That is the cost of this design and it belongs in the room rather than in a footnote.</p></div>
+<div><h4>The verdict is quoted, never summarised</h4><p>The record carries the gate's own last line. A summary is a second source of truth about whether something passed.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads which suites ran and which did not.</li>
+<li>Names one path in their repository whose owner is currently ambiguous.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>If your graph were wrong by one directory, which failure would you never see?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-5-loop">
+<header>
+<p class="series">Cohort module five, two hours</p>
+<h2>Build Self-Healing Engineering Loops</h2>
+<p class="deck">Recovering from a failed check without a human restarting anything, and knowing when to give up. The second half is about stopping, which is the part people skip.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-doer-tester" data-concept="doer-tester">two roles</a>, <a class="concept-link" href="workbook.html#c-exit-criteria" data-concept="exit-criteria">how a loop ends</a>, <a class="concept-link" href="workbook.html#c-latency-budget" data-concept="latency-budget">the time budget</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-reason">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:35</p><h2>Handing back a reason, not a rejection</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>A failed check produces a next attempt that starts from what went wrong.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Show the useless version first: a failure returned as a status with no detail, and the retry that repeats the same mistake.</li>
+<li>Build the useful shape together. What failed, the output, the file, and what the task said should have been true.</li>
+<li>Be clear about why the roles are split. An agent grading its own output has already invested its reasoning in defending it.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/05<span class="hl-n">-loop</span>/demo.ts run 21</pre>
+<p>The loop is <code data-file="steps/05-loop/loop.ts">steps/05-loop/loop.ts</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Watches a first attempt fail, and reads the packet that goes back.</li>
+<li>Watches the second attempt pass, having been told precisely what was wrong.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What does your pipeline hand back today when something fails, and would it help anyone?</p></div>
+</section>
+
+<section class="segment" data-segment="2-stopping">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:35 to 1:10</p><h2>Three ways to end</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Nobody leaves with a loop that can run indefinitely.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what happens to their loop when the task is impossible. The honest answer is usually that nobody has tried.</li>
+<li>Name the three endings and make them choose numbers for their own project rather than copying the lab's.</li>
+<li>Reframe giving up. An item returned to a person with its attempts recorded is a result; a run still going is not.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/05<span class="hl-n">-loop</span>/demo.ts run 22 <span class="hl-n">--impossible</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees attempts exhausted and the item escalated with its history intact.</li>
+<li>Sets an attempt limit and a time limit in their own configuration.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What is the most you would spend on one item before a person should look at it?</p></div>
+</section>
+
+<section class="segment" data-segment="3-budget">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:10 to 1:45</p><h2>Where the time went</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone is timing each stage separately and can see which one to attack.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask them to guess the split before showing it. The guesses are almost always wrong in the same direction.</li>
+<li>Show the recorded numbers and let the surprise do the work. Then name the three usual culprits: repeated setup, repeated checks on finished work, and waiting on a person with nothing saying so.</li>
+<li>Give the actionable version. Reuse caches across workspaces, let the reviewer consume evidence rather than regenerate it, and make waiting visible.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/05<span class="hl-n">-loop</span>/demo.ts budget</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reads a waterfall of stages for one completed item.</li>
+<li>Names the stage they would reduce first, and says how.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which stage would you attack first on your own project, and what evidence do you have?</p></div>
+</section>
+
+<section class="segment" data-segment="4-capstone">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Capstone scope</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has chosen the real item from their own backlog that they will demonstrate.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give the selection rule: small enough to finish, real enough that somebody wanted it, and touching more than one area if possible.</li>
+<li>Warn against the demonstration-shaped item. Choosing something invented for the occasion wastes the exercise.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. Backlogs open, choices written in the shared document.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Commits to one item by name and posts it where the group can see.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Is anyone's choice too large? Say it now rather than on demonstration day.</p></div>
+</section>
+
+<section class="segment" data-segment="5-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Coming back from red</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They can distinguish a retry that uses the reason from one that merely repeats.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>A loop that retries without reading the failure is a slower way to fail the same way.</li>
+<li>Compare the two attempts and find the sentence in the second that only exists because of the first.</li>
+<li>Cap the attempts out loud: twice with the reason attached, then a person.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> score</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-retry.png" alt="The second attempt, starting from the reason">
+<figcaption>Attempt two, beginning from the failure text rather than from the issue again.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Work</li>
+<li class="arrow">to</li>
+<li>a card that retried</li>
+<li class="arrow">to</li>
+<li>its session</li>
+<li class="arrow">to</li>
+<li>attempt two</li>
+</ul>
+<div class="where">
+<div><h4>The second attempt starts from the reason</h4><p>Find the sentence in attempt two that only exists because attempt one failed. If there is none, the loop is repeating rather than recovering, and it will repeat for ever.</p></div>
+<div><h4>An error can survive its own fix</h4><p>A decision that succeeded on its second attempt still carries the text of the first failure. Anyone treating the presence of an error as failure will report healthy runs as broken.</p></div>
+<div><h4>Twice, then a person</h4><p>The charter caps attempts and says what happens after. Ask each table for their number and what they would do with the third failure.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Finds the failure text carried into the second attempt.</li>
+<li>Sets a retry limit for their own repository and writes the reason beside it.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many times should something fail before the failure becomes yours rather than its?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-module-6-delivery">
+<header>
+<p class="series">Cohort module six, two hours</p>
+<h2>Orchestrate and Ship Verified PRs</h2>
+<p class="deck">Everything connects. The last half hour is the build against buy conversation, answered by mapping what they built onto a hosted product.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-work-queue" data-concept="work-queue">durable state</a>, <a class="concept-link" href="workbook.html#c-draft-pr" data-concept="draft-pr">the delivered request</a>, <a class="concept-link" href="workbook.html#c-human-merge-gate" data-concept="human-merge-gate">who decides</a>, <a class="concept-link" href="workbook.html#c-run-record" data-concept="run-record">the record</a>, <a class="concept-link" href="workbook.html#c-board-phases" data-concept="board-phases">stages on a board</a>, <a class="concept-link" href="workbook.html#c-transition-policy" data-concept="transition-policy">policy that stays yours</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-wire">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 0:45</p><h2>One workflow, six layers</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each person's pieces run as a single command against a real item in their own repository.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Resist rebuilding anything. This session connects what exists, and the connecting code should be short and boring.</li>
+<li>Walk the seams rather than the parts: what triage hands to implementation, what implementation hands to checking, what checking hands to delivery.</li>
+<li>Point out that every handoff is written somewhere durable, so a run that dies can be picked up rather than restarted.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=06</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Runs the whole sequence on their own item, unattended.</li>
+<li>Reads their own handoff records and confirms each stage could be resumed.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Kill your run halfway. Can the next one continue from what it left behind?</p></div>
+</section>
+
+<section class="segment" data-segment="2-evidence-pr">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:45 to 1:15</p><h2>What a reviewer receives</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Their requests arrive with enough attached that a colleague could judge one in a few minutes.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Have them review each other's output rather than their own. Reviewing your own factory tells you nothing.</li>
+<li>Collect what reviewers wanted and did not find, and add those to the template on the spot.</li>
+<li>Be firm about the boundary. Nothing merges itself at any tier, and the enforcement belongs in the repository settings rather than in a script.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/06<span class="hl-n">-delivery</span>/demo.ts open<span class="hl-n">-pr</span>
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/06<span class="hl-n">-delivery</span>/demo.ts try<span class="hl-n">-merge</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Reviews a peer's request and reports what was missing.</li>
+<li>Watches an attempted merge blocked, and checks their own protection settings.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did your partner need that your template did not give them?</p></div>
+</section>
+
+<section class="segment" data-segment="3-platform">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:15 to 1:45</p><h2>The same thing, bought</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone can decide for their own organisation, with reasons that are not about preference.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Open the hosted product and map its stages onto their own, out loud, one at a time. The correspondence is close and that is the lesson.</li>
+<li>Show where their policy lands on the other substrate. It is a function that allows or refuses a move, holding the rules they wrote in week one.</li>
+<li>Frame the decision honestly. This is about who maintains the parts you now understand, not about whether to have them.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> demo STEP=07</pre>
+<p>The mapping is written out in <code data-file="steps/07-mastra/README.md">steps/07-mastra/README.md</code>.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees a board whose columns are the stages they built by hand.</li>
+<li>Sees their protected path expressed as a policy function on the other substrate.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which layers would you hand to a vendor, and which would you never give up?</p></div>
+</section>
+
+<section class="segment" data-segment="4-demoday">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:45 to 2:00</p><h2>Demonstration day</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone knows the shape of what they will show and how long they have.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give the running order and the timing, and say what you will ask each of them.</li>
+<li>Set the expectation that a refusal or an escalation shows more than a clean pass. It shows the limits working.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. Schedule on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Picks a slot and confirms their item still runs end to end.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Anyone whose item stopped working this week? Bring it to Friday instead of debugging alone.</p></div>
+</section>
+
+<section class="segment" data-segment="5-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:35 to 1:50</p><h2>Finished, and still not merged</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They stop treating a board reaching done as a claim that anything shipped.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Done on the board means the machine has nothing left to do, which is not the same as merged.</li>
+<li>Two boards, and this is the one for issues; the pull request lives on the other with its own phases.</li>
+<li>Anyone who conflates them will report a week of work that is still sitting unreviewed.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> e2e</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-work-done.png" alt="The work item closed after a human merge">
+<figcaption>The item reaches done while its pull request stays open.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>its own phases</li>
+<li class="arrow">to</li>
+<li>the same change on Work</li>
+<li class="arrow">to</li>
+<li>done, unmerged</li>
+</ul>
+<div class="where">
+<div><h4>Done means the machine is finished</h4><p>The work item reaches done when its pull request exists. Nothing has merged, nobody has read it, and the board is not claiming otherwise.</p></div>
+<div><h4>The same change, two boards</h4><p>Find it on Work as an issue and on Review as a pull request. They have different phases because they are different questions: is this worth doing, and is this done well.</p></div>
+<div><h4>A re-review needs a push</h4><p>The review board has no review-to-review step. Fixing the branch is what starts the second pass, and asking the board to review again does nothing at all.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Finds the same change represented on both boards.</li>
+<li>Writes the sentence they would use in a status update, and has it corrected.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Your dashboard says twelve done. How many of those can a customer use?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-workshop-operating-model">
+<header>
+<p class="series">Leadership workshop, one day</p>
+<h2>Design an AI-Native Software Factory for Your Organization</h2>
+<p class="deck">A working session for people who decide how engineering works. They do not write code here. They leave with an operating model, an autonomy matrix and a sequenced roadmap.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-six-layers" data-concept="six-layers">the six jobs</a>, <a class="concept-link" href="workbook.html#c-charter" data-concept="charter">a written policy</a>, <a class="concept-link" href="workbook.html#c-autonomy-tier" data-concept="autonomy-tier">grading autonomy</a>, <a class="concept-link" href="workbook.html#c-protected-path" data-concept="protected-path">paths off limits</a>, <a class="concept-link" href="workbook.html#c-queue-cap" data-concept="queue-cap">capacity</a>, <a class="concept-link" href="workbook.html#c-human-merge-gate" data-concept="human-merge-gate">accountability</a>, <a class="concept-link" href="workbook.html#c-latency-budget" data-concept="latency-budget">measuring</a>, <a class="concept-link" href="workbook.html#c-ownership-graph" data-concept="ownership-graph">ownership</a>.</p>
+<p class="covers">Evidence to bring: <a class="concept-link" href="workbook.html#c-adoption-evidence" data-concept="adoption-evidence">what adoption measured</a>, <a class="concept-link" href="workbook.html#c-speed-evidence" data-concept="speed-evidence">felt against measured speed</a>, <a class="concept-link" href="workbook.html#c-risk-classes" data-concept="risk-classes">the named risk classes</a>, <a class="concept-link" href="workbook.html#c-routing-evidence" data-concept="routing-evidence">routing as published practice</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-inventory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:00 to 1:15</p><h2>What you already have, unwritten</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each team's current rules are on paper, and the variation between teams is visible to everyone in the room.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Open by asserting that they already have an operating model. It is informal, it differs by team, and nobody has compared the versions.</li>
+<li>Have each team write theirs on a card: what a machine may do unattended, what needs approval, and who grants exceptions.</li>
+<li>Put the cards side by side and let the spread speak. That gap is the reason for the day, and it is more persuasive than any slide.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing technical. Cards on a wall.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Produces one card per team and reads two others aloud.</li>
+<li>Marks every place two teams contradict each other.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Where two of your teams disagree, which one is right, and who would decide that today?</p></div>
+</section>
+
+<section class="segment" data-segment="2-matrix">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">1:30 to 3:00</p><h2>The autonomy matrix</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Their estate is sorted by consequence, with approval placed where the risk actually is.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Kill the difficulty axis early, using an example from their own estate rather than a generic one.</li>
+<li>Run the sort as a group exercise across their real services, and let the arguments happen. The arguments are the product.</li>
+<li>Push back whenever everything lands in the strictest column. A model where nothing may proceed is a model nobody will follow.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts graph</pre>
+<p>Show the worked example once, as a shape to copy, then put it away.</p>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Places every significant service in a column, with a named owner.</li>
+<li>Agrees who may move something between columns and how that gets recorded.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Which service caused the longest argument? That is the one your written policy most needs to cover.</p></div>
+</section>
+
+<section class="segment" data-segment="3-standards">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">3:45 to 5:00</p><h2>Protecting the standard you already have</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They know which checks must run on every change and which belong before release, and where their current setup fails open.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask what a machine could produce today that would pass their pipeline and still be wrong. Let the room be uncomfortable.</li>
+<li>Introduce failing closed as a governance property, not a technical one. A missing check is invisible in every report they receive.</li>
+<li>Explain the independent read in terms they own: an assurance step, with a cost per change they can decide to pay.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">bash</span> steps/04<span class="hl-n">-verification</span>/gates.sh <span class="hl-n">--without-tests</span></pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Sees a missing check produce something that is neither a pass nor a failure.</li>
+<li>Lists the checks that will be required across every team.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How would you learn, this month, that one of your teams quietly disabled a required check?</p></div>
+</section>
+
+<section class="segment" data-segment="4-accountability">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">5:00 to 5:30</p><h2>Who is accountable for a change nobody wrote</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Accountability is assigned explicitly, and the capacity limit is a number rather than a feeling.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Put the question bluntly, because it is the one their board will ask them. A machine wrote it, someone approved it, and something went wrong.</li>
+<li>Settle it the same way as any other change: a named engineer approved it and owns it.</li>
+<li>Then give them the constraint that follows. Approval capacity is finite, so the pipeline must stop producing when it is full.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts capacity</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Writes the accountability rule in one sentence.</li>
+<li>Sets a review capacity per team and says how it will be measured.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>How many changes per week can each of your teams genuinely stand behind?</p></div>
+</section>
+
+<section class="segment" data-segment="5-roadmap">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">5:30 to 6:00</p><h2>Sequencing it</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>They leave with an ordered plan whose first step is small enough to happen next week.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Insist the first move is boring and cheap. Trust is built by a small thing that works, not by a programme.</li>
+<li>Have them pick the first workflow by two criteria: it happens often, and getting it wrong is recoverable.</li>
+<li>Name what they will measure before starting, so the second conversation is about numbers rather than impressions.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. The roadmap template on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Fills in the first three steps with owners and dates.</li>
+<li>Agrees the baseline they will compare against later.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What will you be able to show in six weeks, and who needs to see it?</p></div>
+</section>
+
+<section class="segment" data-segment="6-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">2:20 to 2:40</p><h2>Four shapes, one afternoon</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Each leader has chosen a shape for one real team and can defend the cost it imposes.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Switch the shape live and re-run the same item. The room then sees the rules doing the work, not the model.</li>
+<li>None of the four is correct. Each is a position about who carries the cost of being wrong.</li>
+<li>Push back on anyone choosing the strictest by default. It has a price, and people who are not in this room pay it in throughput.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> profile NAME=solo
+<span class="hl-c">$ </span><span class="hl-k">make</span> profile NAME=enterprise</pre>
+<figure class="shot">
+<img src="evidence/screens/profile-enterprise.png" alt="The money item under an enterprise shape">
+<figcaption>The same item, under the strictest of the four shapes.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Settings</li>
+<li class="arrow">to</li>
+<li>the two switches</li>
+<li class="arrow">to</li>
+<li>Work</li>
+<li class="arrow">to</li>
+<li>the money item</li>
+</ul>
+<div class="where">
+<div><h4>A shape is a commit, not a setting</h4><p>make profile writes the charter and the ownership graph and pushes them, because a run clones from the remote. A shape that exists only on somebody's laptop is a shape no agent will ever read.</p></div>
+<div><h4>The queue cap is the number to argue about</h4><p>Every shape declares how many decisions may wait on a person. That number, not the model, is what decides whether the factory helps or buries the team.</p></div>
+<div><h4>Nobody in the room pays the cost of the strictest shape</h4><p>Pushing everything to refuse feels responsible and is paid for in throughput by people who are not at this table. Ask who they are and whether they agreed.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Picks a shape for one named team and writes the trade-off it accepts.</li>
+<li>Names the first rule they would relax after a quarter of evidence.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Who in your organisation currently pays for a change being wrong, and do they know?</p></div>
+</section>
+</div>
+
+<div class="session opens" id="s-office-hours">
+<header>
+<p class="series">Weekly hour, plus the final session</p>
+<h2>Office hours and capstone demo day</h2>
+<p class="deck">Unscripted by design. This sheet exists so the hour has a shape when nobody brings anything, and so the last one runs to time.</p>
+<p class="covers">Ideas taught here: <a class="concept-link" href="workbook.html#c-run-record" data-concept="run-record">records</a>, <a class="concept-link" href="workbook.html#c-exit-criteria" data-concept="exit-criteria">endings</a>.</p>
+</header>
+
+<section class="segment" data-segment="1-triage">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">First ten minutes</p><h2>Collect before solving</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Every blocker in the room is written down before any of them is worked on.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Ask for problems in one line each and write them all up before touching any of them.</li>
+<li>Look for the repeated one. When three people are stuck the same way, that is a teaching gap rather than three bugs.</li>
+<li>Say the order out loud so nobody is waiting without knowing whether their turn is coming.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Nothing. A list on screen.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Contributes one line each, including those who came only to listen.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>Anything here that more than one of you recognises?</p></div>
+</section>
+
+<section class="segment" data-segment="2-known">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">As they come up</p><h2>The four that always appear</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Recurring problems get a fast answer so the hour goes to the interesting ones.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>A new workspace with no dependencies installed. Answer with caching and a preparation command rather than a longer setup step.</li>
+<li>Context that never arrives. Almost always a path the ownership graph does not claim, so run the graph check first.</li>
+<li>A check that passes when it should not. Apply the reverting proof before debugging anything else.</li>
+<li>A run that never ends. Look for the missing limit rather than the slow model.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">node</span> steps/02<span class="hl-n">-execution</span>/demo.ts selftest
+<span class="hl-c">$ </span><span class="hl-k">node</span> steps/01<span class="hl-n">-boundary</span>/demo.ts graph</pre>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div><p>Runs the same two commands on their own project before describing the symptom.</p></div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did the self-check say? Read it out before we theorise.</p></div>
+</section>
+
+<section class="segment" data-segment="3-demoday">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">Final session only</p><h2>Demonstrations</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone shows their own item moving, and gets one useful piece of feedback from the group.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Give each person a fixed slot and hold it, so the last presenter gets the same time as the first.</li>
+<li>Ask the same two questions of everyone: which layer took the longest to get right, and what did it refuse to do.</li>
+<li>Direct the feedback towards what the group can use rather than towards praise.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div><p>Their machines, their repositories. Yours stays closed.</p></div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>Shows an item becoming a reviewed request on their own codebase.</li>
+<li>Names one thing they would build differently.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What will you take back to your team on Monday, in one sentence?</p></div>
+</section>
+
+<section class="segment" data-segment="4-factory">
+<div class="lead">
+<div class="head"><p class="when" data-part="when">0:20 to 0:40</p><h2>Reading somebody else's evidence</h2></div>
+<div class="part goal" data-part="goal"><h3>Goal</h3><p>Everyone has read one run they did not perform and formed a view without being told the story.</p></div>
+</div>
+<div class="part say" data-part="say"><h3>Say</h3><div>
+<ul>
+<li>Bring up a capstone board and review it cold, with no narration from its author.</li>
+<li>Judge the evidence rather than the outcome, because a green run with no proof is the thing this whole course argues against.</li>
+<li>Let the author respond only after the room has committed to a verdict.</li>
+</ul>
+</div></div>
+<div class="part run" data-part="run"><h3>Run</h3><div>
+<pre data-lang="bash"><span class="hl-c">$ </span><span class="hl-k">make</span> status
+<span class="hl-c">$ </span><span class="hl-k">make</span> score</pre>
+<figure class="shot">
+<img src="evidence/screens/factory-board-review.png" alt="The Review board, which tracks pull requests separately">
+<figcaption>Pull requests on their own board, with their own phases.</figcaption>
+</figure>
+</div></div>
+<div class="part show" data-part="show"><h3>Show on the board</h3><div>
+<ul class="path">
+<li>Review</li>
+<li class="arrow">to</li>
+<li>somebody else's board</li>
+<li class="arrow">to</li>
+<li>a pull request</li>
+<li class="arrow">to</li>
+<li>the verdict</li>
+</ul>
+<div class="where">
+<div><h4>Judge the evidence, not the outcome</h4><p>A green run with no proof is the thing this course argues against. Ask what would have to be true for this verdict to be wrong, before the author says anything.</p></div>
+<div><h4>The author speaks last</h4><p>Let the room commit to a view first. A narrated demo teaches the narrator, and everyone else watches somebody else be competent.</p></div>
+<div><h4>One number each, and what it cost</h4><p>Every capstone reports a coverage figure and a score. Ask which of the two they trust and why, because the gap between them is the only interesting part.</p></div>
+</div>
+</div></div>
+<div class="part expect" data-part="expect"><h3>Room does</h3><div>
+<ul>
+<li>States a verdict on a run they did not make.</li>
+<li>Names the one piece of evidence that would have changed it.</li>
+</ul>
+</div></div>
+<div class="part ask" data-part="ask"><h3>Ask</h3><p>What did you believe about this run before the author spoke, and what changed after?</p></div>
+</section>
+</div>
+
+</main>
+</body>
+</html>

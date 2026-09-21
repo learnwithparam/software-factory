@@ -1,0 +1,28 @@
+{
+  "shape": "pair",
+  "alt": "Mapping each file to one target compared with walking dependency edges, for one contract edit.",
+  "caption": "A file-to-target map runs one suite, passes, and ships the break.",
+  "labelWidth": 70,
+  "left": {
+    "title": "File to target",
+    "tone": "quiet"
+  },
+  "right": {
+    "title": "Dependency edges",
+    "tone": "mark"
+  },
+  "rows": [
+    {
+      "label": "Runs",
+      "left": "One suite",
+      "right": "All three",
+      "changed": true
+    },
+    {
+      "label": "Result",
+      "left": "Green, broken",
+      "right": "Red at once",
+      "changed": true
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "shape": "growth",
+  "alt": "Prompt size against mistakes fixed. A prompt that keeps every fix climbs. Routing stays flat.",
+  "caption": "Every fix adds a line for every task. Routing sends each task only its own lines.",
+  "ylabel": "Prompt size",
+  "xlabel": "Mistakes fixed",
+  "mark": {
+    "at": 0.6,
+    "label": "Accuracy starts to slip"
+  },
+  "rising": {
+    "label": "Every line, every task",
+    "tone": "fail"
+  },
+  "flat": {
+    "label": "Only what this task needs",
+    "tone": "pass"
+  }
+}

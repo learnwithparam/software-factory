@@ -1,0 +1,42 @@
+{
+  "shape": "timeline",
+  "alt": "Where the time in one run goes: each stage timed separately, with the wait on a person as the last bar.",
+  "caption": "One run with each stage timed on its own, read from evidence/factory-run.json on openrouter/deepseek/deepseek-v4-flash. Each bar is the median of what the factory recorded. Generation is rarely the slow part. Waiting on a person usually is.",
+  "rows": [
+    {
+      "label": "Triage",
+      "start": 0,
+      "length": 2.99,
+      "note": "3m 00s"
+    },
+    {
+      "label": "Plan",
+      "start": 0,
+      "length": 0.02,
+      "note": "1s"
+    },
+    {
+      "label": "Implement",
+      "start": 0,
+      "length": 3.57,
+      "note": "3m 34s"
+    },
+    {
+      "label": "Review",
+      "start": 0,
+      "length": 4.14,
+      "note": "4m 09s"
+    },
+    {
+      "label": "Human wait",
+      "start": 0,
+      "length": 0.22,
+      "tone": "wait",
+      "note": "13s"
+    }
+  ],
+  "total": 8,
+  "unit": " min",
+  "ticks": 4,
+  "labelWidth": 100
+}

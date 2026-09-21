@@ -1,0 +1,22 @@
+{
+  "shape": "flow",
+  "alt": "A task's files go to the ownership graph, then to a router, which returns the rules, skills and the task.",
+  "caption": "The router is a function, so a test can call it.",
+  "per": 4,
+  "steps": [
+    {
+      "title": "Task's files"
+    },
+    {
+      "title": "Ownership graph"
+    },
+    {
+      "title": "Router",
+      "tone": "dark"
+    },
+    {
+      "title": "What it sees",
+      "tone": "mark"
+    }
+  ]
+}

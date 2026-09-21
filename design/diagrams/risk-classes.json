@@ -1,0 +1,42 @@
+{
+  "shape": "matrix",
+  "alt": "Each of the five layers matched to the agent risk it removes.",
+  "caption": "OWASP's agentic risks mapped onto the layers, so a security reviewer can read this against a list they already hold.",
+  "corner": "Layer",
+  "labelWidth": 90,
+  "cols": [
+    "Risk removed"
+  ],
+  "rows": [
+    {
+      "label": "Boundary",
+      "cells": [
+        "Excess agency"
+      ]
+    },
+    {
+      "label": "Context",
+      "cells": [
+        "Poisoned context"
+      ]
+    },
+    {
+      "label": "Execution",
+      "cells": [
+        "Rogue code"
+      ]
+    },
+    {
+      "label": "Verification",
+      "cells": [
+        "Goal hijack"
+      ]
+    },
+    {
+      "label": "Delivery",
+      "cells": [
+        "Trust abuse"
+      ]
+    }
+  ]
+}
