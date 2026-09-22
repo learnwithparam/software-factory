@@ -38,5 +38,59 @@
     "in today's fast-paced"
   ],
   "max_words": 28,
-  "max_sentences": 4
+  "max_sentences": 4,
+  "terms": {
+    "worktree": [
+      "own folder",
+      "its own folder",
+      "folder of its own",
+      "folder per task",
+      "folder each",
+      "a folder for every task",
+      "makes a workspace",
+      "no workspace"
+    ],
+    "worktree or checkout": [
+      "the folder",
+      "a folder",
+      "same folder",
+      "new folder",
+      "folder is gone"
+    ],
+    "holdout tests": [
+      "hidden checks",
+      "hidden check",
+      "hidden suite",
+      "hidden tests",
+      "hidden test",
+      "checks the writer never saw",
+      "checks it never saw"
+    ],
+    "guardrails agent": [
+      "a guard",
+      "the guard",
+      "guard call"
+    ],
+    "error agent": [
+      "repair step"
+    ],
+    "cold reader": [
+      "cold verifier",
+      "cold reviewer"
+    ],
+    "triage": [
+      "sorted first",
+      "sorting before",
+      "is sorted before",
+      "are sorted before",
+      "sort every issue",
+      "sort each issue",
+      "sorting every item",
+      "sorted every issue"
+    ],
+    "claim": [
+      "owns the item",
+      "first run own the item"
+    ]
+  }
 }

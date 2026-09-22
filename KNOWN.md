@@ -15,9 +15,9 @@ instruments:
 | `make score` | 100 / 100 |
 | `make status` | 85 of 86 delivered |
 
-Every one of the thirteen end-to-end specs has passed against the real model:
-the six issue routes, the staged gate recovery, the four company shapes, the
-plan revision, the board, and the click paths.
+Every one of the thirteen end-to-end specs has passed against the real model.
+They cover the six issue routes, the staged gate recovery, the four company
+shapes, the plan revision, the board and the click paths.
 
 ## Proven: the whole suite as one sequence
 
@@ -60,8 +60,9 @@ otherwise.
 
 Mastra Factory reads `AGENTS.md`, which states all three autonomy levels and
 names the file they live in. It has no knowledge of `.factory/` and no code that
-consults the graph before an agent writes a file. There is also no stage gate:
-nothing asks who is allowed to move an item, so an agent that judges its own plan
+consults the graph before an agent writes a file.
+
+There is also no stage gate. Nothing asks who is allowed to move an item. An agent that judges its own plan
 finished moves itself into execute and starts building.
 
 On the recorded runs it did both. It modified a path the graph refuses on the
@@ -69,10 +70,11 @@ clean route, and it wrote to a `propose` target with a plan nobody had accepted.
 Neither is a misconfiguration and neither was worked around: the agent was told,
 in the file the product reads, and nothing was there to stop it.
 
-So the graph is advisory on the platform and enforced in the hand-built pipeline,
-where `steps/01-boundary/policy.ts` is called before anything runs.
-`evidence/prompt-vs-gate.json` records every instruction a run did not follow,
-`tests/findings.test.ts` fails if workbook.html omits one, and the page teaches the
+So the graph is advisory on the platform. In the hand-built pipeline it is enforced,
+because `steps/01-boundary/policy.ts` is called before anything runs.
+
+The file `evidence/prompt-vs-gate.json` records every instruction a run did not follow. The test
+`tests/findings.test.ts` fails if workbook.html omits one. The page teaches the
 contrast rather than the ideal. If you carry one thing from this repository into
 your own, carry the check that reads the graph and refuses the diff.
 

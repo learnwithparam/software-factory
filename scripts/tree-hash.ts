@@ -52,6 +52,7 @@ export const NOT_STAMPED: ReadonlyArray<readonly [string, string]> = [
 	['evidence/', 'written by the run itself, so it cannot be an input to it'],
 	['artifacts/', 'written by the run itself'],
 	['.github/', 'CI configuration'],
+	['.githooks/', 'the pre-commit hook that rebuilds the PDFs'],
 	['LICENSE', 'not code'],
 	['.gitignore', 'not code'],
 ]

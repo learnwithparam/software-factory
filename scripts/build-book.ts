@@ -15,6 +15,7 @@
  *   over-split  letter-spacing from about .13em emits one run per character
  *   clipped     a command that runs off the page is cut in the text layer too
  *   fonts       Inter and Inconsolata are embedded, not quietly replaced
+ *   tight       a code block, table or figure closer than MIN_GAP_MM to what follows it
  *   empty       a page that is mostly white, outside the cover, the contents and
  *               the last page of each document
  *   canaries    catch the rest, including corruptions local to one element
@@ -34,6 +35,8 @@ import { ROOT } from './tree-hash.ts'
 
 const FRESHNESS = join(ROOT, 'scripts/pdf-freshness.json')
 
+/** A code block, table or figure must leave at least this much room before the next element. */
+const MIN_GAP_MM = 5
 /** A page less full than this is a page of white space. */
 const MIN_FILL = 0.55
 /** The A4 page in points, and the band the @page margins take at the top and bottom (16 mm and 18 mm). */
@@ -162,6 +165,24 @@ if (import.meta.main) {
 			.map((text: string) => bare(text).slice(0, 24))
 			.filter(Boolean)
 
+		// Blocks side by side are not stacked, so a negative gap is skipped. The callback
+		// runs in the browser and this project has no DOM types, so it goes over as text.
+		await page.emulateMedia({ media: 'print' })
+		const tight: string[] = await page.evaluate(`((minMm) => {
+			const min = (minMm * 96) / 25.4
+			const found = []
+			for (const el of document.querySelectorAll('pre, table, figure')) {
+				const next = el.nextElementSibling
+				if (!next) continue
+				const gap = next.getBoundingClientRect().top - el.getBoundingClientRect().bottom
+				if (gap < -2 || gap >= min) continue
+				const heading = Array.from(document.querySelectorAll('h2, h3')).filter((h) => h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING).pop()
+				found.push(el.tagName.toLowerCase() + ' under "' + ((heading && heading.textContent) || '?').trim().slice(0, 40) + '" leaves ' + ((gap * 25.4) / 96).toFixed(1) + ' mm')
+			}
+			return found
+		})(${MIN_GAP_MM})`)
+		problems.push(...tight.map((line) => `${out}: ${line}, under ${MIN_GAP_MM} mm`))
+
 		// The inset lives in @page in design/book.css and nowhere else. A CSS @page margin
 		// overrides whatever is passed here, so passing one too would only hide which of
 		// them is live.
@@ -198,5 +219,5 @@ if (import.meta.main) {
 		freshness[pdf] = Object.fromEntries(sources.filter((file) => existsSync(join(ROOT, file))).map((file) => [file, sha256(file)]))
 	}
 	writeFileSync(FRESHNESS, `${JSON.stringify(freshness, null, '\t')}\n`)
-	console.log(`\nmake book  ok  ${Object.keys(PDFS).length} PDFs, every canary and command whole, fonts embedded, no page mostly empty`)
+	console.log(`\nmake book  ok  ${Object.keys(PDFS).length} PDFs, every canary and command whole, fonts embedded, every block spaced, no page mostly empty`)
 }

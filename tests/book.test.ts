@@ -8,7 +8,7 @@
  * `make check` can assert with neither, on a machine that only has the files.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { expect, it } from 'bun:test'
@@ -91,4 +91,24 @@ it('the builder refuses a Chromium without margin boxes', () => {
 	// Without them the book prints with no page numbers and nothing says so.
 	expect(MARGIN_BOXES_FROM).toBe(131)
 	expect(readFileSync(join(ROOT, 'scripts/build-book.ts'), 'utf8')).toContain('version < MARGIN_BOXES_FROM')
+})
+
+it('blocks keep a gap, and the build measures it', () => {
+	// A reset `pre { margin: 0 }` left code welded to the next paragraph. The rule gives
+	// every stacked block a gap; `make book` measures it in a browser.
+	const css = readFileSync(join(ROOT, 'design/book.css'), 'utf8')
+	expect(css).toMatch(/\.doc pre:not\(:last-child\), \.doc table:not\(:last-child\)\s*\{\s*margin-bottom/)
+	expect(css).toMatch(/\.doc figure\.diagram\s*\{\s*margin: var\(--space-4\) 0/)
+	const build = readFileSync(join(ROOT, 'scripts/build-book.ts'), 'utf8')
+	expect(build).toMatch(/MIN_GAP_MM = \d/)
+	expect(build, 'the gap is measured but never fails the build').toContain('problems.push(...tight')
+})
+
+it('the pre-commit hook rebuilds the PDFs it stages', () => {
+	const hook = join(ROOT, '.githooks/pre-commit')
+	expect(statSync(hook).mode & 0o111, 'an unexecutable hook is skipped without a word').not.toBe(0)
+	const body = readFileSync(hook, 'utf8')
+	expect(body).toContain('scripts/pdf-freshness.json')
+	expect(body).toContain('make book')
+	for (const pdf of Object.keys(PDFS)) expect(body, `${pdf} is rebuilt but never staged`).toContain(pdf)
 })

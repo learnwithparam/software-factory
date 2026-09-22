@@ -1,6 +1,6 @@
 {
   "shape": "flow",
-  "alt": "A prompt goes in on standard input to any command, which works in a folder and exits.",
+  "alt": "A prompt goes in on standard input to any command, which runs in a worktree and exits.",
   "caption": "Anything that fits these four parts can stand in as the agent.",
   "per": 4,
   "steps": [
@@ -14,7 +14,7 @@
       "note": "the agent"
     },
     {
-      "title": "A folder",
+      "title": "A worktree",
       "note": "where it works"
     },
     {

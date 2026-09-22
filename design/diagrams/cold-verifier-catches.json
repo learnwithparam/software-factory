@@ -1,9 +1,9 @@
 {
   "shape": "fan",
-  "alt": "The cold reviewer on the left and three defects it finds on the right.",
+  "alt": "The cold reader on the left and three defects it finds on the right.",
   "caption": "Not syntax. The change that passes its tests while doing something nobody asked.",
   "from": {
-    "title": "Cold reviewer",
+    "title": "Cold reader",
     "tone": "dark"
   },
   "to": [

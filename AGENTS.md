@@ -3,9 +3,11 @@
 Lab for the learnwithparam Software Factory sessions. It runs live in front of a room, so every change is
 proven by running it.
 
-`make install` · `make check` (prose, types, unit, structural; no model, no network) · `make prove` (break
-each scored gate, confirm it fails) · `make e2e` (real model, repo, PRs) · `make book` · `make score`
-(below 100 exits 1) · `make demo STEP=02`. Every target takes `REPO=<path>`.
+- `make install` installs. `make check` runs prose, types, unit and structural tests with no model and no network.
+- `make prove` breaks each scored gate and confirms it fails.
+- `make e2e` uses the real model, repo and PRs.
+- `make book` prints both PDFs. `make score` exits 1 below 100. `make demo STEP=02` runs one step.
+- Every target takes `REPO=<path>`.
 
 ## The factory knows no codebase
 
@@ -25,6 +27,10 @@ language or directory of a real project; tests use `tests/fixtures/sample`.
 - Diagrams are drawn by `scripts/diagram.mjs` from `design/diagrams/*.json` (`make diagrams`); a hand edit to a figure, a label under 7.5pt on paper, or a concept with no diagram and no reason in `design/diagrams/exempt.json` fails `make check`. Colours are tokens from `design/tokens.json`, explained in `design/BRAND.md`, never a hex.
 - `make book` records source hashes; `make check` names a stale PDF. Never judge a PDF by eye: the text
   layer resets live in `design/book.css` (`tests/book.test.ts`) and `make book` reads back with `pdftotext`.
+- Code blocks, tables and figures keep 5 mm before what follows: `make book` measures it and fails below.
+- `.githooks/pre-commit` runs `make book` when a commit stages a PDF source, then stages the PDFs. Arm it once
+  per clone: `git config core.hooksPath .githooks`.
+- Titles are claims that name the subject, in sentence case; `python3 ~/.claude/skills/lwp-shared/scripts/house_rules.py --voice --terms` on `workbook.html` and `guide.html` must report 0.
 - Every external claim cites `sources.json` (`tests/sources.test.ts`); links are checked weekly, never in `make check`.
 - No em dashes (`scripts/check-prose.ts`). Secrets never go on a command line.
 - Test worktrees go to a temp dir (`tests/setup.ts`); session sandboxes live in `~/.cache/software-factory/sandboxes`.

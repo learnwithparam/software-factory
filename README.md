@@ -1,7 +1,7 @@
 # Software Factory
 
-A software factory is the engineering system around a coding agent: what it may attempt, where it
-runs, what context it receives, what proof it must produce, and where a human decides.
+A software factory is the engineering system around a coding agent. It decides what the agent may
+attempt, where it runs, what context it receives, what proof it must produce and where a human decides.
 
 This repository is that system, built one layer at a time so you can read it. It is the lab for the
 learnwithparam Software Factory sessions, and it is useful on its own.
@@ -39,9 +39,9 @@ make check REPO=~/work/your-repo   # yours
 | Verification | What proof must exist before a person spends attention on this? | `steps/04-verification` |
 | Delivery | How does finished work reach a person, and who decides it ships? | `steps/06-delivery` |
 
-`steps/05-loop` is how a failure comes back with its reason attached and how a run ends.
-`steps/07-mastra` maps all six onto a hosted platform, which is the honest way to answer whether to
-build this or buy it.
+The loop in `steps/05-loop` returns a failure with its reason attached and decides when a run ends.
+The Mastra step, `steps/07-mastra`, maps all six layers onto a hosted platform. That is the honest way
+to answer whether to build this or buy it.
 
 ## Running it
 
@@ -54,13 +54,13 @@ make score    # what is actually proven, 0 to 100
 make demo STEP=06
 ```
 
-`make check` runs with no model and no network, because the executor is an interface: the same loop
-runs against a recorded transcript for tests and against a real coding agent for a live run.
+The `make check` target runs with no model and no network. The executor is an interface, so the same
+loop runs against a recorded transcript for tests and against a real coding agent for a live run.
 
 ## Two things worth stealing even if you never run this
 
-**A gate nobody has seen fail is not a gate.** `make prove` copies the tree to a scratch directory,
-applies one declared break per scored check, and asserts that check goes red. A scorecard entry with
+**A gate nobody has seen fail is not a gate.** The `make prove` target copies the tree to a scratch
+directory. It applies one declared break per scored check and asserts that check goes red. A scorecard entry with
 no break behind it fails the build. Every point is earned against a test that has been watched to
 fail.
 
@@ -71,8 +71,8 @@ downgraded. What the agent said about the run is never consulted.
 
 ## Build state
 
-The score is the honest answer. `make score` names every check that has not run and reports how many
-points are not yet bound to a test, so this README cannot claim more than the repository proves.
+The score is the honest answer. The `make score` target names every check that has not run. It reports
+how many points are not yet bound to a test. So this README cannot claim more than the repository proves.
 
 ## Credit
 
@@ -101,7 +101,9 @@ The design borrows openly, and each of these is worth reading on its own:
 
 [KNOWN.md](KNOWN.md) is the honest list: which instruments pass on a clean
 clone, which claims are proven against the real model, and the three that are
-not. Read it before the first live session. The largest gap is that all thirteen
-end-to-end specs have passed individually and never as one sequence, which is
-ninety minutes of `make e2e` and the only way to find the state one spec leaves
+not. Read it before the first live session.
+
+The largest gap is sequence. All thirteen
+end-to-end specs have passed individually and never as one run. That takes ninety
+minutes of `make e2e`, and it is the only way to find the state one spec leaves
 for the next.

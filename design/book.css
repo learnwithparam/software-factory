@@ -205,6 +205,14 @@ pre {
 .hl-c { color: var(--c-muted); font-style: italic; }
 pre code { font-size: inherit; background: none; border: 0; padding: 0; }
 
+/* Space after a block that is not prose. Code, a table and a figure each leave 6 mm (9 mm for a
+   figure) before whatever follows, wherever they sit: a rule that lived in one container left a
+   paragraph flush against a command. build_book measures it, so a new wrapper cannot lose it. */
+.doc pre:not(:last-child), .doc table:not(:last-child) { margin-bottom: var(--space-3); }
+.doc figure.diagram { margin: var(--space-4) 0; }
+.doc figure.diagram:first-child { margin-top: 0; }
+.doc figure.diagram:last-child { margin-bottom: 0; }
+
 table { border-collapse: collapse; width: 100%; margin: 0 0 var(--space-3); font-size: var(--step--1); }
 th, td { text-align: left; padding: 1.5mm 2.5mm; border-bottom: 1px solid var(--c-line); vertical-align: top; }
 thead th { border-bottom: 1.5px solid var(--c-ink); font-weight: 700; }
@@ -213,7 +221,6 @@ td code { white-space: nowrap; }
 /* Figures ---------------------------------------------------------------------------------- */
 
 figure { margin: 0; }
-figure.diagram { margin: var(--space-3) 0; }
 figure.diagram svg { display: block; width: 100%; height: auto; overflow: visible; }
 figcaption {
 	margin-top: var(--space-2);

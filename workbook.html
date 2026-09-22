@@ -161,7 +161,7 @@
 <p class="hook">Models change every few months. A system bolted to one of them dies with it.</p>
 <figure class="diagram" data-diagram="executor-interface">
 <svg viewBox="0 0 504 47" role="img" aria-labelledby="t-executor-interface">
-<title id="t-executor-interface">A prompt goes in on standard input to any command, which works in a folder and exits.</title>
+<title id="t-executor-interface">A prompt goes in on standard input to any command, which runs in a worktree and exits.</title>
 <defs><marker id="a-executor-interface" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-muted"/></marker></defs>
 <rect x="0.5" y="1" width="112.3" height="43.5" rx="4" class="f-card s-line"/>
 <text x="9.5" y="18.5" font-size="11" class="t-ink b">Prompt</text>
@@ -171,7 +171,7 @@
 <text x="139.8" y="31" font-size="8.5" class="t-paper">the agent</text>
 <path d="M114.8 22.8 H129.8" class="s-muted arrow" marker-end="url(#a-executor-interface)"/>
 <rect x="261" y="1" width="112.3" height="43.5" rx="4" class="f-card s-line"/>
-<text x="270" y="18.5" font-size="11" class="t-ink b">A folder</text>
+<text x="270" y="18.5" font-size="11" class="t-ink b">A worktree</text>
 <text x="270" y="31" font-size="8.5" class="t-muted">where it works</text>
 <path d="M245 22.8 H260" class="s-muted arrow" marker-end="url(#a-executor-interface)"/>
 <rect x="391.3" y="1" width="112.3" height="43.5" rx="4" class="f-card s-line"/>
@@ -858,7 +858,7 @@ steps/01-boundary/CHARTER.md   # limits an agent can edit are not limits
 </figure>
 </div>
 <div class="body">
-<p>So we use git's own answer. Two tasks cannot interfere. A failed run leaves a folder you can inspect, not a mess in your working copy.</p>
+<p>So we use git's own answer. Two tasks cannot interfere. A failed run leaves a worktree you can inspect, not a mess in your working copy.</p>
 </div>
 <pre data-lang="ts" data-from="steps/02-execution/worktree.ts"><span class="hl-k">const</span> existing = git([<span class="hl-s">'branch'</span>, <span class="hl-s">'--list'</span>, workspace.branch], repo)
 <span class="hl-k">if</span> (existing.trim() === <span class="hl-s">''</span>) {
@@ -916,7 +916,7 @@ steps/01-boundary/CHARTER.md   # limits an agent can edit are not limits
 
 <div class="concept" id="c-sandbox-limits">
 <div class="lead"><h3>What can the agent reach from its own place?</h3>
-<p class="hook">A folder of its own does not stop it deleting your home directory, or calling out to the internet.</p>
+<p class="hook">A worktree does not stop it deleting your home directory, or calling out to the internet.</p>
 <figure class="diagram" data-diagram="sandbox-limits">
 <svg viewBox="0 0 504 83" role="img" aria-labelledby="t-sandbox-limits">
 <title id="t-sandbox-limits">The whole machine, and inside it the small set of files, commands and network access this one task needs.</title>
@@ -1132,10 +1132,10 @@ run: <span class="hl-k">async</span> (base) =&gt; {
 </div>
 <figure class="diagram" data-diagram="cold-verifier-catches">
 <svg viewBox="0 0 504 109" role="img" aria-labelledby="t-cold-verifier-catches">
-<title id="t-cold-verifier-catches">The cold reviewer on the left and three defects it finds on the right.</title>
+<title id="t-cold-verifier-catches">The cold reader on the left and three defects it finds on the right.</title>
 <defs><marker id="a-cold-verifier-catches" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-muted"/></marker></defs>
 <rect x="0.5" y="34" width="150" height="40" rx="4" class="f-fill-dark s-fill-dark"/>
-<text x="9.5" y="51.5" font-size="11" class="t-paper b">Cold reviewer</text>
+<text x="9.5" y="51.5" font-size="11" class="t-paper b">Cold reader</text>
 <rect x="194.5" y="1" width="309" height="30" rx="4" class="f-card s-line"/>
 <text x="203.5" y="18.5" font-size="11" class="t-ink b">Extra files touched</text>
 <path d="M152.5 54 H172.5 V16 H193.5" class="s-muted arrow" marker-end="url(#a-cold-verifier-catches)"/>
