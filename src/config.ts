@@ -17,6 +17,23 @@ export interface StageBudgets {
   readonly pr: number;
 }
 
+// Extra Bash patterns the repo grants its agents, on top of the read-only
+// git and shell basics in stage-permissions.ts. `read` applies to every
+// stage; `build` and `verify` add to that stage only. Each entry is a bare
+// pattern such as "make *" or "npm test *", never a compound command.
+export interface AgentCommands {
+  readonly read: readonly string[];
+  readonly build: readonly string[];
+  readonly verify: readonly string[];
+}
+
+// One gate `.factory/gates.sh` runs. `required: false` reports but never fails the build.
+export interface GateSpec {
+  readonly name: string;
+  readonly cmd: string;
+  readonly required: boolean;
+}
+
 export interface FactoryConfig {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
@@ -29,6 +46,8 @@ export interface FactoryConfig {
   readonly base: string; // base branch for PRs, usually "main"
   readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
+  readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
+  readonly agentCommands: AgentCommands;
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -43,6 +62,8 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   base: "main",
   stageTimeoutMinutes: 15,
   maxToolCalls: 60,
+  gates: [],
+  agentCommands: { read: [], build: [], verify: [] },
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -51,13 +72,19 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     ...partial,
     riskPolicy: { ...DEFAULT_CONFIG.riskPolicy, ...partial.riskPolicy },
     maxBudgetUsd: { ...DEFAULT_CONFIG.maxBudgetUsd, ...partial.maxBudgetUsd },
+    agentCommands: { ...DEFAULT_CONFIG.agentCommands, ...partial.agentCommands },
   };
 }
 
 export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> {
   const path = `${targetRepoDir}/.factory/config.json`;
   const file = Bun.file(path);
-  if (!(await file.exists())) return DEFAULT_CONFIG;
-  const raw = (await file.json()) as Partial<FactoryConfig>;
-  return mergeConfig(raw);
+  if (!(await file.exists())) {
+    throw new Error(`${path} not found: run \`factory install ${targetRepoDir}\`, then copy config.example.json to config.json and fill it in`);
+  }
+  const config = mergeConfig((await file.json()) as Partial<FactoryConfig>);
+  if (!/^[^/\s]+\/[^/\s]+$/.test(config.repo)) {
+    throw new Error(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
+  }
+  return config;
 }

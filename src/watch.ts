@@ -21,7 +21,7 @@ import {
   type TriageArtifact,
   type VerdictArtifact,
 } from "./artifacts";
-import { isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { deriveIssueState } from "./derive";
 import { rehydrate } from "./rehydrate";
 import { runGates, type GateRunner } from "./gates";
@@ -100,7 +100,8 @@ async function postComment(
   dataTag?: { stage: string; json: unknown },
 ): Promise<void> {
   if (!body.trim()) return;
-  const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body;
+  // No marker means it would read as an OWNER-authored human comment.
+  const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body.includes("<!-- factory:") ? body : `${body}\n\n<!-- factory:notice -->`;
   await deps.github.commentIssue(config.repo, issueNumber, full);
 }
 
@@ -146,6 +147,15 @@ async function writeIssueSnapshot(worktree: string, issue: GhIssue): Promise<voi
   await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
 }
 
+// Why a stage produced nothing: a kill, then a refused tool call (named, so a
+// permission gap reads as one), then anything `claude` printed to stderr.
+function stageFailure(result: StageRunResult, fallback: string): string;
+function stageFailure(result: StageRunResult): string | undefined;
+function stageFailure(result: StageRunResult, fallback?: string): string | undefined {
+  const denied = result.permissionDenials.length ? `permission denied: ${result.permissionDenials.join("; ")}` : undefined;
+  return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
+}
+
 async function runStage(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -172,6 +182,7 @@ async function runStage(
     maxBudgetUsd: config.maxBudgetUsd[stage],
     timeoutMinutes: config.stageTimeoutMinutes,
     maxToolCalls: config.maxToolCalls,
+    agentCommands: config.agentCommands,
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind, e.text ?? e.toolName ?? "");
   deps.state.updateRun(config.repo, issueNumber, {
@@ -211,7 +222,7 @@ async function runFromStage(
       const json = art.json as TriageArtifact | undefined;
       if (result.exitCode !== 0 || !json) {
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", result.killedReason ?? "triage produced no valid triage.json");
+        finish(deps, config, issueNumber, "failed", stageFailure(result, "triage produced no valid triage.json"));
         return "failed";
       }
       if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "triage", json });
@@ -227,7 +238,7 @@ async function runFromStage(
           return "needs-human";
         }
         ctx.questionRound += 1;
-        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound } });
+        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "triage" } });
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsInfo);
         finish(deps, config, issueNumber, "needs-info");
         return "needs-info";
@@ -246,8 +257,20 @@ async function runFromStage(
       // to approve against — stuck forever (audit finding #10).
       if (result.exitCode !== 0 || !json) {
         await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", result.killedReason ?? "plan produced no valid plan.json");
+        finish(deps, config, issueNumber, "failed", stageFailure(result, "plan produced no valid plan.json"));
         return "failed";
+      }
+      if (json.status === "needs-info") {
+        if (ctx.questionRound >= MAX_QUESTION_ROUNDS) {
+          await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.needsHuman);
+          finish(deps, config, issueNumber, "needs-human", `unresolved after ${ctx.questionRound} rounds of questions`);
+          return "needs-human";
+        }
+        ctx.questionRound += 1;
+        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "plan" } });
+        await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.needsInfo);
+        finish(deps, config, issueNumber, "needs-info");
+        return "needs-info";
       }
       if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json });
       const autoApproveToggle = deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk);
@@ -278,7 +301,7 @@ async function runFromStage(
         }
         ctx.questionRound += 1;
         if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, json);
-        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound } });
+        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "build" } });
         await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsInfo);
         finish(deps, config, issueNumber, "needs-info");
         return "needs-info";
@@ -293,7 +316,8 @@ async function runFromStage(
         await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.failed);
         deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
         const reason =
-          result.killedReason ?? `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
+          stageFailure(result) ??
+          `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
         finish(deps, config, issueNumber, "failed", reason);
         return "failed";
       }
@@ -332,7 +356,7 @@ async function runFromStage(
           config,
           issueNumber,
           "needs-human",
-          result.killedReason ?? (json ? "verify uncertain" : "verify produced no valid verdict.json"),
+          stageFailure(result, json ? "verify uncertain" : "verify produced no valid verdict.json"),
         );
         return "needs-human";
       }
@@ -356,14 +380,22 @@ async function runFromStage(
     // stage === "pr"
     await runStage(deps, config, issue, "pr", worktree);
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
-    const prUrl = await deps.github.createPr({
-      repo: config.repo,
-      base: config.base,
-      head: deps.git.branchName(issueNumber),
-      title: `${issue.title} (#${issueNumber})`,
-      body: art.comment ?? `Closes #${issueNumber}`,
-      draft: true,
-    });
+    // A revise from in-review re-enters here with the PR already open;
+    // the push in build already updated its branch.
+    const head = deps.git.branchName(issueNumber);
+    const existing = await deps.github.findPrByHead(config.repo, head);
+    const prUrl =
+      existing?.url ??
+      (await deps.github.createPr({
+        repo: config.repo,
+        base: config.base,
+        head,
+        title: `${issue.title} (#${issueNumber})`,
+        body: art.comment ?? `Closes #${issueNumber}`,
+        draft: true,
+      }));
+    // Opened as a draft while the factory works; ready is the hand-off to a human.
+    await deps.github.markReady(config.repo, head, true);
     deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });
     finish(deps, config, issueNumber, "shipped");
     return "shipped";
@@ -385,6 +417,7 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
         issue.number +
         "` branch already exists, so the claim was not renewed — either another run is already in flight, or a previous run parked here. Use `/factory retry` on the parked labels, not a fresh `factory:ready`.",
     );
+    await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
     return "lost-claim";
   }
   const worktree = worktreeFor(deps, issue.number);
@@ -451,7 +484,12 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
     finish(deps, config, issue.number, "cancelled");
     return "cancelled";
   }
-  // retry, or a plain reply that is not a command: nothing to do yet.
+  if (command.type === "retry") {
+    await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
+    return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
+  }
+  // A plain reply that is not a command: nothing to do yet.
   return "waiting";
 }
 
@@ -459,8 +497,7 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
 // before this, both were dead ends. Resumes from whichever stage last
 // posted a data marker, recovered by deriveIssueState.
 export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
-  const trusted = issue.comments.filter((c) => isTrusted(c));
-  const latest = trusted[trusted.length - 1];
+  const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest || parseChatOps(latest.body).type !== "retry") return undefined;
 
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
@@ -479,8 +516,16 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
 // `/factory revise <text>` on an in-review issue (audit finding #19): sends
 // the change back to build with the feedback as `revise.md`.
 export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
-  const trusted = issue.comments.filter((c) => isTrusted(c));
-  const latest = trusted[trusted.length - 1];
+  // Feedback counts only if it is newer than the runner's last marker
+  // comment: a handled revise is followed by the rebuild's own verdict, so it
+  // is never picked up twice. The draft PR's comments and reviews count too.
+  const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
+  const since = lastRunner ? Date.parse(lastRunner.createdAt) : 0;
+  const prFeedback = await deps.github.prFeedback(config.repo, deps.git.branchName(issue.number));
+  const latest = [...issue.comments, ...prFeedback]
+    .filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > since)
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .at(-1);
   if (!latest) return undefined;
   const command = parseChatOps(latest.body);
   if (command.type !== "revise") return undefined;
@@ -488,6 +533,8 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   const worktree = worktreeFor(deps, issue.number);
   await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
   await Bun.write(`${worktree}/${runDir(issue.number)}/revise.md`, command.text);
+  const head = deps.git.branchName(issue.number);
+  if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], LABEL.building);
   return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
 }
@@ -508,17 +555,12 @@ export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, issue
 export async function pollOnce(deps: WatchDeps, config: FactoryConfig): Promise<PollResult> {
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
   const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/"));
-  if (factoryPrs.length >= config.maxOpenFactoryPrs) {
-    return {
-      paused: true,
-      reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`,
-      processed: [],
-    };
-  }
-
+  // STOP_IF pauses new pickups only; approvals, answers, retries and
+  // revises on existing runs keep flowing so a human can clear the backlog.
+  const stopIf = factoryPrs.length >= config.maxOpenFactoryPrs;
   const autoStart = deps.state.getToggle("auto_start", true);
   const buckets = await Promise.all([
-    autoStart ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
+    autoStart && !stopIf ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
     deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
     deps.github.listIssuesByLabel(config.repo, LABEL.failed),
@@ -538,7 +580,9 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig): Promise<
   // whole five-stage chain finished (audit finding #2).
   const outcomes = await runPool(candidates, config.concurrency, (issue) => advanceIssue(deps, config, issue));
   const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
-  return { paused: false, processed };
+  return stopIf
+    ? { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed }
+    : { paused: false, processed };
 }
 
 // Re-drives any issue a crashed or restarted process left sitting in a

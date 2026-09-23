@@ -8,6 +8,9 @@
 //     --no-session-persistence --max-budget-usd <limit>
 // All six flags exist as written in the plan; no corrections were needed.
 
+import type { AgentCommands } from "./config";
+import { STAGE_GUIDANCE, stageSettings } from "./stage-permissions";
+
 export type StageName = "triage" | "plan" | "build" | "verify" | "pr";
 
 export interface StageEvent {
@@ -17,6 +20,8 @@ export interface StageEvent {
   readonly tokensIn?: number;
   readonly tokensOut?: number;
   readonly costUsd?: number;
+  // On "result" events: tool calls the permission system refused, as "Tool path".
+  readonly denials?: string[];
 }
 
 export interface StageRunOptions {
@@ -26,6 +31,7 @@ export interface StageRunOptions {
   readonly maxBudgetUsd: number;
   readonly timeoutMinutes?: number;
   readonly maxToolCalls?: number;
+  readonly agentCommands?: AgentCommands;
 }
 
 export interface StageRunResult {
@@ -38,6 +44,13 @@ export interface StageRunResult {
   // Set when the runner killed the process itself (timeout or tool-call cap)
   // rather than letting it exit on its own — audit finding #15.
   readonly killedReason?: string;
+  // The child's stderr, only set on a non-zero exit. `claude -p` prints its
+  // launch-time errors (bad flag, auth, permission refusal) to stderr, not
+  // stdout — before this, that stream was piped and never read, so a launch
+  // failure surfaced as an empty result with no clue why.
+  readonly stderrTail?: string;
+  // Tool calls `claude` refused (from the result event's permission_denials).
+  readonly permissionDenials: string[];
 }
 
 export interface Executor {
@@ -56,6 +69,7 @@ interface StreamJsonLine {
     usage?: { input_tokens?: number; output_tokens?: number };
   };
   usage?: { input_tokens?: number; output_tokens?: number };
+  permission_denials?: Array<{ tool_name?: string; tool_input?: { file_path?: string; command?: string } }>;
 }
 
 export function parseStreamJsonLine(line: string): StageEvent[] {
@@ -85,29 +99,38 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
       });
     }
   } else if (parsed.type === "result") {
+    const denials = (parsed.permission_denials ?? []).map(
+      (d) => `${d.tool_name ?? "tool"} ${d.tool_input?.file_path ?? d.tool_input?.command ?? ""}`.trim(),
+    );
     events.push({
       kind: "result",
       costUsd: parsed.total_cost_usd ?? parsed.cost_usd ?? 0,
       text: parsed.subtype,
+      ...(denials.length ? { denials } : {}),
     });
   }
   return events;
 }
 
-export function aggregateStageEvents(events: StageEvent[], exitCode: number): StageRunResult {
+export function aggregateStageEvents(events: StageEvent[], exitCode: number, stderrTail?: string): StageRunResult {
   let toolCalls = 0;
   let tokensIn = 0;
   let tokensOut = 0;
   let costUsd = 0;
+  const permissionDenials: string[] = [];
   for (const e of events) {
     if (e.kind === "tool_use") toolCalls += 1;
     if (e.kind === "usage") {
       tokensIn += e.tokensIn ?? 0;
       tokensOut += e.tokensOut ?? 0;
     }
-    if (e.kind === "result") costUsd = e.costUsd ?? costUsd;
+    if (e.kind === "result") {
+      costUsd = e.costUsd ?? costUsd;
+      permissionDenials.push(...(e.denials ?? []));
+    }
   }
-  return { events, toolCalls, tokensIn, tokensOut, costUsd, exitCode };
+  const result = { events, toolCalls, tokensIn, tokensOut, costUsd, exitCode, permissionDenials };
+  return exitCode !== 0 && stderrTail ? { ...result, stderrTail } : result;
 }
 
 export function claudeArgs(opts: StageRunOptions): string[] {
@@ -119,8 +142,14 @@ export function claudeArgs(opts: StageRunOptions): string[] {
     "--verbose",
     "--permission-mode",
     "dontAsk",
+    "--permission-prompts",
+    "none",
     "--setting-sources",
     "project,local",
+    "--settings",
+    stageSettings(opts.stage, opts.issue, opts.agentCommands),
+    "--append-system-prompt",
+    STAGE_GUIDANCE,
     "--no-session-persistence",
     "--max-budget-usd",
     String(opts.maxBudgetUsd),
@@ -159,6 +188,10 @@ export class ClaudeExecutor implements Executor {
     const events: StageEvent[] = [];
     let toolCalls = 0;
     let killedReason: string | undefined;
+    // Read alongside stdout, not after: an unread pipe can otherwise fill its
+    // OS buffer and stall the child, and any launch-time error (bad flag,
+    // auth, a permission refusal) `claude` prints only goes to stderr.
+    const stderrPromise = new Response(proc.stderr).text();
 
     const timeoutMinutes = opts.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES;
     const timer = setTimeout(() => {
@@ -194,8 +227,9 @@ export class ClaudeExecutor implements Executor {
       clearTimeout(timer);
     }
 
-    const exitCode = await proc.exited;
-    const result = aggregateStageEvents(events, exitCode);
+    const [exitCode, stderr] = await Promise.all([proc.exited, stderrPromise]);
+    const stderrTail = stderr.trim().slice(-4000) || undefined;
+    const result = aggregateStageEvents(events, exitCode, stderrTail);
     return killedReason ? { ...result, exitCode: exitCode || 1, killedReason } : result;
   }
 }

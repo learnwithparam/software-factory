@@ -16,12 +16,15 @@ export interface DoctorDeps {
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
   readonly fileExists: (path: string) => Promise<boolean>;
+  readonly readFile: (path: string) => Promise<string | undefined>;
+  readonly isExecutable: (path: string) => Promise<boolean>;
 }
 
 export interface DoctorContext {
   readonly repo: string;
   readonly cloneDir: string;
   readonly baselineTag: string;
+  readonly factoryMode?: string; // FACTORY_MODE, "actions" when CI drives the loop
 }
 
 export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<DoctorCheck[]> {
@@ -67,11 +70,30 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     fixable: false,
   });
   checks.push({
-    name: "target has .factory/gates.sh",
-    ok: await deps.fileExists(`${ctx.cloneDir}/.factory/gates.sh`),
-    detail: `${ctx.cloneDir}/.factory/gates.sh`,
+    name: "target has an executable .factory/gates.sh",
+    ok: await deps.isExecutable(`${ctx.cloneDir}/.factory/gates.sh`),
+    detail: `${ctx.cloneDir}/.factory/gates.sh (run \`factory install --update\` to restore it)`,
     fixable: false,
   });
+  // A skeleton left as installed still has TODO markers: the runner would
+  // grade against placeholder gates and an empty charter.
+  for (const file of ["config.json", "charter.md"]) {
+    const text = await deps.readFile(`${ctx.cloneDir}/.factory/${file}`);
+    checks.push({
+      name: `.factory/${file} has no TODO left`,
+      ok: text !== undefined && !text.includes("TODO"),
+      detail: text === undefined ? "file is missing" : text.includes("TODO") ? "fill in every TODO" : "filled in",
+      fixable: false,
+    });
+  }
+  if (ctx.factoryMode === "actions") {
+    checks.push({
+      name: "FACTORY_MODE=actions has a workflow",
+      ok: await deps.fileExists(`${ctx.cloneDir}/.github/workflows/factory.yml`),
+      detail: "rename .github/workflows/factory.yml.example to factory.yml (from `factory install --ci`)",
+      fixable: false,
+    });
+  }
 
   const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
   checks.push({

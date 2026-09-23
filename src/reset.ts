@@ -10,6 +10,7 @@ import { LABELS } from "./labels";
 export type ResetActionKind =
   | "close-pr"
   | "delete-branch"
+  | "drop-commit"
   | "force-main"
   | "close-issue"
   | "create-issue"
@@ -27,6 +28,7 @@ export interface ResetContext {
   readonly repo: string;
   readonly cloneDir: string;
   readonly baselineTag: string;
+  readonly base: string; // the branch force-pushed back to the baseline (config.base)
   readonly issuesDir: string; // target's .factory/issues/*.md
   readonly workspacesDir: string;
   readonly statePath: string;
@@ -104,6 +106,28 @@ function parseRemoteBranches(lsRemoteOutput: string): string[] {
     .map((ref) => ref.replace("refs/heads/", ""));
 }
 
+// One line per commit on origin/<base> that the baseline tag does not contain.
+export async function commitsAheadOfTag(deps: ResetDeps, ctx: ResetContext): Promise<string[]> {
+  await deps.git.run(["fetch", "origin", ctx.base], { cwd: ctx.cloneDir });
+  const log = await deps.git.run(["log", "--oneline", `${ctx.baselineTag}..origin/${ctx.base}`], { cwd: ctx.cloneDir });
+  return log.stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+}
+
+async function checked(deps: ResetDeps, ctx: ResetContext, args: string[]): Promise<void> {
+  const r = await deps.git.run(args, { cwd: ctx.cloneDir });
+  if (r.code !== 0) throw new Error(`git ${args.join(" ")} failed (${r.code}): ${r.stderr.trim()}`);
+}
+
+// Move the baseline tag to origin/<base>: the "keep this merge" command.
+export async function rebaseline(deps: ResetDeps, ctx: ResetContext, dryRun: boolean): Promise<string[]> {
+  const moved = await commitsAheadOfTag(deps, ctx);
+  if (!dryRun && moved.length) {
+    await checked(deps, ctx, ["tag", "-f", ctx.baselineTag, `origin/${ctx.base}`]);
+    await checked(deps, ctx, ["push", "--force", "origin", `refs/tags/${ctx.baselineTag}`]);
+  }
+  return moved;
+}
+
 export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<ResetAction[]> {
   const actions: ResetAction[] = [];
 
@@ -119,7 +143,12 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
 
   const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
   const sha = tag.stdout.trim();
-  actions.push({ kind: "force-main", detail: sha || `<tag ${ctx.baselineTag} not found>`, data: { sha } });
+  // Show what the force push throws away, so a merged setup change is
+  // noticed before it is lost (keep it with `factory rebaseline`).
+  for (const commit of await commitsAheadOfTag(deps, ctx)) {
+    actions.push({ kind: "drop-commit", detail: commit });
+  }
+  actions.push({ kind: "force-main", detail: `${ctx.base} <- ` + (sha || `<tag ${ctx.baselineTag} not found>`), data: { sha } });
 
   const openIssues = await deps.github.listOpenIssues(ctx.repo);
   for (const issue of openIssues) {
@@ -147,14 +176,16 @@ async function applyAction(deps: ResetDeps, ctx: ResetContext, action: ResetActi
       await deps.github.closePr(ctx.repo, (action.data!.number as number));
       return;
     case "delete-branch":
-      await deps.git.run(["push", "origin", "--delete", action.data!.branch as string], { cwd: ctx.cloneDir });
+      await checked(deps, ctx, ["push", "origin", "--delete", action.data!.branch as string]);
       return;
     case "force-main": {
       const sha = action.data!.sha as string;
       if (!sha) throw new Error(`baseline tag ${ctx.baselineTag} not found in ${ctx.cloneDir}`);
-      await deps.git.run(["push", "--force", "origin", `${sha}:refs/heads/main`], { cwd: ctx.cloneDir });
+      await checked(deps, ctx, ["push", "--force", "origin", `${sha}:refs/heads/${ctx.base}`]);
       return;
     }
+    case "drop-commit":
+      return; // informational: the force-main push below is what drops it
     case "close-issue":
       await deps.github.closeIssue(ctx.repo, action.data!.number as number);
       return;

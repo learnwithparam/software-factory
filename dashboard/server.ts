@@ -34,7 +34,7 @@ function isLoopback(address: string | undefined): boolean {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
 }
 
-export function createDashboard(state: FactoryState, github: GitHub, repo: string) {
+export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   let boardCache: { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> } | null = null;
@@ -149,7 +149,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
     if (url.pathname === "/api/toggles" && req.method === "GET") {
       return json({
         auto_start: state.getToggle("auto_start", true),
-        auto_approve_low_risk: state.getToggle("auto_approve_low_risk", false),
+        auto_approve_low_risk: state.getToggle("auto_approve_low_risk", autoApproveDefault),
       });
     }
 

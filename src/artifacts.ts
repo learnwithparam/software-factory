@@ -23,6 +23,7 @@ export interface TriageArtifact {
 }
 
 export interface PlanArtifact {
+  readonly status?: "needs-info";
   readonly risk: Risk;
   readonly revision: number;
   readonly files: string[];

@@ -65,3 +65,9 @@ plan, or the previous revision + 1 when `revise.md` is present. Then write
 
 `autoApproveEligible` is your judgment call, not just a mirror of `risk`:
 set it false for anything you'd want a second look at even at low risk.
+
+If you stop to ask a question instead (see the escape hatch in step 3), write
+`question-comment.md` with the `factory-comment` skill's `question.md`
+template and a `plan.json` of `{"status": "needs-info", "risk": "low",
+"revision": 1, "files": [], "autoApproveEligible": false}`. The runner posts
+the question and resumes planning once a trusted reply arrives.

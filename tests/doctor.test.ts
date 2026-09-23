@@ -27,6 +27,8 @@ class FakeGit implements CommandRunner {
   }
 }
 
+const files = new Map<string, string>();
+
 function deps(overrides: Partial<{ which: Set<string>; auth: { ok: boolean; detail: string } }> = {}): DoctorDeps {
   const which = overrides.which ?? new Set(["gh", "claude", "python3", "jq"]);
   return {
@@ -34,6 +36,8 @@ function deps(overrides: Partial<{ which: Set<string>; auth: { ok: boolean; deta
     git: new FakeGit(),
     which: async (bin: string) => which.has(bin),
     fileExists: async () => true,
+    readFile: async () => files.get("text") ?? "{}",
+    isExecutable: async () => files.get("exec") !== "no",
   };
 }
 
@@ -70,5 +74,27 @@ describe("runDoctor", () => {
     expect(binCheck.ok).toBe(true); // `which gh` still finds the binary
     expect(authCheck.ok).toBe(false);
     expect(authCheck.detail).toContain("not logged into");
+  });
+
+  test("flags TODO markers left in the scaffolded config and charter", async () => {
+    files.set("text", "# TODO: fill me in");
+    const checks = await runDoctor(deps(), ctx);
+    files.clear();
+    expect(checks.filter((c) => c.name.includes("no TODO left")).map((c) => c.ok)).toEqual([false, false]);
+  });
+
+  test("flags a gates.sh that is not executable", async () => {
+    files.set("exec", "no");
+    const checks = await runDoctor(deps(), ctx);
+    files.clear();
+    expect(checks.find((c) => c.name.includes("gates.sh"))!.ok).toBe(false);
+  });
+
+  test("FACTORY_MODE=actions needs the workflow file; other modes do not", async () => {
+    const noWorkflow = { ...deps(), fileExists: async (p: string) => !p.includes("workflows") };
+    const inActions = await runDoctor(noWorkflow, { ...ctx, factoryMode: "actions" });
+    expect(inActions.find((c) => c.name.includes("FACTORY_MODE"))!.ok).toBe(false);
+    const local = await runDoctor(noWorkflow, ctx);
+    expect(local.some((c) => c.name.includes("FACTORY_MODE"))).toBe(false);
   });
 });

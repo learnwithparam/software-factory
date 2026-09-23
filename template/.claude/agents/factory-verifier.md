@@ -14,8 +14,8 @@ Your job is to rule that out before you believe anything else.
 
 1. Identify the non-test hunks in the diff (everything except the new or
    changed test files).
-2. Revert only those hunks (`git stash`/`git apply -R`/manual edit — pick
-   whichever is clean for this diff), keeping the new tests in place.
+2. Revert only those hunks (`git stash` or `git checkout <base> -- <file>`,
+   one command at a time; `git apply` is not allowed), keeping the new tests in place.
 3. Run the new tests. They must fail, and fail for the stated reason (not
    a compile error, not an unrelated crash). If they pass without the
    implementation, the test proves nothing — reject.

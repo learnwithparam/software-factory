@@ -9,6 +9,12 @@ export function isTrusted(comment: Pick<GhComment, "authorAssociation">): boolea
   return TRUSTED_ASSOCIATIONS.has(comment.authorAssociation);
 }
 
+// The runner posts as the operator, so its own comments are OWNER-authored.
+// Every one carries a `<!-- factory:` marker; none is a human answer.
+export function isHumanComment(comment: Pick<GhComment, "authorAssociation" | "body">): boolean {
+  return isTrusted(comment) && !comment.body.includes("<!-- factory:");
+}
+
 export type Command =
   | { type: "approve" }
   | { type: "revise"; text: string }
@@ -40,7 +46,7 @@ export function latestTrustedCommentAfter(
   afterIso: string,
 ): GhComment | undefined {
   const after = Date.parse(afterIso);
-  const trusted = comments.filter((c) => isTrusted(c) && Date.parse(c.createdAt) > after);
+  const trusted = comments.filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > after);
   if (trusted.length === 0) return undefined;
   return trusted.reduce((latest, c) => (Date.parse(c.createdAt) > Date.parse(latest.createdAt) ? c : latest));
 }
