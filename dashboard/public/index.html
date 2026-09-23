@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Software Factory</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f4;
+    --panel: #ffffff;
+    --text: #1b1f1a;
+    --muted: #5b6259;
+    --border: #d9ddd4;
+    --accent: #0e6b3a;
+    --warn: #b45309;
+    --danger: #b3261e;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14170f;
+      --panel: #1d211a;
+      --text: #eef1e8;
+      --muted: #a7ae9e;
+      --border: #333a2c;
+      --accent: #5fd39a;
+      --warn: #e8a84c;
+      --danger: #ef6b62;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 22px; margin: 0; }
+  .repo { color: var(--muted); font-size: 15px; }
+  .toggles { display: flex; gap: 20px; align-items: center; font-size: 15px; }
+  .toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  main { padding: 20px 24px 60px; }
+
+  .attention {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+  }
+  .attention h2 { margin: 0 0 10px; font-size: 16px; color: var(--warn); }
+  .attention ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .attention li { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; padding: 6px 8px; border-radius: 6px; }
+  .attention li:hover { background: var(--bg); }
+  .attention .empty { color: var(--muted); }
+
+  .board { display: grid; grid-template-columns: repeat(7, minmax(220px, 1fr)); gap: 12px; align-items: start; }
+  .column h3 { font-size: 15px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .cards { display: flex; flex-direction: column; gap: 10px; min-height: 40px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    cursor: pointer;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card .title { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .chip.risk-low { color: var(--accent); border-color: var(--accent); }
+  .chip.risk-medium { color: var(--warn); border-color: var(--warn); }
+  .chip.risk-high { color: var(--danger); border-color: var(--danger); }
+  .meta { display: flex; gap: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .gate-line { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  #drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: 420px; max-width: 92vw;
+    background: var(--panel); border-left: 1px solid var(--border);
+    transform: translateX(100%); transition: transform .15s ease;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  #drawer.open { transform: translateX(0); }
+  #drawer .drawer-head { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  #drawer .drawer-body { padding: 16px; overflow-y: auto; flex: 1; }
+  #drawer .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  #drawer .tabs button { font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+  #drawer .tabs button.active { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+  #drawer .actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--border); }
+  #drawer .actions button { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 13px; }
+  #drawer textarea { width: 100%; min-height: 60px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 8px; font: inherit; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.25); display: none; z-index: 9; }
+  #overlay.open { display: block; }
+  .event { font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .event .kind { color: var(--muted); margin-right: 6px; }
+  button.close { background: none; border: none; font-size: 20px; color: var(--muted); cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Software Factory</h1>
+    <div class="repo" id="repo-label">loading…</div>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="toggle-auto-start" /> Auto-start runs</label>
+    <label><input type="checkbox" id="toggle-auto-approve" /> Auto-approve low-risk plans</label>
+  </div>
+</header>
+<main>
+  <section class="attention">
+    <h2>Needs attention</h2>
+    <ul id="attention-list"><li class="empty">Nothing waiting.</li></ul>
+  </section>
+
+  <section class="board" id="board">
+    <!-- columns injected by script -->
+  </section>
+</main>
+
+<div id="overlay"></div>
+<aside id="drawer">
+  <div class="drawer-head">
+    <strong id="drawer-title">#0</strong>
+    <button class="close" id="drawer-close">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="tabs" id="drawer-tabs"></div>
+    <div id="drawer-content"></div>
+  </div>
+  <div class="actions">
+    <button data-cmd="approve">Approve plan</button>
+    <button data-cmd="revise">Request revision</button>
+    <button data-cmd="retry">Retry</button>
+    <button data-cmd="cancel">Cancel</button>
+  </div>
+  <div style="padding:12px 16px; border-top:1px solid var(--border);">
+    <textarea id="reply-text" placeholder="Reply on the issue thread…"></textarea>
+    <button id="reply-send" style="margin-top:8px; width:100%; padding:8px; border-radius:8px; border:1px solid var(--border); background:var(--accent); color:var(--panel); cursor:pointer;">Send</button>
+  </div>
+</aside>
+
+<script>
+const STAGES = [
+  { key: "intake", label: "Intake" },
+  { key: "triage", label: "Triage" },
+  { key: "plan", label: "Planning" },
+  { key: "build", label: "Building" },
+  { key: "verify", label: "Verifying" },
+  { key: "pr", label: "In review" },
+  { key: "done", label: "Done" },
+];
+
+let runs = [];
+let selected = null;
+
+function columnFor(run) {
+  if (["needs-info", "needs-human", "failed", "cancelled"].includes(run.status)) return "done";
+  if (run.status === "shipped") return "done";
+  if (run.status === "awaiting-approval") return "plan";
+  return run.stage === "pr" ? "pr" : run.stage;
+}
+
+function renderAttention() {
+  const list = document.getElementById("attention-list");
+  const waiting = runs.filter((r) =>
+    ["needs-info", "awaiting-approval", "needs-human", "failed"].includes(r.status) ||
+    (r.status === "shipped" && r.stage === "pr"),
+  );
+  waiting.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+  if (waiting.length === 0) {
+    list.innerHTML = '<li class="empty">Nothing waiting.</li>';
+    return;
+  }
+  list.innerHTML = waiting
+    .map(
+      (r) =>
+        `<li data-issue="${r.issue}"><span>#${r.issue} ${escapeHtml(r.title)} — ${r.status}</span><span>${age(r.updated_at)}</span></li>`,
+    )
+    .join("");
+  list.querySelectorAll("li[data-issue]").forEach((li) => {
+    li.addEventListener("click", () => openDrawer(Number(li.dataset.issue)));
+  });
+}
+
+function age(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + "m";
+  return Math.floor(mins / 60) + "h";
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderBoard() {
+  const board = document.getElementById("board");
+  board.innerHTML = STAGES.map((s) => `<div class="column" data-col="${s.key}"><h3>${s.label}</h3><div class="cards"></div></div>`).join("");
+  for (const run of runs) {
+    const col = columnFor(run);
+    const container = board.querySelector(`[data-col="${col}"] .cards`);
+    if (!container) continue;
+    const progress = ["triage", "plan", "build", "verify", "pr"].indexOf(run.stage) + 1;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="title">#${run.issue} ${escapeHtml(run.title)}</div>
+      <div class="chips"><span class="chip">${run.status}</span></div>
+      <div class="meta">
+        <span>${progress}/5</span>
+        <span>${age(run.started_at)} elapsed</span>
+        <span>${run.tool_calls} calls</span>
+        <span>$${(run.cost_usd || 0).toFixed(2)}</span>
+      </div>
+      ${run.gate_line ? `<div class="gate-line">${escapeHtml(run.gate_line)}</div>` : ""}
+    `;
+    card.addEventListener("click", () => openDrawer(run.issue));
+    container.appendChild(card);
+  }
+}
+
+async function refresh() {
+  const res = await fetch("/api/runs");
+  const data = await res.json();
+  runs = data.runs;
+  document.getElementById("repo-label").textContent = data.repo || "no repo configured";
+  renderAttention();
+  renderBoard();
+  if (selected) openDrawer(selected, true);
+}
+
+async function openDrawer(issue, silent) {
+  selected = issue;
+  const run = runs.find((r) => r.issue === issue);
+  if (!run) return;
+  document.getElementById("drawer-title").textContent = `#${issue} ${run.title}`;
+  document.getElementById("drawer").classList.add("open");
+  document.getElementById("overlay").classList.add("open");
+  if (silent) return; // just refreshed the title; keep the open tab
+
+  const eventsRes = await fetch(`/api/runs/${run.id}/events`);
+  const { events } = await eventsRes.json();
+  const tabs = document.getElementById("drawer-tabs");
+  tabs.innerHTML = `<button class="active" data-tab="timeline">Timeline</button>
+    <button data-tab="gate">Gate line</button>`;
+  renderTab("timeline", events, run);
+  tabs.querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => {
+      tabs.querySelectorAll("button").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      renderTab(b.dataset.tab, events, run);
+    }),
+  );
+}
+
+function renderTab(tab, events, run) {
+  const content = document.getElementById("drawer-content");
+  if (tab === "gate") {
+    content.innerHTML = `<div class="gate-line">${escapeHtml(run.gate_line || "no gate line recorded yet")}</div>
+      ${run.pr_url ? `<p><a href="${run.pr_url}" target="_blank">${run.pr_url}</a></p>` : ""}
+      ${run.reason ? `<p>${escapeHtml(run.reason)}</p>` : ""}`;
+    return;
+  }
+  content.innerHTML = events.length
+    ? events.map((e) => `<div class="event"><span class="kind">[${e.stage}/${e.kind}]</span>${escapeHtml(e.text)}</div>`).join("")
+    : '<p style="color:var(--muted)">No events recorded for this run yet.</p>';
+}
+
+document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+document.getElementById("overlay").addEventListener("click", closeDrawer);
+function closeDrawer() {
+  selected = null;
+  document.getElementById("drawer").classList.remove("open");
+  document.getElementById("overlay").classList.remove("open");
+}
+
+document.querySelectorAll("#drawer .actions button").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    if (!selected) return;
+    const cmd = btn.dataset.cmd;
+    let text;
+    if (cmd === "revise") {
+      text = prompt("What should change in the plan?");
+      if (text === null) return;
+    }
+    await fetch("/api/command", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ issue: selected, command: cmd, text }),
+    });
+  });
+});
+
+document.getElementById("reply-send").addEventListener("click", async () => {
+  if (!selected) return;
+  const textarea = document.getElementById("reply-text");
+  if (!textarea.value.trim()) return;
+  await fetch("/api/reply", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ issue: selected, text: textarea.value }),
+  });
+  textarea.value = "";
+});
+
+async function initToggles() {
+  const res = await fetch("/api/toggles");
+  const t = await res.json();
+  document.getElementById("toggle-auto-start").checked = t.auto_start;
+  document.getElementById("toggle-auto-approve").checked = t.auto_approve_low_risk;
+}
+document.getElementById("toggle-auto-start").addEventListener("change", (e) => {
+  fetch("/api/toggles", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: "auto_start", value: e.target.checked }) });
+});
+document.getElementById("toggle-auto-approve").addEventListener("change", (e) => {
+  fetch("/api/toggles", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: "auto_approve_low_risk", value: e.target.checked }) });
+});
+
+initToggles();
+refresh();
+setInterval(refresh, 4000);
+
+if (window.EventSource) {
+  const es = new EventSource("/api/stream");
+  es.onmessage = (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      runs = data.runs;
+      renderAttention();
+      renderBoard();
+    } catch {}
+  };
+}
+</script>
+</body>
+</html>
