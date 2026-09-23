@@ -79,6 +79,11 @@ describe("parseIssueSeed", () => {
     expect(seed).toEqual({ title: "Add rate limit", type: "feature", labels: ["feature", "backend"], body: "Do the thing." });
   });
 
+  test("strips YAML-array brackets from labels", () => {
+    const seed = parseIssueSeed('---\ntitle: "Docs fix"\nlabels: [docs]\n---\nBody.');
+    expect(seed.labels).toEqual(["docs"]);
+  });
+
   test("falls back to the first heading when there is no frontmatter", () => {
     const seed = parseIssueSeed("# Fix the login bug\n\nSteps to reproduce...");
     expect(seed.title).toBe("Fix the login bug");

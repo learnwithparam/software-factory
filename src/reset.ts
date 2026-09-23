@@ -63,7 +63,12 @@ export function parseIssueSeed(text: string): IssueSeed {
       const value = (rawValue ?? "").trim().replace(/^"(.*)"$/, "$1");
       if (key === "title") title = value;
       else if (key === "type") type = value;
-      else if (key === "labels") labels = value.split(",").map((s) => s.trim()).filter(Boolean);
+      else if (key === "labels")
+        labels = value
+          .replace(/^\[(.*)\]$/, "$1")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
     }
   }
   if (!title) {
