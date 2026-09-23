@@ -27,6 +27,8 @@ export interface FactoryConfig {
   readonly maxBudgetUsd: StageBudgets;
   readonly baselineTag: string; // reset.ts forces main to this tag's SHA
   readonly base: string; // base branch for PRs, usually "main"
+  readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
+  readonly maxToolCalls: number; // kills a runaway stage before it burns budget
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -39,6 +41,8 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   maxBudgetUsd: { triage: 1, plan: 2, build: 5, verify: 3, pr: 1 },
   baselineTag: "baseline",
   base: "main",
+  stageTimeoutMinutes: 15,
+  maxToolCalls: 60,
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {

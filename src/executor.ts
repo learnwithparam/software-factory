@@ -24,6 +24,8 @@ export interface StageRunOptions {
   readonly issue: number;
   readonly cwd: string;
   readonly maxBudgetUsd: number;
+  readonly timeoutMinutes?: number;
+  readonly maxToolCalls?: number;
 }
 
 export interface StageRunResult {
@@ -33,6 +35,9 @@ export interface StageRunResult {
   readonly tokensOut: number;
   readonly costUsd: number;
   readonly exitCode: number;
+  // Set when the runner killed the process itself (timeout or tool-call cap)
+  // rather than letting it exit on its own — audit finding #15.
+  readonly killedReason?: string;
 }
 
 export interface Executor {
@@ -122,28 +127,76 @@ export function claudeArgs(opts: StageRunOptions): string[] {
   ];
 }
 
+// Strips the runner's own secrets from the environment the agent process
+// inherits: the target repo's `GH_TOKEN` would otherwise let a rogue `Bash`
+// call push or merge over the guard hook's head, and `FACTORY_*` leaks the
+// dashboard token and DB path (audit finding #14). Everything else (PATH,
+// HOME, ANTHROPIC_API_KEY, ...) passes through — the agent still needs a
+// model key, so the residual risk (a spend-capped key, documented in the
+// README) is deliberate, not an oversight.
+const STRIPPED_ENV_PREFIXES = ["GH_TOKEN", "GITHUB_TOKEN", "FACTORY_"];
+
+export function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) continue;
+    if (STRIPPED_ENV_PREFIXES.some((p) => key === p || key.startsWith(p))) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+const DEFAULT_TIMEOUT_MINUTES = 15;
+
 export class ClaudeExecutor implements Executor {
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
     const proc = Bun.spawn(["claude", ...claudeArgs(opts)], {
       cwd: opts.cwd,
       stdout: "pipe",
       stderr: "pipe",
+      env: sanitizeEnv(process.env),
     });
     const events: StageEvent[] = [];
-    const reader = proc.stdout.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) events.push(...parseStreamJsonLine(line));
+    let toolCalls = 0;
+    let killedReason: string | undefined;
+
+    const timeoutMinutes = opts.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES;
+    const timer = setTimeout(() => {
+      killedReason = `stage exceeded stageTimeoutMinutes=${timeoutMinutes}`;
+      proc.kill();
+    }, timeoutMinutes * 60_000);
+
+    try {
+      const reader = proc.stdout.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const parsed = parseStreamJsonLine(line);
+          events.push(...parsed);
+          for (const e of parsed) {
+            if (e.kind !== "tool_use") continue;
+            toolCalls += 1;
+            if (opts.maxToolCalls && toolCalls > opts.maxToolCalls && !killedReason) {
+              killedReason = `stage exceeded maxToolCalls=${opts.maxToolCalls}`;
+              proc.kill();
+            }
+          }
+        }
+      }
+      if (buffer.trim()) events.push(...parseStreamJsonLine(buffer));
+    } finally {
+      clearTimeout(timer);
     }
-    if (buffer.trim()) events.push(...parseStreamJsonLine(buffer));
+
     const exitCode = await proc.exited;
-    return aggregateStageEvents(events, exitCode);
+    const result = aggregateStageEvents(events, exitCode);
+    return killedReason ? { ...result, exitCode: exitCode || 1, killedReason } : result;
   }
 }
 

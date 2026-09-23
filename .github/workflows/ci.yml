@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, v2]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -23,3 +23,17 @@ jobs:
 
       - name: make check
         run: make check
+
+  # The Dockerfile ships the VM run mode (plan "Run anywhere"). An image that
+  # only builds when someone remembers to try it by hand rots the first time
+  # a base-image tag or a pinned tool version moves — this is the check that
+  # keeps it honest (Rule 0: an unwired check did not ship).
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: software-factory:ci

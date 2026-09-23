@@ -1,22 +1,184 @@
-# Placeholder written by `factory install --ci`. It is NOT active: GitHub
-# only runs workflows whose filename ends in .yml/.yaml, and this one is
-# named .example on purpose. The loop stays inert even after you rename it
-# until the repo variable FACTORY_MODE=actions is also set (see doctor's
-# "only one mode should drive a repo at once" check).
+# CI/CD run mode (plan "Run anywhere"). Written by `factory install --ci` as
+# `factory.yml.example` — GitHub only runs a workflow whose filename ends in
+# .yml/.yaml, so this stays inert on its own. To turn it on:
+#   1. rename this file to `.github/workflows/factory.yml`
+#   2. add repo secrets FACTORY_GH_TOKEN (fine-grained PAT or GitHub App
+#      install token with contents+issues+pull-requests read/write — a plain
+#      GITHUB_TOKEN-authored PR never triggers this repo's own CI, which
+#      defeats the point) and ANTHROPIC_API_KEY
+#   3. set the repo VARIABLE FACTORY_MODE=actions (Settings > Secrets and
+#      variables > Actions > Variables) — `factory doctor` on a local machine
+#      warns if this is set while you also start a local watcher, since only
+#      one mode should drive a repo at a time.
 #
-# This placeholder exists so `factory install --ci` has something to write
-# today; the real workflow (issues:labeled / issue_comment / cron tick /
-# workflow_dispatch triggers, a trusted-author check, per-issue concurrency,
-# a pinned software-factory tag, `factory run` / `factory park`) ships as
-# part of the CI/CD run mode — see the "Run anywhere" section of the
-# software-factory README once that lands.
-name: factory (placeholder)
+# The trust rule matches src/chatops.ts's isTrusted(): OWNER, MEMBER or
+# COLLABORATOR only. The `if:` below is a first filter to avoid spending a
+# runner-minute on an untrusted event; `factory run` re-derives the same
+# check from the issue thread before it does anything (audit finding
+# "prompt injection" lesson — a workflow-level check alone is not enough,
+# since the comment body itself is attacker-controlled).
+name: factory
+
 on:
-  workflow_dispatch: {}
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  schedule:
+    # tick: one poll pass across every factory-owned open issue.
+    - cron: "*/30 * * * *"
+    # scan: file issues from `bun audit`, once a day.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "issue number to advance with `factory run` (leave blank for `factory tick`)"
+        required: false
+
+env:
+  FACTORY_RUNNER_REF: v2.1.0 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REPO: learnwithparam/software-factory
+  CLAUDE_CODE_VERSION: "2.0.5" # pinned claude, same version the Dockerfile installs
+
+# One workflow run in flight per issue at a time; a second labeled/comment
+# event on the same issue queues behind it instead of racing a second
+# Actions runner against the first (claim() is still a real CAS underneath —
+# this just avoids burning two runners on the same issue).
+concurrency:
+  group: factory-issue-${{ github.event.issue.number || 'scheduled' }}
+  cancel-in-progress: false
+
 jobs:
-  placeholder:
+  run-issue:
+    if: |
+      vars.FACTORY_MODE == 'actions' && (
+        (github.event_name == 'issues' && github.event.label.name == 'factory:ready') ||
+        (github.event_name == 'issue_comment' &&
+         contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - run: |
-          echo "factory CI is not wired up yet."
-          echo "Rename this file to factory.yml and set FACTORY_MODE=actions once the real workflow is in place."
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+
+      - name: Checkout software-factory (pinned)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FACTORY_RUNNER_REPO }}
+          ref: ${{ env.FACTORY_RUNNER_REF }}
+          path: .factory-runner
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+
+      - run: bun install --frozen-lockfile
+        working-directory: .factory-runner
+
+      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+
+      - name: gh auth setup-git
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+        run: gh auth setup-git
+
+      - name: factory run
+        working-directory: .factory-runner
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bun bin/factory run --repo-dir "${{ github.workspace }}" --issue ${{ github.event.issue.number }}
+
+      - name: factory park (on failure)
+        if: failure()
+        working-directory: .factory-runner
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+        run: |
+          bun bin/factory park --repo-dir "${{ github.workspace }}" --issue ${{ github.event.issue.number }} \
+            --reason "CI run failed or timed out — see the Actions run for this workflow"
+
+  tick:
+    if: vars.FACTORY_MODE == 'actions' && github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FACTORY_RUNNER_REPO }}
+          ref: ${{ env.FACTORY_RUNNER_REF }}
+          path: .factory-runner
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --frozen-lockfile
+        working-directory: .factory-runner
+      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+      - env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+        run: gh auth setup-git
+      - name: factory tick
+        working-directory: .factory-runner
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bun bin/factory tick --repo-dir "${{ github.workspace }}"
+
+  scan:
+    if: vars.FACTORY_MODE == 'actions' && github.event_name == 'schedule' && github.event.schedule == '0 6 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FACTORY_RUNNER_REPO }}
+          ref: ${{ env.FACTORY_RUNNER_REF }}
+          path: .factory-runner
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --frozen-lockfile
+        working-directory: .factory-runner
+      - name: factory scan
+        working-directory: .factory-runner
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+        run: bun bin/factory scan --repo-dir "${{ github.workspace }}"
+
+  # `workflow_dispatch`: run one issue if `issue` was given, otherwise one
+  # tick — the manual escape hatch for "nothing fired and I don't want to
+  # wait 30 minutes."
+  manual:
+    if: vars.FACTORY_MODE == 'actions' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.FACTORY_RUNNER_REPO }}
+          ref: ${{ env.FACTORY_RUNNER_REF }}
+          path: .factory-runner
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3"
+      - run: bun install --frozen-lockfile
+        working-directory: .factory-runner
+      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+      - env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+        run: gh auth setup-git
+      - name: factory run or tick
+        working-directory: .factory-runner
+        env:
+          GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "${{ github.event.inputs.issue }}" ]; then
+            bun bin/factory run --repo-dir "${{ github.workspace }}" --issue ${{ github.event.inputs.issue }}
+          else
+            bun bin/factory tick --repo-dir "${{ github.workspace }}"
+          fi

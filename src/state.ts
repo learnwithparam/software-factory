@@ -5,6 +5,7 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { defaultStatePath } from "./paths";
 
 export type Stage = "triage" | "plan" | "build" | "verify" | "pr";
 export type RunStatus =
@@ -46,7 +47,10 @@ export interface RunEvent {
   text: string;
 }
 
-export const DEFAULT_DB_PATH = ".factory-state/factory.db";
+// Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
+// see paths.ts. A relative path here broke on any machine where the process
+// cwd wasn't the target repo (audit finding #1).
+export const DEFAULT_DB_PATH = defaultStatePath();
 
 export class FactoryState {
   private readonly db: Database;

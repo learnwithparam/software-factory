@@ -21,6 +21,7 @@ import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr } from "../src/github";
 import { Git } from "../src/git";
+import type { GateRunner } from "../src/gates";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue, resumeNeedsInfo } from "../src/watch";
@@ -207,17 +208,30 @@ class FakeGitHub extends GitHub {
 class FakeGit extends Git {
   claimResult = true;
   pushed: number[] = [];
+  committed: string[] = [];
 
   override async claim(): Promise<boolean> {
     return this.claimResult;
   }
 
-  override async addWorktree(_cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
+  override async ensureWorktree(_cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     mkdirSync(join(worktreeDir, runDir(issue)), { recursive: true });
   }
 
   override async removeWorktree(_cloneDir: string, worktreeDir: string): Promise<void> {
     rmSync(worktreeDir, { recursive: true, force: true });
+  }
+
+  // The runner commits (audit finding #4) and diffs against base before
+  // pushing (finding #12); this fake just records that it happened, since
+  // there's no real git repo backing the temp worktree in these tests.
+  override async commitAll(_worktreeDir: string, message: string): Promise<boolean> {
+    this.committed.push(message);
+    return true;
+  }
+
+  override async changedFiles(): Promise<string[]> {
+    return [];
   }
 
   override async push(_worktreeDir: string, issue: number) {
@@ -230,12 +244,18 @@ class FakeGit extends Git {
   }
 }
 
-function baseIssue(number: number, labels: string[]): GhIssue {
-  return { number, title: `Issue ${number}`, body: "do the thing", labels: labels.map((name) => ({ name })), comments: [] };
+// The runner grades the build itself now (audit finding #11), so every test
+// that reaches the build stage needs a gate result. Defaults to green; a
+// test can swap `line` for a red one to exercise the failure path.
+class FakeGateRunner implements GateRunner {
+  line = "FACTORY_GATES: status=GREEN passed=10 failed=0 skipped=0 failed_gates=-";
+  async run(_worktreeDir: string) {
+    return { stdout: this.line, stderr: "", code: 0 };
+  }
 }
 
-function writeArtifact(worktree: string, issue: number, name: string, content: string): void {
-  writeFileSync(join(worktree, runDir(issue), name), content);
+function baseIssue(number: number, labels: string[]): GhIssue {
+  return { number, title: `Issue ${number}`, body: "do the thing", labels: labels.map((name) => ({ name })), comments: [] };
 }
 
 function fixtureFor(stage: StageName, issue: number) {
@@ -245,15 +265,34 @@ function fixtureFor(stage: StageName, issue: number) {
   ]);
 }
 
+// watch.ts now clears a stage's artifact files before running it (audit
+// finding #9), so a test can no longer pre-seed them on disk before calling
+// processReadyIssue/resumeNeedsInfo — they'd be deleted before the fake
+// executor ever runs. Instead each `push` carries the files that round's
+// "claude" run would have written, and runStage() writes them itself, right
+// where the clear just happened. A queue per stage:issue key lets a resumed
+// stage (needs-info, reject-and-rebuild) return different output each round.
 class MultiStageExecutor {
-  private readonly byKey = new Map<string, ReplayExecutor>();
-  set(stage: StageName, issue: number, executor: ReplayExecutor): void {
-    this.byKey.set(`${stage}:${issue}`, executor);
+  private readonly queue = new Map<string, Array<{ executor: ReplayExecutor; files?: Record<string, string> }>>();
+
+  push(stage: StageName, issue: number, executor: ReplayExecutor, files?: Record<string, string>): void {
+    const key = `${stage}:${issue}`;
+    const arr = this.queue.get(key) ?? [];
+    arr.push({ executor, files });
+    this.queue.set(key, arr);
   }
+
   async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number }) {
-    const executor = this.byKey.get(`${opts.stage}:${opts.issue}`);
-    if (!executor) throw new Error(`no executor registered for ${opts.stage}:${opts.issue}`);
-    return executor.runStage(opts);
+    const key = `${opts.stage}:${opts.issue}`;
+    const arr = this.queue.get(key);
+    const next = arr?.shift();
+    if (!next) throw new Error(`no executor registered for ${key}`);
+    if (next.files) {
+      const dir = join(opts.cwd, runDir(opts.issue));
+      mkdirSync(dir, { recursive: true });
+      for (const [name, content] of Object.entries(next.files)) writeFileSync(join(dir, name), content);
+    }
+    return next.executor.runStage(opts);
   }
 }
 
@@ -271,31 +310,35 @@ describe("full happy-path pipeline (triage -> plan -> build -> verify -> pr)", (
     const config = mergeConfig({ ...DEFAULT_CONFIG, repo: "acme/widgets" });
 
     const executor = new MultiStageExecutor();
-    for (const stage of ["triage", "plan", "build", "verify", "pr"] as const) {
-      executor.set(stage, 1, fixtureFor(stage, 1));
-    }
+    executor.push("triage", 1, fixtureFor("triage", 1), {
+      "triage-comment.md": "<!-- factory:triage v1 -->\nlooks good",
+      "triage.json": JSON.stringify({
+        disposition: "proceed",
+        type: "bug",
+        risk: "low",
+        done_when: "tests pass",
+        files_expected: ["src/a.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
+    });
+    executor.push("plan", 1, fixtureFor("plan", 1), {
+      "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan body",
+      "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }),
+    });
+    executor.push("build", 1, fixtureFor("build", 1), {
+      "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
+      "build.json": JSON.stringify({ status: "green", gate_line: "make check: 10 pass", rounds: 1 }),
+    });
+    executor.push("verify", 1, fixtureFor("verify", 1), {
+      "verdict-comment.md": "<!-- factory:verdict v1 -->\npass",
+      "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }),
+    });
+    executor.push("pr", 1, fixtureFor("pr", 1), {
+      "pr-body.md": "## Summary\nDid the thing.\nCloses #1",
+    });
 
-    const worktree = join(workspacesDir, "issue-1");
-    // processReadyIssue calls git.addWorktree itself, but the stage fixtures
-    // below have to exist on disk before it runs each stage, so create the
-    // directory FakeGit.addWorktree would create and seed it up front.
-    mkdirSync(join(worktree, runDir(1)), { recursive: true });
-    writeArtifact(worktree, 1, "triage-comment.md", "<!-- factory:triage v1 -->\nlooks good");
-    writeArtifact(
-      worktree,
-      1,
-      "triage.json",
-      JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "tests pass", files_expected: ["src/a.ts"], gate_level: "make check", confidence: 0.9 }),
-    );
-    writeArtifact(worktree, 1, "plan-comment.md", "<!-- factory:plan v1 rev=1 -->\nplan body");
-    writeArtifact(worktree, 1, "plan.json", JSON.stringify({ risk: "low", revision: 1, files: ["src/a.ts"], autoApproveEligible: true }));
-    writeArtifact(worktree, 1, "status-comment.md", "<!-- factory:status v1 -->\nbuilding");
-    writeArtifact(worktree, 1, "build.json", JSON.stringify({ status: "green", gate_line: "make check: 10 pass", rounds: 1 }));
-    writeArtifact(worktree, 1, "verdict-comment.md", "<!-- factory:verdict v1 -->\npass");
-    writeArtifact(worktree, 1, "verdict.json", JSON.stringify({ result: "pass", rounds: 1, findings: [] }));
-    writeArtifact(worktree, 1, "pr-body.md", "## Summary\nDid the thing.\nCloses #1");
-
-    const deps = { github, git, state, executor, cloneDir, workspacesDir };
+    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("shipped");
@@ -334,20 +377,21 @@ describe("needs-info path", () => {
     const config = mergeConfig({ ...DEFAULT_CONFIG, repo: "acme/widgets" });
 
     const executor = new MultiStageExecutor();
-    executor.set("triage", 2, fixtureFor("triage", 2));
+    executor.push("triage", 2, fixtureFor("triage", 2), {
+      "triage-comment.md": "<!-- factory:triage v1 -->\nneeds more detail",
+      "triage.json": JSON.stringify({
+        disposition: "needs-info",
+        type: "bug",
+        risk: "low",
+        done_when: "",
+        files_expected: [],
+        gate_level: "make check",
+        confidence: 0.2,
+      }),
+      "question-comment.md": "<!-- factory:question v1 -->\n1. Which environment?\na) staging\nb) production",
+    });
 
-    const worktree = join(workspacesDir, "issue-2");
-    mkdirSync(join(worktree, runDir(2)), { recursive: true });
-    writeArtifact(worktree, 2, "triage-comment.md", "<!-- factory:triage v1 -->\nneeds more detail");
-    writeArtifact(
-      worktree,
-      2,
-      "triage.json",
-      JSON.stringify({ disposition: "needs-info", type: "bug", risk: "low", done_when: "", files_expected: [], gate_level: "make check", confidence: 0.2 }),
-    );
-    writeArtifact(worktree, 2, "question-comment.md", "<!-- factory:question v1 -->\n1. Which environment?\na) staging\nb) production");
-
-    const deps = { github, git, state, executor, cloneDir, workspacesDir };
+    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("needs-info");
@@ -361,23 +405,30 @@ describe("needs-info path", () => {
     expect(stillWaiting).toBe("waiting");
 
     // A trusted reply resumes triage; simulate the resumed run's own output
-    // by overwriting the artifacts it would produce this time.
+    // via a second queued round for the same stage:issue key.
     await new Promise((r) => setTimeout(r, 5));
     issue.comments.push({ id: 9002, author: "param", authorAssociation: "OWNER", body: "staging", createdAt: new Date().toISOString() });
-    writeArtifact(
-      worktree,
-      2,
-      "triage.json",
-      JSON.stringify({ disposition: "proceed", type: "bug", risk: "medium", done_when: "tests pass", files_expected: ["src/b.ts"], gate_level: "make check", confidence: 0.9 }),
-    );
-    writeArtifact(worktree, 2, "plan-comment.md", "<!-- factory:plan v1 rev=1 -->\nplan body");
-    writeArtifact(worktree, 2, "plan.json", JSON.stringify({ risk: "medium", revision: 1, files: ["src/b.ts"], autoApproveEligible: false }));
-    executor.set("plan", 2, fixtureFor("plan", 2));
+    executor.push("triage", 2, fixtureFor("triage", 2), {
+      "triage.json": JSON.stringify({
+        disposition: "proceed",
+        type: "bug",
+        risk: "medium",
+        done_when: "tests pass",
+        files_expected: ["src/b.ts"],
+        gate_level: "make check",
+        confidence: 0.9,
+      }),
+    });
+    executor.push("plan", 2, fixtureFor("plan", 2), {
+      "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan body",
+      "plan.json": JSON.stringify({ risk: "medium", revision: 1, files: ["src/b.ts"], autoApproveEligible: false }),
+    });
 
     const resumed = await resumeNeedsInfo(issue, deps, config);
     expect(resumed).toBe("awaiting-approval");
     expect(issue.labels.map((l) => l.name)).toContain(LABEL.awaitingApproval);
 
+    const worktree = join(workspacesDir, "issue-2");
     const answer = await Bun.file(join(worktree, runDir(2), "answer.md")).text();
     expect(answer).toBe("staging");
 
