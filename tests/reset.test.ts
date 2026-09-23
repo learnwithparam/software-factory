@@ -210,6 +210,18 @@ describe("reset keeps merged setup safe", () => {
     await expect(reset({ github: new FakeGitHub([], []), git }, ctxFor("/tmp/none"), false)).rejects.toThrow(/protected branch/);
   });
 
+  test("a refused force push of main leaves PRs, branches and issues untouched", async () => {
+    const github = new FakeGitHub([issue(10, "Old bug")], [pr(5, "factory/issue-3")]);
+    const git = new FakeGitRunner();
+    git.failPush = true;
+    git.lsRemoteOutput = "abc\trefs/heads/factory/issue-3\n";
+    await expect(reset({ github, git }, ctxFor("/tmp/none"), false)).rejects.toThrow(/protected branch/);
+    expect(github.closedPrs).toEqual([]);
+    expect(github.closedIssues).toEqual([]);
+    expect(github.createdIssues).toEqual([]);
+    expect(git.calls.some((c) => c[0] === "push" && c.includes("--delete"))).toBe(false);
+  });
+
   test("rebaseline moves the tag and pushes it; dry-run only lists", async () => {
     const git = new FakeGitRunner();
     git.logOutput = "1a2b3c Declare agentCommands\n";

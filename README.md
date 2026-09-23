@@ -263,8 +263,14 @@ Also `--db`, `--workspaces`, `--port` and the `FACTORY_*` env vars; `factory --h
 `factory reset` (or `--dry-run` first) closes factory PRs, deletes `factory/*` branches, forces
 the base branch (`config.base`) back to the baseline tag, closes open issues, recreates the seeded ones from
 `.factory/issues/*.md`, and wipes worktrees and local state. Idempotent, run it before every
-workshop or demo run. The dry-run lists each commit the force push would drop as `drop-commit`, and a
-rejected push (for example a protected branch) fails the reset instead of reporting success.
+workshop or demo run. The dry-run lists each commit the force push would drop as `drop-commit`.
+
+**Protected base branch.** Rewinding a base that has commits after the tag needs force pushes allowed
+on it. Reset pushes the base first, so a refusal fails the reset with git's message before any PR,
+branch or issue is touched. Allow force pushes for yourself (GitHub: Settings, Branches, the rule
+for the base, "Allow force pushes" for everyone or for you), run the reset, then turn it off again.
+The settings API can report force pushes as enabled while the push is still refused, so trust the
+push, not the setting.
 
 **Keeping a merge across reset.** Reset returns the base branch to the baseline tag, so anything
 merged after the tag is lost. Merge setup changes (config, charter, skills, CI), then run

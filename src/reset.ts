@@ -131,6 +131,17 @@ export async function rebaseline(deps: ResetDeps, ctx: ResetContext, dryRun: boo
 export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<ResetAction[]> {
   const actions: ResetAction[] = [];
 
+  // Rewinding the base goes first: a protected branch can refuse the force
+  // push, and nothing destructive should have run by then.
+  const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
+  const sha = tag.stdout.trim();
+  // Show what the force push throws away, so a merged setup change is
+  // noticed before it is lost (keep it with `factory rebaseline`).
+  for (const commit of await commitsAheadOfTag(deps, ctx)) {
+    actions.push({ kind: "drop-commit", detail: commit });
+  }
+  actions.push({ kind: "force-main", detail: `${ctx.base} <- ` + (sha || `<tag ${ctx.baselineTag} not found>`), data: { sha } });
+
   const prs = await deps.github.listPrs(ctx.repo, { state: "open" });
   for (const pr of prs.filter((p) => p.headRefName.startsWith("factory/"))) {
     actions.push({ kind: "close-pr", detail: `#${pr.number} (${pr.headRefName})`, data: { number: pr.number } });
@@ -140,15 +151,6 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
   for (const branch of parseRemoteBranches(lsRemote.stdout)) {
     actions.push({ kind: "delete-branch", detail: branch, data: { branch } });
   }
-
-  const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
-  const sha = tag.stdout.trim();
-  // Show what the force push throws away, so a merged setup change is
-  // noticed before it is lost (keep it with `factory rebaseline`).
-  for (const commit of await commitsAheadOfTag(deps, ctx)) {
-    actions.push({ kind: "drop-commit", detail: commit });
-  }
-  actions.push({ kind: "force-main", detail: `${ctx.base} <- ` + (sha || `<tag ${ctx.baselineTag} not found>`), data: { sha } });
 
   const openIssues = await deps.github.listOpenIssues(ctx.repo);
   for (const issue of openIssues) {
