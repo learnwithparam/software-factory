@@ -3,11 +3,23 @@
 // network — just the hook script and a scratch project directory.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const HOOK = join(import.meta.dir, "..", "template", ".claude", "hooks", "guard-paths.sh");
+
+// A minimal PATH with everything the hook's bash needs (env's shebang
+// lookup, mktemp/cat/rm/command) but no python3, to prove the "python3
+// missing" branch actually fires rather than just existing in the script.
+function pathWithoutPython3(): string {
+  const binDir = mkdtempSync(join(tmpdir(), "factory-nopython-bin-"));
+  for (const tool of ["bash", "mktemp", "cat", "rm", "sh"]) {
+    const real = Bun.spawnSync(["which", tool]).stdout.toString().trim();
+    if (real) symlinkSync(real, join(binDir, tool));
+  }
+  return binDir;
+}
 
 let projectDir: string;
 
@@ -106,5 +118,22 @@ describe("guard-paths.sh", () => {
     // no config.json means no repo-declared protected paths; .claude/** and
     // .factory/** are still always protected, but src/payments isn't.
     expect(code).toBe(0);
+  });
+
+  test("fails CLOSED (blocks) when python3 is not on PATH, instead of failing open", async () => {
+    const binDir = pathWithoutPython3();
+    const proc = Bun.spawn([HOOK], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { CLAUDE_PROJECT_DIR: projectDir, PATH: binDir },
+    });
+    proc.stdin.write(JSON.stringify({ tool_name: "Edit", tool_input: { file_path: `${projectDir}/src/widgets/list.ts` } }));
+    await proc.stdin.end();
+    const stderr = await new Response(proc.stderr).text();
+    const code = await proc.exited;
+    rmSync(binDir, { recursive: true, force: true });
+    expect(code).toBe(2);
+    expect(stderr).toContain("python3");
   });
 });

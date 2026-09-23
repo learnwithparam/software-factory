@@ -1,0 +1,22 @@
+# Placeholder written by `factory install --ci`. It is NOT active: GitHub
+# only runs workflows whose filename ends in .yml/.yaml, and this one is
+# named .example on purpose. The loop stays inert even after you rename it
+# until the repo variable FACTORY_MODE=actions is also set (see doctor's
+# "only one mode should drive a repo at once" check).
+#
+# This placeholder exists so `factory install --ci` has something to write
+# today; the real workflow (issues:labeled / issue_comment / cron tick /
+# workflow_dispatch triggers, a trusted-author check, per-issue concurrency,
+# a pinned software-factory tag, `factory run` / `factory park`) ships as
+# part of the CI/CD run mode — see the "Run anywhere" section of the
+# software-factory README once that lands.
+name: factory (placeholder)
+on:
+  workflow_dispatch: {}
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "factory CI is not wired up yet."
+          echo "Rename this file to factory.yml and set FACTORY_MODE=actions once the real workflow is in place."

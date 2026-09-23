@@ -1,18 +1,31 @@
 #!/usr/bin/env bash
-# Installs the factory template into a target repo. Never overwrites a file
-# that is already there — a repo customizing a skill keeps its own copy.
-# `--dry-run` lists what would be written without touching anything.
+# Installs the factory template into a target repo.
+#
+# Default mode never overwrites a file that is already there — a repo
+# customizing a skill keeps its own copy. `--update` is for pulling in
+# runner-side fixes (audit finding #17): every factory-owned file is
+# overwritten EXCEPT .claude/settings.json, which a repo may have hand-tuned
+# (extra allow/deny entries) — that one is diffed instead of clobbered, and
+# a `.claude/settings.json.factory-new` is written next to it when it
+# differs, for the human to reconcile. `--ci` additionally writes an inert
+# `.github/workflows/factory.yml.example` placeholder (the real workflow is
+# a separate factory release — see the CI/CD section of the README).
+# `--dry-run` lists what would happen without touching anything.
 set -euo pipefail
 
 usage() {
-  echo "usage: install.sh <target-dir> [--dry-run]" >&2
+  echo "usage: install.sh <target-dir> [--dry-run] [--update] [--ci]" >&2
 }
 
 TARGET=""
 DRY_RUN=0
+UPDATE=0
+CI=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+    --update) UPDATE=1 ;;
+    --ci) CI=1 ;;
     -h|--help) usage; exit 0 ;;
     *) TARGET="$arg" ;;
   esac
@@ -36,15 +49,49 @@ TARGET="$(cd "$TARGET" && pwd)"
 
 wrote=0
 skipped=0
+unchanged=0
 
 while IFS= read -r -d '' file; do
   rel="${file#"$SRC"/}"
   dest="$TARGET/$rel"
-  if [[ -e "$dest" || -L "$dest" ]]; then
-    echo "skip (exists): $rel"
-    skipped=$((skipped + 1))
+
+  # settings.json may carry repo-specific allow/deny entries on top of the
+  # template's; --update never overwrites it silently.
+  if [[ "$rel" == ".claude/settings.json" && "$UPDATE" -eq 1 && ( -e "$dest" || -L "$dest" ) ]]; then
+    if diff -q "$file" "$dest" >/dev/null 2>&1; then
+      echo "unchanged: $rel"
+      unchanged=$((unchanged + 1))
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "differs (would write $rel.factory-new for review): $rel"
+      wrote=$((wrote + 1))
+    else
+      cp "$file" "$dest.factory-new"
+      echo "differs (not overwritten): $rel — reconcile with ${rel}.factory-new"
+      wrote=$((wrote + 1))
+    fi
     continue
   fi
+
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    if [[ "$UPDATE" -eq 0 ]]; then
+      echo "skip (exists): $rel"
+      skipped=$((skipped + 1))
+      continue
+    fi
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "would overwrite: $rel"
+      wrote=$((wrote + 1))
+      continue
+    fi
+    cp "$file" "$dest"
+    case "$rel" in
+      .claude/hooks/*) chmod +x "$dest" ;;
+    esac
+    echo "overwrote: $rel"
+    wrote=$((wrote + 1))
+    continue
+  fi
+
   if [[ "$DRY_RUN" -eq 1 ]]; then
     echo "write: $rel"
     wrote=$((wrote + 1))
@@ -74,8 +121,27 @@ else
   wrote=$((wrote + 1))
 fi
 
+if [[ "$CI" -eq 1 ]]; then
+  CI_SRC="$SCRIPT_DIR/template-ci/factory.yml.example"
+  CI_DEST_REL=".github/workflows/factory.yml.example"
+  CI_DEST="$TARGET/$CI_DEST_REL"
+  if [[ ! -f "$CI_SRC" ]]; then
+    echo "install.sh: --ci requested but $CI_SRC is missing" >&2
+    exit 1
+  fi
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "write: $CI_DEST_REL"
+    wrote=$((wrote + 1))
+  else
+    mkdir -p "$(dirname "$CI_DEST")"
+    cp "$CI_SRC" "$CI_DEST"
+    echo "wrote: $CI_DEST_REL (inert — rename to factory.yml and set repo variable FACTORY_MODE=actions to activate)"
+    wrote=$((wrote + 1))
+  fi
+fi
+
 action="wrote"
 [[ "$DRY_RUN" -eq 1 ]] && action="would write"
 echo ""
-echo "install.sh: $action $wrote item(s), skipped $skipped existing item(s) in $TARGET"
+echo "install.sh: $action $wrote item(s), skipped $skipped existing item(s), $unchanged unchanged in $TARGET"
 echo "install.sh: .factory/config.json is not part of this template — add it (or reconcile with your repo's own) before \`factory watch\`."

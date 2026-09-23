@@ -73,4 +73,15 @@ for g in globs:
 sys.exit(0)
 PY
 
+# Fail CLOSED, not open: without python3 there is no way to evaluate
+# protectedPaths or the merge/force-push blocklist, so every tool call must
+# be refused rather than silently let through (audit finding #13 — a bare
+# `python3 "$SCRIPT"` on a PATH without python3 exits 127, which Claude Code
+# treats as "hook errored", not "hook blocked", so the tool call would have
+# gone through anyway).
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "guard-paths: blocked — python3 is not on PATH, so protected paths can't be checked; refusing every tool call until this is fixed (fails closed, not open)" >&2
+  exit 2
+fi
+
 python3 "$SCRIPT" "$PROJECT_DIR"

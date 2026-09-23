@@ -1,13 +1,31 @@
 // `factory scan --repo r`: production signal becomes a task (plan section 1,
-// Monitor row). Runs `bun audit --json` and `bun outdated` in the target's
-// local clone, files one issue per finding not already open.
+// Monitor row). Runs `bun audit --json` in the target's local clone and
+// files one issue per PACKAGE with open advisories (audit finding #6).
+//
+// Two things about the real CLI output that the first version of this file
+// got wrong, found by actually running it against splitbill (bun 1.3.14):
+//   - `bun audit --json` is `Record<packageName, Advisory[]>`, not an array
+//     and not `{ advisories: [...] }`. There is no `module_name`/`ghsa_id`
+//     field on each advisory — the package name is the object key, and the
+//     GHSA id has to be pulled out of the advisory's `url`.
+//   - `bun outdated --json` does not exist: `--json` is silently ignored and
+//     the command prints the same ASCII table as plain `bun outdated`. A
+//     naive JSON.parse of that table always fails, so this file no longer
+//     calls `bun outdated` at all — filing per-package upgrades is a
+//     `upgrading-a-dependency` skill concern once a human opens the issue,
+//     not something scan can source structured data for today.
+//
+// Filing per-package (not per-advisory) keeps a repo with one outdated,
+// many-advisory package (hono: 48 advisories in splitbill) from producing
+// 48 issues — see tests/fixtures/bun-audit-splitbill.json, captured from a
+// real run, for the shape this parses.
 
 import type { GitHub } from "./github";
 import type { CommandRunner } from "./github";
 import { LABEL } from "./labels";
 
 export interface ScanFinding {
-  readonly id: string; // advisory GHSA id, or "outdated:<package>"
+  readonly id: string; // "audit:<package>"
   readonly title: string;
   readonly body: string;
   readonly labelType: "security" | "dependency";
@@ -18,12 +36,25 @@ function marker(id: string): string {
 }
 
 interface AuditAdvisory {
-  id?: string;
-  ghsa_id?: string;
-  module_name?: string;
-  title?: string;
-  severity?: string;
-  url?: string;
+  readonly id?: number;
+  readonly url?: string;
+  readonly title?: string;
+  readonly severity?: string;
+}
+
+type AuditReport = Record<string, AuditAdvisory[]>;
+
+const SEVERITY_RANK: Record<string, number> = { critical: 4, high: 3, moderate: 2, low: 1 };
+
+function severityRank(severity: string | undefined): number {
+  return SEVERITY_RANK[severity ?? ""] ?? 0;
+}
+
+// The advisory has no GHSA id field of its own — pull it from the advisory
+// URL (…/advisories/GHSA-xxxx-xxxx-xxxx), falling back to the numeric id.
+function ghsaId(advisory: AuditAdvisory): string {
+  const match = advisory.url?.match(/GHSA-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+/i);
+  return match ? match[0] : String(advisory.id ?? "unknown");
 }
 
 export function parseAuditFindings(json: string): ScanFinding[] {
@@ -34,63 +65,37 @@ export function parseAuditFindings(json: string): ScanFinding[] {
   } catch {
     return [];
   }
-  const advisories: AuditAdvisory[] = Array.isArray(parsed)
-    ? (parsed as AuditAdvisory[])
-    : ((parsed as { advisories?: AuditAdvisory[] })?.advisories ?? []);
-  return advisories.map((a) => {
-    const id = a.ghsa_id ?? a.id ?? "unknown";
-    return {
+  // `bun audit --json` with nothing to report, and any shape this file
+  // doesn't recognize, both fall through to "no findings" rather than a
+  // crash — scan is best-effort, not a gate.
+  if (Array.isArray(parsed) || typeof parsed !== "object" || parsed === null) return [];
+
+  const report = parsed as AuditReport;
+  const findings: ScanFinding[] = [];
+  for (const [pkg, advisoriesRaw] of Object.entries(report)) {
+    const advisories = Array.isArray(advisoriesRaw) ? advisoriesRaw : [];
+    if (advisories.length === 0) continue;
+    const id = `audit:${pkg}`;
+    const sorted = [...advisories].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+    const worst = sorted[0]!;
+    const count = advisories.length;
+    const lines = sorted.map((a) => `- **${ghsaId(a)}** (${a.severity ?? "unknown"}): ${a.title ?? "untitled advisory"}`);
+    findings.push({
       id,
-      title: `${a.severity ?? "unknown"}-severity advisory in ${a.module_name ?? "a dependency"}: ${id}`,
+      title: `${count} advisor${count === 1 ? "y" : "ies"} in ${pkg} (worst: ${worst.severity ?? "unknown"})`,
       body: [
         marker(id),
-        `**Advisory:** ${id}`,
-        `**Package:** ${a.module_name ?? "unknown"}`,
-        `**Severity:** ${a.severity ?? "unknown"}`,
-        a.url ? `**Details:** ${a.url}` : "",
+        `**Package:** ${pkg}`,
+        `**Advisories:** ${count}`,
+        "",
+        ...lines,
         "",
         "Filed by `factory scan` from `bun audit --json`.",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      ].join("\n"),
       labelType: "security" as const,
-    };
-  });
-}
-
-interface OutdatedRow {
-  name?: string;
-  current?: string;
-  latest?: string;
-}
-
-export function parseOutdatedFindings(json: string): ScanFinding[] {
-  if (!json.trim()) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    return [];
-  }
-  const rows: OutdatedRow[] = Array.isArray(parsed) ? (parsed as OutdatedRow[]) : [];
-  return rows
-    .filter((r) => r.name && r.current && r.latest && r.current !== r.latest)
-    .map((r) => {
-      const id = `outdated:${r.name}`;
-      return {
-        id,
-        title: `Upgrade ${r.name} ${r.current} -> ${r.latest}`,
-        body: [
-          marker(id),
-          `**Package:** ${r.name}`,
-          `**Current:** ${r.current}`,
-          `**Latest:** ${r.latest}`,
-          "",
-          "Filed by `factory scan` from `bun outdated`.",
-        ].join("\n"),
-        labelType: "dependency" as const,
-      };
     });
+  }
+  return findings;
 }
 
 export interface ScanDeps {
@@ -104,11 +109,8 @@ export interface ScanResult {
 }
 
 export async function scan(deps: ScanDeps, repo: string, cloneDir: string): Promise<ScanResult> {
-  const [audit, outdated] = await Promise.all([
-    deps.runner.run(["audit", "--json"], { cwd: cloneDir }),
-    deps.runner.run(["outdated", "--json"], { cwd: cloneDir }),
-  ]);
-  const findings = [...parseAuditFindings(audit.stdout), ...parseOutdatedFindings(outdated.stdout)];
+  const audit = await deps.runner.run(["audit", "--json"], { cwd: cloneDir });
+  const findings = parseAuditFindings(audit.stdout);
 
   const open = await deps.github.listOpenIssues(repo);
   const openMarkers = new Set(

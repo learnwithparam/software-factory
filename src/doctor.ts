@@ -39,6 +39,26 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     detail: "the Claude Code CLI runs each stage",
     fixable: false,
   });
+  checks.push({
+    name: "python3 on PATH",
+    ok: await deps.which("python3"),
+    detail: "guard-paths.sh parses hook JSON with python3 and fails closed (blocks everything) without it",
+    fixable: false,
+  });
+  checks.push({
+    name: "jq on PATH",
+    ok: await deps.which("jq"),
+    detail: "gates.sh and the CI workflow expect jq",
+    fixable: false,
+  });
+
+  const auth = await deps.github.authStatus();
+  checks.push({
+    name: "gh authenticated",
+    ok: auth.ok,
+    detail: auth.detail,
+    fixable: false,
+  });
 
   checks.push({
     name: "target has .factory/config.json",

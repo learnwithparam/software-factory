@@ -75,6 +75,8 @@
   }
   .card:hover { border-color: var(--accent); }
   .card .title { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .card .mark-ready { margin-top: 6px; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+  .card .mark-ready:hover { background: var(--accent); color: var(--panel); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
   .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
   .chip.risk-low { color: var(--accent); border-color: var(--accent); }
@@ -161,6 +163,7 @@ const STAGES = [
 ];
 
 let runs = [];
+let boardCards = []; // from /api/board — GitHub labels only, no SQLite needed
 let selected = null;
 
 function columnFor(run) {
@@ -172,11 +175,20 @@ function columnFor(run) {
 
 function renderAttention() {
   const list = document.getElementById("attention-list");
-  const waiting = runs.filter((r) =>
+  const runWaiting = runs.filter((r) =>
     ["needs-info", "awaiting-approval", "needs-human", "failed"].includes(r.status) ||
     (r.status === "shipped" && r.stage === "pr"),
   );
-  waiting.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at));
+  // A parked GitHub label (needs-info/needs-human/failed) always lands here
+  // too, even for an issue with no live run record — this is what keeps
+  // "Needs attention" honest in CI/VM mode, where nothing local is tracking
+  // it. Skip any issue the run feed already covers, so it isn't listed twice.
+  const runIssues = new Set(runWaiting.map((r) => r.issue));
+  const boardWaiting = boardCards
+    .filter((c) => c.column === "attention" && !runIssues.has(c.issue))
+    .map((c) => ({ issue: c.issue, title: c.title, status: c.parkedLabel || "attention", updated_at: null }));
+  const waiting = [...runWaiting, ...boardWaiting];
+  waiting.sort((a, b) => (a.updated_at ? new Date(a.updated_at) : 0) - (b.updated_at ? new Date(b.updated_at) : 0));
   if (waiting.length === 0) {
     list.innerHTML = '<li class="empty">Nothing waiting.</li>';
     return;
@@ -184,7 +196,7 @@ function renderAttention() {
   list.innerHTML = waiting
     .map(
       (r) =>
-        `<li data-issue="${r.issue}"><span>#${r.issue} ${escapeHtml(r.title)} — ${r.status}</span><span>${age(r.updated_at)}</span></li>`,
+        `<li data-issue="${r.issue}"><span>#${r.issue} ${escapeHtml(r.title)} — ${r.status}</span><span>${r.updated_at ? age(r.updated_at) : ""}</span></li>`,
     )
     .join("");
   list.querySelectorAll("li[data-issue]").forEach((li) => {
@@ -207,6 +219,7 @@ function escapeHtml(s) {
 function renderBoard() {
   const board = document.getElementById("board");
   board.innerHTML = STAGES.map((s) => `<div class="column" data-col="${s.key}"><h3>${s.label}</h3><div class="cards"></div></div>`).join("");
+  const runIssues = new Set(runs.map((r) => r.issue));
   for (const run of runs) {
     const col = columnFor(run);
     const container = board.querySelector(`[data-col="${col}"] .cards`);
@@ -228,6 +241,54 @@ function renderBoard() {
     card.addEventListener("click", () => openDrawer(run.issue));
     container.appendChild(card);
   }
+
+  // Board cards come straight from GitHub labels (dashboard/board.ts), no
+  // SQLite involved — this is what keeps Intake populated (a run record
+  // never exists for an issue nobody has marked ready yet) and what keeps
+  // the board useful at all in CI/VM mode, where no local run feed exists.
+  // Skip anything the run feed already renders, and skip "attention" —
+  // that's shown in the banner above, not as a column.
+  for (const card of boardCards) {
+    if (runIssues.has(card.issue) || card.column === "attention") continue;
+    const container = board.querySelector(`[data-col="${card.column}"] .cards`);
+    if (!container) continue;
+    const el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML = `
+      <div class="title">#${card.issue} ${escapeHtml(card.title)}</div>
+      <div class="chips">${card.typeLabels.map((t) => `<span class="chip">${escapeHtml(t)}</span>`).join("")}</div>
+      ${card.needsMarkReady ? `<button class="mark-ready" type="button">Mark ready</button>` : ""}
+    `;
+    el.addEventListener("click", (e) => {
+      if (e.target.closest(".mark-ready")) return;
+      openDrawer(card.issue);
+    });
+    const markBtn = el.querySelector(".mark-ready");
+    if (markBtn) {
+      markBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        markBtn.disabled = true;
+        await fetch("/api/mark-ready", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ issue: card.issue }),
+        });
+        refresh();
+      });
+    }
+    container.appendChild(el);
+  }
+}
+
+async function loadBoard() {
+  try {
+    const res = await fetch("/api/board");
+    if (!res.ok) { boardCards = []; return; }
+    const data = await res.json();
+    boardCards = data.cards || [];
+  } catch {
+    boardCards = [];
+  }
 }
 
 async function refresh() {
@@ -235,6 +296,7 @@ async function refresh() {
   const data = await res.json();
   runs = data.runs;
   document.getElementById("repo-label").textContent = data.repo || "no repo configured";
+  await loadBoard();
   renderAttention();
   renderBoard();
   if (selected) openDrawer(selected, true);
@@ -243,33 +305,59 @@ async function refresh() {
 async function openDrawer(issue, silent) {
   selected = issue;
   const run = runs.find((r) => r.issue === issue);
-  if (!run) return;
-  document.getElementById("drawer-title").textContent = `#${issue} ${run.title}`;
+  const card = boardCards.find((c) => c.issue === issue);
+  if (!run && !card) return; // neither a tracked run nor a known board card
+  document.getElementById("drawer-title").textContent = `#${issue} ${run ? run.title : card.title}`;
   document.getElementById("drawer").classList.add("open");
   document.getElementById("overlay").classList.add("open");
   if (silent) return; // just refreshed the title; keep the open tab
 
-  const eventsRes = await fetch(`/api/runs/${run.id}/events`);
-  const { events } = await eventsRes.json();
+  let events = [];
+  if (run) {
+    const eventsRes = await fetch(`/api/runs/${run.id}/events`);
+    ({ events } = await eventsRes.json());
+  }
   const tabs = document.getElementById("drawer-tabs");
-  tabs.innerHTML = `<button class="active" data-tab="timeline">Timeline</button>
-    <button data-tab="gate">Gate line</button>`;
-  renderTab("timeline", events, run);
+  // A run gets Timeline + Gate line; every issue (run-tracked or not) gets
+  // Issue thread, since that reads straight from GitHub and needs no run.
+  tabs.innerHTML = run
+    ? `<button class="active" data-tab="timeline">Timeline</button>
+       <button data-tab="gate">Gate line</button>
+       <button data-tab="thread">Issue thread</button>`
+    : `<button class="active" data-tab="thread">Issue thread</button>`;
+  renderTab(run ? "timeline" : "thread", events, run, issue);
   tabs.querySelectorAll("button").forEach((b) =>
     b.addEventListener("click", () => {
       tabs.querySelectorAll("button").forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
-      renderTab(b.dataset.tab, events, run);
+      renderTab(b.dataset.tab, events, run, issue);
     }),
   );
 }
 
-function renderTab(tab, events, run) {
+function renderTab(tab, events, run, issue) {
   const content = document.getElementById("drawer-content");
   if (tab === "gate") {
     content.innerHTML = `<div class="gate-line">${escapeHtml(run.gate_line || "no gate line recorded yet")}</div>
       ${run.pr_url ? `<p><a href="${run.pr_url}" target="_blank">${run.pr_url}</a></p>` : ""}
       ${run.reason ? `<p>${escapeHtml(run.reason)}</p>` : ""}`;
+    return;
+  }
+  if (tab === "thread") {
+    content.innerHTML = '<p style="color:var(--muted)">Loading…</p>';
+    fetch(`/api/issues/${issue}/thread`)
+      .then((r) => r.json())
+      .then(({ issue: full }) => {
+        if (!full) throw new Error("no issue in response");
+        const comments = full.comments || [];
+        content.innerHTML = `
+          <div class="event"><span class="kind">[body]</span>${escapeHtml(full.body || "(no description)")}</div>
+          ${comments.map((c) => `<div class="event"><span class="kind">[${escapeHtml(c.author)}]</span>${escapeHtml(c.body)}</div>`).join("")}
+        `;
+      })
+      .catch(() => {
+        content.innerHTML = '<p style="color:var(--muted)">Could not load the issue thread.</p>';
+      });
     return;
   }
   content.innerHTML = events.length

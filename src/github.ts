@@ -236,4 +236,14 @@ export class GitHub {
     const result = await this.exec(["api", "user", "--jq", ".login"]);
     return result.stdout.trim();
   }
+
+  // Unlike the methods above, a failed `gh auth status` is an expected,
+  // reportable outcome (doctor finding #13 wants a real check here), not an
+  // exceptional one — so this calls the runner directly instead of `exec`,
+  // which would throw.
+  async authStatus(): Promise<{ ok: boolean; detail: string }> {
+    const result = await this.runner.run(["auth", "status"]);
+    const firstLine = (result.stdout + result.stderr).trim().split("\n")[0] ?? "";
+    return { ok: result.code === 0, detail: firstLine || "gh auth status failed with no output" };
+  }
 }
