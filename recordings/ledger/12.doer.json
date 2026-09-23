@@ -1,9 +1,0 @@
-{
-  "$comment": "A recorded implementation, so the whole loop runs in make check with no model and no network. Re-recorded by make e2e-live against a real agent.",
-  "text": "Read the empty state component and the page that renders it. The table renders with headers and no rows, and nothing tells the reader whether the ledger is empty or broken. Added copy naming what is missing and what will make it appear, and a test covering the empty case.",
-  "toolCalls": 17,
-  "tokensIn": 41200,
-  "tokensOut": 5100,
-  "costMinor": 74,
-  "changedFiles": ["apps/console/components/empty.tsx"]
-}

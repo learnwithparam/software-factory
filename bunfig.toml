@@ -1,6 +1,0 @@
-# The factory's own tests only. The target is a separate codebase with its own
-# commands, and the factory runs those through the gate script rather than
-# absorbing them, because that is how it would work on your repository.
-[test]
-root = "tests"
-preload = ["./tests/setup.ts"]
