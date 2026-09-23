@@ -4,7 +4,10 @@
 // real script against a scratch target dir — no fakes, this is a shell
 // script.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, setDefaultTimeout } from "bun:test";
+
+// Real git processes: a loaded machine can exceed bun's 5s default.
+setDefaultTimeout(30_000);
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

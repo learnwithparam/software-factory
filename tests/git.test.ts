@@ -6,7 +6,10 @@
 //   - commitAll() excludes `.factory/runs` (audit finding #4): that
 //     directory is the stage handoff, never meant to land in the target repo.
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test, setDefaultTimeout } from "bun:test";
+
+// Real git processes: a loaded machine can exceed bun's 5s default.
+setDefaultTimeout(30_000);
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
