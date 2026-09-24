@@ -110,7 +110,7 @@ Not in this release:
 - `gpt-5.6-terra` is unpriced, so its cost is not reported. Incomplete usage stores `cost_usd = 0` with
   `usage_complete = 0`, not NULL.
 - A read-only reply's artifact is capped at 16 KiB.
-- The tool-free finding re-check call (P40) is still prompt text only.
+- The tool-free finding re-check call (P40) was still prompt text only here; v2.5.2 made it a second tool-free call.
 - Sub-minute durations keep the upstream `42.5s` format.
 - Upstream `runs-view.test.js`, `artifacts_test.go` and the auth tests are not ported.
 - Real Claude fixtures per stage are not recorded; they spend tokens.
