@@ -35,7 +35,7 @@ function bucketBy(rows: readonly StageRun[], key: (r: StageRun) => string): Buck
       key: k,
       attempts: g.length,
       failures: g.filter((r) => r.exit_code !== 0 || r.killed_reason).length,
-      costUsd: g.reduce((n, r) => n + r.cost_usd, 0),
+      costUsd: g.reduce((n, r) => n + (r.cost_usd ?? 0), 0),
       tokensIn: g.reduce((n, r) => n + r.tokens_in, 0),
       tokensOut: g.reduce((n, r) => n + r.tokens_out, 0),
       avgDurationMs: Math.round(g.reduce((n, r) => n + r.duration_ms, 0) / g.length),
@@ -47,7 +47,7 @@ export function analytics(runs: readonly Run[], stageRuns: readonly StageRun[], 
   const finished = runs.filter((r) => FINISHED.has(r.status));
   const shipped = runs.filter((r) => r.status === "shipped").length;
   const spendSince = (days: number) =>
-    stageRuns.filter((r) => now.getTime() - Date.parse(r.finished_at) <= days * DAY_MS).reduce((n, r) => n + r.cost_usd, 0);
+    stageRuns.filter((r) => now.getTime() - Date.parse(r.finished_at) <= days * DAY_MS).reduce((n, r) => n + (r.cost_usd ?? 0), 0);
   return {
     runs: runs.length,
     shipped,

@@ -34,7 +34,7 @@ export function reportFor(agent: string, runs: readonly StageRun[], outcome: str
     agent,
     stages: runs.length,
     failedStages,
-    costUsd: runs.reduce((n, r) => n + r.cost_usd, 0),
+    costUsd: runs.reduce((n, r) => n + (r.cost_usd ?? 0), 0),
     tokensIn: runs.reduce((n, r) => n + r.tokens_in, 0),
     tokensOut: runs.reduce((n, r) => n + r.tokens_out, 0),
     durationMs: runs.reduce((n, r) => n + r.duration_ms, 0),
