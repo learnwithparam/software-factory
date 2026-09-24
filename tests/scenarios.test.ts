@@ -177,6 +177,26 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("4c. an unpriced or partial usage is stored as not reported, a priced one gets a cost", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const usage = { tokensIn: 1000, tokensOut: 100, tokensCached: 400, costUsd: 0, costReported: false };
+    c.push("triage", triage(), { ...usage, model: "gpt-not-priced" });
+    c.push("plan", plan("low"), { ...usage, model: "claude-haiku-4-5" });
+    c.push("build", build(), { ...usage, model: "claude-haiku-4-5", usageComplete: false });
+    c.push("verify", verdict("pass"), { ...usage, costUsd: 0.25, costReported: true, model: "gpt-not-priced" });
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    const rows = Object.fromEntries(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => [r.stage, r]));
+    expect([rows.triage!.usage_complete, rows.triage!.cost_usd]).toEqual([0, 0]);
+    expect(rows.plan!.usage_complete).toBe(1);
+    expect(rows.plan!.tokens_cached).toBe(400);
+    expect(rows.plan!.cost_usd).toBeCloseTo((600 * 1 + 400 * 0.1 + 100 * 5) / 1e6, 12);
+    expect(rows.build!.usage_complete).toBe(0);
+    expect([rows.verify!.usage_complete, rows.verify!.cost_usd]).toEqual([1, 0.25]);
+    done(c);
+  });
+
   test("18. an untrusted /factory approve is ignored", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ risk: "medium" }));

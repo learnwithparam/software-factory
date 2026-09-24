@@ -32,7 +32,7 @@ export function parseCodexLine(line: string): StageEvent[] {
   }
   if (parsed.type === "turn.completed") {
     const usage = readUsage(parsed.usage, false);
-    return [usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, total: true } : { kind: "usage", invalid: true }];
+    return [usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, tokensCached: usage.tokensCached, total: true } : { kind: "usage", invalid: true }];
   }
   return [];
 }

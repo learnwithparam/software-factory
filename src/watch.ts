@@ -12,6 +12,7 @@
 
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
+import { costFor } from "./pricing";
 import type { Executor, StageName, StageRunResult } from "./executor";
 import {
   clearStageArtifacts,
@@ -191,6 +192,15 @@ async function runStage(
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
+  // The agent's own cost wins; otherwise price the tokens. No price means the
+  // cost is unknown, which is stored as 0 with usage_complete = 0, never as real.
+  const cached = result.tokensCached ?? 0;
+  const priced =
+    result.costReported === false
+      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
+      : result.costUsd;
+  const usageComplete = result.usageComplete !== false && priced !== undefined;
+  const costUsd = usageComplete ? (priced ?? 0) : 0;
   deps.state.recordStageRun({
     repo: config.repo,
     issue: issueNumber,
@@ -203,7 +213,9 @@ async function runStage(
     tool_calls: result.toolCalls,
     tokens_in: result.tokensIn,
     tokens_out: result.tokensOut,
-    cost_usd: result.costUsd,
+    tokens_cached: cached,
+    cost_usd: costUsd,
+    usage_complete: usageComplete ? 1 : 0,
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
   });
@@ -211,7 +223,7 @@ async function runStage(
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
     tokens_out: run.tokens_out + result.tokensOut,
-    cost_usd: run.cost_usd + result.costUsd,
+    cost_usd: run.cost_usd + costUsd,
   });
   return result;
 }

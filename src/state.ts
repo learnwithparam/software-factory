@@ -62,12 +62,16 @@ export interface StageRun {
   tool_calls: number;
   tokens_in: number;
   tokens_out: number;
+  tokens_cached: number;
   cost_usd: number;
+  // 0 when tokens or cost are not a full count; the dashboard shows "Not reported".
+  usage_complete: number;
   exit_code: number;
   killed_reason: string | null;
 }
 
-export type StageRunInput = Omit<StageRun, "id">;
+// The two v2.5.1 columns default to 0 cached tokens and a complete count.
+export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete">>;
 
 // Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
 // see paths.ts. A relative path here broke on any machine where the process
@@ -148,6 +152,19 @@ export class FactoryState {
         value TEXT NOT NULL
       );
     `);
+    // Forward-only and idempotent: safe to run on boot from several replicas.
+    const have = new Set((this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name));
+    for (const [col, ddl] of [
+      ["tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
+      ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
+    ] as const) {
+      if (have.has(col)) continue;
+      try {
+        this.db.exec(`ALTER TABLE stage_runs ADD COLUMN ${col} ${ddl}`);
+      } catch (e) {
+        if (!/duplicate column/i.test(String(e))) throw e;
+      }
+    }
   }
 
   upsertRun(input: {
@@ -242,8 +259,8 @@ export class FactoryState {
   recordStageRun(input: StageRunInput): void {
     this.db
       .query(
-        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, cost_usd, exit_code, killed_reason)
-         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $cost_usd, $exit_code, $killed_reason)`,
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code, killed_reason)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason)`,
       )
       .run({
         $repo: input.repo,
@@ -257,7 +274,9 @@ export class FactoryState {
         $tool_calls: input.tool_calls,
         $tokens_in: input.tokens_in,
         $tokens_out: input.tokens_out,
+        $tokens_cached: input.tokens_cached ?? 0,
         $cost_usd: input.cost_usd,
+        $usage_complete: input.usage_complete ?? 1,
         $exit_code: input.exit_code,
         $killed_reason: input.killed_reason,
       });
