@@ -361,11 +361,9 @@ async function cmdVerifyAgent(): Promise<void> {
   const config: FactoryConfig = { ...loaded, ...configFor(name) };
   const out = resolve(flag("out") ?? `tests/fixtures/agents/${name}`);
   const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, new FixtureRecorder(out, name)) };
-  let outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
-  // The operator running this command is the human at the plan gate, so the plan is approved with the same comment they would type.
-  for (let gate = 0; outcome === "awaiting-approval" && gate < 2; gate++) {
-    await deps.github.commentIssue(config.repo, issueNumber, "/factory approve");
-    outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
+  const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
+  if (outcome === "awaiting-approval") {
+    console.log(`Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`);
   }
   const report = reportFor(name, deps.state.listStageRuns(config.repo, { issue: issueNumber }), outcome);
   console.log(formatReport(report));

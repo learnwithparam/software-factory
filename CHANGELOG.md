@@ -28,8 +28,16 @@ the in-repo record; the lock's `shipped:` line was corrected by hand.
   that agent, records a scrubbed fixture and prints pass/fail, cost and tokens; `make agent-matrix` runs it
   for every installed agent; `docs/verify-an-agent.md` is the runbook. Only Claude is verified by us.
 
+Live proof (Claude, splitbill issue #61, cent split): triage, plan, build, verify and pr all passed with
+no manual step except approving the plan. 5 stages, about 4.5 minutes, $1.68. Verify passed 5 of 5
+acceptance criteria and the PR changed only `src/money/cents.ts` and its test. `--json-schema` with no tools
+returns `structured_output`, which the P40 re-check reads. Recorded fixtures: `tests/fixtures/agents/claude/`
+(triage and plan) with a replay test; a preset can only say `verified: true` with a real fixture.
+
 Not in this release:
 
+- Claude fixtures for build, verify and pr: that run was not recorded. The next live Claude run adds them.
+- The P40 re-check has not fired in a live run (verify raised no findings); only its call was probed live.
 - R10: `cost_usd` stays `NOT NULL DEFAULT 0` in old databases. Incomplete usage is flagged by `usage_complete`.
 - Assembler `readCommandDecision` and `runSDK` (dead code for a CLI runner) and `test/delivery.test.ts`
   (task-to-pr workflow, v2.8).

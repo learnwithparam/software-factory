@@ -6,12 +6,13 @@ credentials and one pull request.
 
 1. Install the agent's CLI and sign in to it (or set its API key in your shell).
 2. Fork `splitbill`, install the factory there, and copy `.factory/config.example.json` to `config.json`.
-3. Label the cent-split issue `factory:ready`, then run (it posts `/factory approve` at the plan gate for you):
+3. Label the cent-split issue `factory:ready`, then run (it stops at the plan gate):
 
    ```
    bun bin/factory verify-agent <name> --repo-dir <your-fork> --issue <N>
    ```
 
+   Read the plan and comment `/factory approve` on the issue, then run the same `verify-agent` command again. It resumes and records the rest.
    It runs every stage on that agent, writes a scrubbed fixture to `tests/fixtures/agents/<name>/`,
    and prints PASS or FAIL with the cost, tokens and duration.
 4. On PASS, open a pull request to the factory that adds the fixture and sets `verified: true` on the preset.
