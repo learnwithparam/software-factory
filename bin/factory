@@ -15,6 +15,7 @@ import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } f
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
+import { act, buildInbox, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
@@ -156,6 +157,25 @@ async function cmdLogs(): Promise<void> {
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
   await streamLogs(state, repo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
+}
+
+async function cmdInbox(): Promise<void> {
+  const repo = flag("repo") ?? process.env.FACTORY_REPO;
+  if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
+  const github = new GitHub();
+  const items = buildInbox(await github.listOpenIssues(repo));
+  const [, issueArg, actionArg] = args;
+  if (issueArg) {
+    const item = items.find((i) => i.issue === Number(issueArg));
+    if (!item) throw new UsageError(`inbox: #${issueArg} is not waiting for you`);
+    if (!actionArg) throw new UsageError(`inbox: choose an action: ${item.actions.join(", ")}`);
+    const posted = await act(github, repo, item, actionArg as InboxAction, flag("text") ?? "");
+    console.log(has("json") ? successJson({ issue: item.issue, posted }, true) : `#${item.issue}: posted "${posted}"`);
+    return;
+  }
+  if (has("json")) console.log(successJson({ items }, true));
+  else if (!items.length) console.log("Nothing is waiting for you.");
+  else for (const i of items) console.log(`#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}`);
 }
 
 async function cmdScan(): Promise<void> {
@@ -333,6 +353,8 @@ async function main(): Promise<void> {
       return cmdDashboard();
     case "logs":
       return cmdLogs();
+    case "inbox":
+      return cmdInbox();
     case "scan":
       return cmdScan();
     case "reset":
