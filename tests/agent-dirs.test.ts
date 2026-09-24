@@ -17,3 +17,8 @@ test("src/agent-dirs.ts resolves each preset to the same project dir install.sh 
   const registry = agentRegistry();
   for (const [name, entry] of shellMap) expect(registry.get(name)?.project).toBe(entry.skillsDir);
 });
+
+test("docs/verify-an-agent.md has a section for every preset that needs verifying", () => {
+  const doc = readFileSync(join(import.meta.dir, "../docs/verify-an-agent.md"), "utf8");
+  for (const p of Object.values(PRESETS)) if (!p.verified) expect(doc).toContain(`### ${p.name}\n`);
+});

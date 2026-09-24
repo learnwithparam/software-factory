@@ -40,3 +40,39 @@ Set the key the agent reads, then run step 3 with that name. `factory doctor` na
 The repo ships a synthetic fixture for each of these, written from the CLI's own docs. Your recording
 replaces it. If the real events do not match the parser, the replay test fails: that is the bug to report.
 
+
+## What to watch for, per agent
+
+Each section says how the factory calls the agent and which behaviour no one has confirmed live. Those
+are the lines your run settles.
+
+### codex
+
+Prompt on stdin (`codex exec --json -s <sandbox> -`). Triage, plan and verify run `-s read-only` and return their
+artifact as the final message; build and pr run `workspace-write`. Unconfirmed: the `-` stdin form, from memory.
+
+### gemini
+
+Prompt on stdin, `-o stream-json`. Read-only stages use `--approval-mode plan`; write stages use `yolo`.
+Unconfirmed: that plan mode is read-only in a headless run.
+
+### opencode
+
+Prompt on stdin. Read-only stages add `--agent plan` and return their artifact as the final message.
+Unconfirmed: the event shapes and the usage fields (tokens may show as "Not reported").
+
+### cursor
+
+The prompt is the last argument, because the CLI documents no stdin prompt; a prompt over 120 KiB is refused
+with a clear error. Write stages pass `--force`; read-only stages pass `--mode plan`.
+Unconfirmed: what `--mode plan` allows, and the stream-json shape. Usage is never reported.
+
+### pi
+
+Prompt on stdin. Skills are read from `.pi/skills`. Unconfirmed: the read-only `--tools` allow-list.
+
+### mastracode
+
+Prompt on stdin, argv built by the ported flag table (`src/agents/presets/mastracode-flags.ts`).
+It has no `--version` flag (it would read it as a prompt), so `factory doctor` cannot check its pin.
+Unconfirmed: that `--mode plan` keeps a headless run read-only.
