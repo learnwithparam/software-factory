@@ -12,6 +12,10 @@ const opts = (stage: StageName) => ({ stage, issue: 7, cwd: "/work", maxBudgetUs
 const argv = (name: string, stage: StageName, model?: string) => PRESETS[name]!.command(opts(stage), { preset: name, model }, "PROMPT").argv;
 
 describe("preset argv", () => {
+  test("codex: read-only sandbox on triage, plan and verify, workspace-write on build and pr", () => {
+    for (const stage of ["triage", "plan", "verify"] as const) expect(argv("codex", stage)).toContain("read-only");
+    for (const stage of ["build", "pr"] as const) expect(argv("codex", stage)).toContain("workspace-write");
+  });
   test("gemini: plan mode for read-only stages, yolo for write stages, prompt on stdin", () => {
     expect(argv("gemini", "plan")).toEqual(["gemini", "-o", "stream-json", "--approval-mode", "plan", "-p", ""]);
     expect(argv("gemini", "build", "gemini-3-pro")).toEqual(["gemini", "-o", "stream-json", "--approval-mode", "yolo", "-m", "gemini-3-pro", "-p", ""]);
