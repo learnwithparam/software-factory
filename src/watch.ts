@@ -11,6 +11,7 @@
 // on a different machine can all resume any issue.
 
 import type { FactoryConfig } from "./config";
+import { writeRevision } from "./revision";
 import type { Executor, StageName, StageRunResult } from "./executor";
 import {
   clearStageArtifacts,
@@ -510,7 +511,7 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   }
   if (command.type === "revise") {
     await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
-    await Bun.write(`${worktree}/${runDir(issue.number)}/revise.md`, command.text);
+    await writeRevision(worktree, issue, reply, command.text);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
     return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
   }
@@ -567,7 +568,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
 
   const worktree = worktreeFor(deps, issue.number);
   await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
-  await Bun.write(`${worktree}/${runDir(issue.number)}/revise.md`, command.text);
+  await writeRevision(worktree, issue, latest, command.text);
   const head = deps.git.branchName(issue.number);
   if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], LABEL.building);

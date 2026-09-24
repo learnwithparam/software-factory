@@ -80,8 +80,19 @@ export class FactoryState {
   constructor(path: string = DEFAULT_DB_PATH) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
-    this.db.exec("PRAGMA journal_mode = WAL;");
-    this.migrate();
+    // The runner and the dashboard open a fresh database at the same moment after a reset.
+    // Retry a locked open, and migrate in one write transaction so neither sees half a schema.
+    this.db.exec("PRAGMA busy_timeout = 5000;");
+    for (let attempt = 0; ; attempt++) {
+      try {
+        this.db.exec("PRAGMA journal_mode = WAL;");
+        this.db.transaction(() => this.migrate()).immediate();
+        return;
+      } catch (e) {
+        if (attempt >= 20 || !/locked|busy/i.test(String(e))) throw e;
+        Bun.sleepSync(25 * (attempt + 1));
+      }
+    }
   }
 
   private migrate(): void {

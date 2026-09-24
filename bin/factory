@@ -14,6 +14,8 @@ import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
+import { streamLogs } from "../src/logs";
+import { act, buildInbox, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
@@ -147,6 +149,41 @@ async function cmdPark(): Promise<void> {
   console.log(`factory park #${issueNumber}: needs-human — ${reason}`);
 }
 
+async function cmdLogs(): Promise<void> {
+  const issue = Number(args[1]);
+  if (!Number.isInteger(issue) || issue < 1) throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
+  const state = new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH);
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? state.listRuns().find((r) => r.issue === issue)?.repo ?? "";
+  const controller = new AbortController();
+  process.on("SIGINT", () => controller.abort());
+  await streamLogs(state, repo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
+}
+
+async function cmdInbox(): Promise<void> {
+  const repo = flag("repo") ?? process.env.FACTORY_REPO;
+  if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
+  const github = new GitHub();
+  const items = buildInbox(await github.listOpenIssues(repo));
+  const positional: string[] = [];
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--json") continue;
+    if (args[i]!.startsWith("--")) i++; // a flag and its value
+    else positional.push(args[i]!);
+  }
+  const [issueArg, actionArg] = positional;
+  if (issueArg) {
+    const item = items.find((i) => i.issue === Number(issueArg));
+    if (!item) throw new UsageError(`inbox: #${issueArg} is not waiting for you`);
+    if (!actionArg) throw new UsageError(`inbox: choose an action: ${item.actions.join(", ")}`);
+    const posted = await act(github, repo, item, actionArg as InboxAction, flag("text") ?? "");
+    console.log(has("json") ? successJson({ issue: item.issue, posted }, true) : `#${item.issue}: posted "${posted}"`);
+    return;
+  }
+  if (has("json")) console.log(successJson({ items }, true));
+  else if (!items.length) console.log("Nothing is waiting for you.");
+  else for (const i of items) console.log(`#${i.issue} ${i.kind} (${i.actions.join("/")}): ${i.title}`);
+}
+
 async function cmdScan(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
@@ -265,7 +302,8 @@ function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoA
 
 async function cmdDashboard(): Promise<void> {
   const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
-  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? "";
+  const repoDir = flag("repo-dir");
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : "");
   const state = new FactoryState(dbPath);
   const github = new GitHub();
   serveDashboard(state, github, repo);
@@ -320,6 +358,10 @@ async function main(): Promise<void> {
       return cmdPark();
     case "dashboard":
       return cmdDashboard();
+    case "logs":
+      return cmdLogs();
+    case "inbox":
+      return cmdInbox();
     case "scan":
       return cmdScan();
     case "reset":

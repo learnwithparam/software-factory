@@ -50,3 +50,18 @@ test("migrating twice, and on a database from v2.2 without stage_runs, keeps the
   expect(state.listStageRuns("acme/widgets")).toHaveLength(1);
   state.close();
 });
+
+test("two processes opening a fresh database at once both get the full schema", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "factory-race-"));
+  const path = join(dir, "factory.db");
+  const script = `import { FactoryState } from ${JSON.stringify(join(import.meta.dir, "../src/state"))}; const s = new FactoryState(${JSON.stringify(path)}); s.listEvents(1); s.listStageRuns("r");`;
+  for (let round = 0; round < 5; round++) {
+    const target = `${path}${round}`;
+    const src = script.replaceAll(JSON.stringify(path), JSON.stringify(target));
+    const procs = Array.from({ length: 16 }, () => Bun.spawn(["bun", "-e", src], { stderr: "pipe" }));
+    const codes = await Promise.all(procs.map((p) => p.exited));
+    const errs = await Promise.all(procs.map((p) => new Response(p.stderr).text()));
+    expect({ codes, errs: errs.filter(Boolean) }).toEqual({ codes: Array(16).fill(0), errs: [] });
+  }
+  rmSync(dir, { recursive: true, force: true });
+});

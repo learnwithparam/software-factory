@@ -126,6 +126,25 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("3b. a second /factory revise still carries the first round of feedback", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ risk: "medium" }));
+    c.push("plan", plan("medium"));
+    await c.step();
+    c.push("plan", plan("medium", {}, 2));
+    c.github.say(1, "/factory revise also cover the empty case");
+    await c.step();
+    c.push("plan", plan("medium", {}, 3));
+    c.github.say(1, "/factory revise and reject negatives");
+    await c.step();
+    const dir = join(c.workspacesDir, "issue-1", runDir(1));
+    expect(readFileSync(join(dir, "revise.md"), "utf8")).toBe("and reject negatives");
+    const history = readFileSync(join(dir, "revision.md"), "utf8");
+    expect(history).toContain("Earlier review feedback: also cover the empty case");
+    expect(history).toContain("Requested changes:\nand reject negatives");
+    expect(history).toContain("plan.json");
+  });
+
   test("4. /factory cancel clears the label, closes the issue and removes the worktree", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ risk: "medium" }));
