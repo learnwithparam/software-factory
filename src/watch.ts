@@ -175,6 +175,7 @@ async function runStage(
 
   deps.state.upsertRun({ issue: issueNumber, repo: config.repo, title: issue.title, stage: stage as Stage, status: "running" });
   const run = deps.state.getRun(config.repo, issueNumber)!;
+  const startedAt = new Date();
   const result = await deps.executor.runStage({
     stage,
     issue: issueNumber,
@@ -185,6 +186,23 @@ async function runStage(
     agentCommands: config.agentCommands,
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind, e.text ?? e.toolName ?? "");
+  const finishedAt = new Date();
+  deps.state.recordStageRun({
+    repo: config.repo,
+    issue: issueNumber,
+    stage: stage as Stage,
+    agent: "claude", // the only executor until v2.5 makes the agent a config choice
+    model: null,
+    started_at: startedAt.toISOString(),
+    finished_at: finishedAt.toISOString(),
+    duration_ms: finishedAt.getTime() - startedAt.getTime(),
+    tool_calls: result.toolCalls,
+    tokens_in: result.tokensIn,
+    tokens_out: result.tokensOut,
+    cost_usd: result.costUsd,
+    exit_code: result.exitCode,
+    killed_reason: result.killedReason ?? null,
+  });
   deps.state.updateRun(config.repo, issueNumber, {
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
@@ -426,6 +444,22 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   return runFromStage(deps, config, issue, "triage", worktree);
 }
 
+// `/factory cancel` in any waiting state: drop the lifecycle labels, close the
+// PR and the issue, and remove the worktree, so what the README says is what
+// happens. The branch stays, so nothing already pushed is lost.
+async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
+  const lifecycle = labelsOf(issue).filter((n) => n.startsWith("factory:") && n !== LABEL.monitor);
+  if (lifecycle.length > 0) await deps.github.removeLabels(config.repo, issue.number, lifecycle);
+  const head = deps.git.branchName(issue.number);
+  const pr = await deps.github.findPrByHead(config.repo, head);
+  if (pr) await deps.github.closePr(config.repo, pr.number);
+  await postComment(deps, config, issue.number, `Cancelled by \`/factory cancel\`. The branch \`${head}\` is kept; label the issue \`${LABEL.ready}\` after deleting it to start over.`);
+  await deps.github.closeIssue(config.repo, issue.number);
+  await deps.git.removeWorktree(deps.cloneDir, worktreeFor(deps, issue.number));
+  finish(deps, config, issue.number, "cancelled");
+  return "cancelled";
+}
+
 function findQuestionComment(issue: GhIssue): GhComment | undefined {
   return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:question v1 -->"));
 }
@@ -448,6 +482,7 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   if (!question) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, question.createdAt);
   if (!reply) return "waiting";
+  if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
   const derived = deriveIssueState(issue);
   const worktree = worktreeFor(deps, issue.number);
@@ -479,11 +514,7 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
     return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
   }
-  if (command.type === "cancel") {
-    await deps.github.removeLabels(config.repo, issue.number, [LABEL.awaitingApproval]);
-    finish(deps, config, issue.number, "cancelled");
-    return "cancelled";
-  }
+  if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (command.type === "retry") {
     await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
@@ -498,7 +529,10 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
 // posted a data marker, recovered by deriveIssueState.
 export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
-  if (!latest || parseChatOps(latest.body).type !== "retry") return undefined;
+  if (!latest) return undefined;
+  const verb = parseChatOps(latest.body).type;
+  if (verb === "cancel") return cancelRun(issue, deps, config);
+  if (verb !== "retry") return undefined;
 
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
@@ -528,6 +562,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
     .at(-1);
   if (!latest) return undefined;
   const command = parseChatOps(latest.body);
+  if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (command.type !== "revise") return undefined;
 
   const worktree = worktreeFor(deps, issue.number);

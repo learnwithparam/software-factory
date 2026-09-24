@@ -19,14 +19,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
 const DB_PATH = process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
 const REPO = process.env.FACTORY_REPO ?? "";
-// Audit finding #16: the dashboard binds 0.0.0.0 with no auth today and is
-// CSRF-able via a plain `text/plain` POST. Read once at module scope (not a
-// createDashboard param) so both real entry points — this file's own
-// `import.meta.main` block and bin/factory's cmdDashboard — pick it up from
-// the same process env without either having to be changed to pass it
-// through. Binding to a non-loopback host without setting this is refused
-// below; wiring `Bun.serve`'s own `hostname` default to 127.0.0.1 is a
-// separate, still-open change in bin/factory's cmdDashboard (see README).
+// Audit finding #16: the dashboard binds 127.0.0.1 by default (see the bottom
+// of this file) and refuses a non-loopback caller unless this token is set.
+// Read at module scope so createDashboard and bin/factory's cmdDashboard
+// both pick it up from the process env.
 const DASHBOARD_TOKEN = process.env.FACTORY_DASHBOARD_TOKEN ?? "";
 const BOARD_CACHE_MS = 10_000;
 

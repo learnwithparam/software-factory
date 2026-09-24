@@ -10,6 +10,7 @@ import { GitCommandRunner, Git } from "../src/git";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { ClaudeExecutor } from "../src/executor";
 import { loadConfig } from "../src/config";
+import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
@@ -53,11 +54,10 @@ async function resolveCloneDir(): Promise<string> {
   const repoSlug = flag("repo");
   if (repoSlug) {
     const dir = await ensureRepoClone(new GitCommandRunner(), repoSlug);
-    console.log(`factory: --repo ${repoSlug} resolved to ${dir}`);
+    console.error(`factory: --repo ${repoSlug} resolved to ${dir}`);
     return dir;
   }
-  console.error("factory: --repo-dir <path-to-clone> or --repo <owner/name> is required");
-  process.exit(1);
+  throw new UsageError("--repo-dir <path-to-clone> or --repo <owner/name> is required");
 }
 
 // Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
@@ -88,7 +88,8 @@ async function cmdWatch(): Promise<void> {
   if (recovered.length) console.log(`factory watch: recovered #${recovered.join(", #")}`);
   if (has("once")) {
     const result = await pollOnce(deps, config);
-    console.log(JSON.stringify(result, null, 2));
+    console.log(has("json") ? successJson(result, !result.paused) : JSON.stringify(result, null, 2));
+    if (result.paused) process.exit(EXIT.paused);
     return;
   }
   startWatch(deps, config, (r) => {
@@ -106,15 +107,13 @@ async function cmdRun(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   const issueNumber = Number(flag("issue"));
-  if (!issueNumber) {
-    console.error("factory run: --issue <N> is required");
-    process.exit(1);
-  }
+  if (!issueNumber) throw new UsageError("run: --issue <N> is required");
   const deps = buildWatchDeps(cloneDir);
   const issue = await deps.github.getIssue(config.repo, issueNumber);
   const outcome = await advanceIssue(deps, config, issue);
-  console.log(`factory run #${issueNumber}: ${outcome}`);
-  if (outcome === "failed") process.exit(1);
+  if (has("json")) console.log(successJson({ issue: issueNumber, outcome }, outcome !== "failed"));
+  else console.log(`factory run #${issueNumber}: ${outcome}`);
+  if (outcome === "failed") process.exit(EXIT.runFailed);
 }
 
 // A single poll pass across every open, factory-owned label, then exit —
@@ -125,8 +124,8 @@ async function cmdTick(): Promise<void> {
   const config = await loadConfig(cloneDir);
   const deps = buildWatchDeps(cloneDir);
   const result = await pollOnce(deps, config);
-  console.log(JSON.stringify(result, null, 2));
-  if (result.paused) process.exit(1);
+  console.log(has("json") ? successJson(result, !result.paused) : JSON.stringify(result, null, 2));
+  if (result.paused) process.exit(EXIT.paused);
 }
 
 // Called from a CI failure step: the workflow itself already knows the run
@@ -138,10 +137,7 @@ async function cmdPark(): Promise<void> {
   const config = await loadConfig(cloneDir);
   const issueNumber = Number(flag("issue"));
   const reason = flag("reason") ?? "parked by CI (no reason given)";
-  if (!issueNumber) {
-    console.error("factory park: --issue <N> is required");
-    process.exit(1);
-  }
+  if (!issueNumber) throw new UsageError("park: --issue <N> is required");
   const github = new GitHub();
   const issue = await github.getIssue(config.repo, issueNumber);
   const runningLabels = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
@@ -214,8 +210,9 @@ async function cmdDoctor(): Promise<void> {
   try {
     config = await loadConfig(cloneDir);
   } catch (err) {
-    console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
-    process.exit(1);
+    if (has("json")) console.log(successJson({ checks: [{ name: ".factory/config.json is usable", ok: false, detail: err instanceof Error ? err.message : String(err), fixable: false }] }, false));
+    else console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
+    process.exit(EXIT.checksFailed);
   }
   const github = new GitHub();
   const checks = await runDoctor(
@@ -236,16 +233,14 @@ async function cmdDoctor(): Promise<void> {
     },
     { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE },
   );
-  let allOk = true;
-  for (const c of checks) {
-    console.log(`  [${c.ok ? "ok" : "FAIL"}] ${c.name} — ${c.detail}`);
-    if (!c.ok) allOk = false;
-  }
+  const allOk = checks.every((c) => c.ok);
+  if (has("json")) console.log(successJson({ checks }, allOk));
+  else for (const c of checks) console.log(`  [${c.ok ? "ok" : "FAIL"}] ${c.name} — ${c.detail}`);
   if (!allOk && has("fix")) {
-    console.log("factory doctor --fix: creating missing labels");
+    console.error("factory doctor --fix: creating missing labels");
     await fixDoctor(github, config.repo);
   }
-  if (!allOk && !has("fix")) process.exit(1);
+  if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
 }
 
 // `dashboard/server.ts`'s own `if (import.meta.main)` block never fires
@@ -299,10 +294,7 @@ async function cmdUp(): Promise<void> {
 
 async function cmdInstall(): Promise<void> {
   const target = args[1];
-  if (!target) {
-    console.error("factory install: usage: factory install <target-dir> [--dry-run] [--update] [--ci]");
-    process.exit(1);
-  }
+  if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci]");
   const passthrough = [
     ...(has("dry-run") ? ["--dry-run"] : []),
     ...(has("update") ? ["--update"] : []),
@@ -340,13 +332,14 @@ async function main(): Promise<void> {
       return cmdInstall();
     default:
       console.log(helpText());
-      if (command && !["help", "--help", "-h"].includes(command)) process.exit(1);
+      if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);
   }
 }
 
 try {
   await main();
 } catch (err) {
-  console.error(`factory: ${err instanceof Error ? err.message : err}`);
-  process.exit(1);
+  if (has("json")) console.error(failureJson(err));
+  else console.error(`factory: ${err instanceof Error ? err.message : err}`);
+  process.exit(EXIT.error);
 }

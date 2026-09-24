@@ -13,7 +13,7 @@ FROM oven/bun:1.3.4-slim
 
 ARG GH_CLI_VERSION=2.63.2
 ARG NODE_MAJOR=20
-ARG CLAUDE_CODE_VERSION=2.0.5
+ARG CLAUDE_CODE_VERSION=2.1.281
 ARG UV_VERSION=0.5.11
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

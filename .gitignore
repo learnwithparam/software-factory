@@ -4,3 +4,4 @@ workspaces/
 *.log
 .DS_Store
 artifacts/
+.worktrees/

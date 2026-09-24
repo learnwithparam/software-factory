@@ -4,7 +4,7 @@
 // The last test fails if a factory label exists that no scenario reaches.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
@@ -126,7 +126,7 @@ describe("approval paths", () => {
     done(c);
   });
 
-  test("4. /factory cancel clears the label and stops the run", async () => {
+  test("4. /factory cancel clears the label, closes the issue and removes the worktree", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ risk: "medium" }));
     c.push("plan", plan("medium"));
@@ -134,7 +134,27 @@ describe("approval paths", () => {
     c.github.say(1, "/factory cancel");
     expect(await c.step()).toBe("cancelled");
     expect(labels(c.github, 1)).toEqual([]);
+    expect(c.github.closed).toEqual([1]);
+    expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
     expect(c.state.getRun("acme/widgets", 1)!.status).toBe("cancelled");
+    done(c);
+  });
+
+  test("4b. every stage that runs is recorded as a stage_runs row, retries included", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    expect(await c.step()).toBe("failed");
+    c.gateRunner.line = "FACTORY_GATES: status=GREEN passed=2 failed=0 skipped=0 failed_gates=-";
+    c.push("build", build());
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("shipped");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan", "build", "build", "verify", "pr"]);
     done(c);
   });
 
@@ -368,6 +388,68 @@ describe("in-review and claim paths", () => {
     expect(result.processed).toEqual([2]);
     expect(labels(c.github, 1)).toEqual([LABEL.ready]);
     done(c);
+  });
+});
+
+// The README promises `/factory cancel` closes the run from every waiting
+// state. One row per state; a new waiting label without a row here fails the
+// coverage check below.
+describe("cancel from every waiting state", () => {
+  const reach: Record<string, (c: Ctx) => Promise<void>> = {
+    [LABEL.needsInfo]: async (c) => {
+      c.push("triage", { ...triage({ disposition: "needs-info" }), ...question() });
+      await c.step();
+    },
+    [LABEL.awaitingApproval]: async (c) => {
+      c.push("triage", triage({ risk: "medium" }));
+      c.push("plan", plan("medium"));
+      await c.step();
+    },
+    [LABEL.needsHuman]: async (c) => {
+      c.push("triage", triage({ disposition: "refused" }));
+      await c.step();
+    },
+    [LABEL.failed]: async (c) => {
+      c.gateRunner.line = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+      c.state.setToggle("auto_approve_low_risk", true);
+      happy(c);
+      await c.step();
+    },
+    [LABEL.inReview]: async (c) => {
+      c.state.setToggle("auto_approve_low_risk", true);
+      happy(c);
+      await c.step();
+    },
+  };
+
+  for (const [label, getThere] of Object.entries(reach)) {
+    test(`22. /factory cancel from ${label} closes the issue and the PR`, async () => {
+      const c = setup([LABEL.ready]);
+      await getThere(c);
+      expect(labels(c.github, 1)).toEqual([label]);
+      c.github.say(1, "/factory cancel");
+      expect(await c.step()).toBe("cancelled");
+      expect(labels(c.github, 1)).toEqual([]);
+      expect(c.github.closed).toEqual([1]);
+      expect(c.github.prs.every((p) => p.state === "closed")).toBe(true);
+      expect(existsSync(join(c.workspacesDir, "issue-1"))).toBe(false);
+      expect(c.state.getRun("acme/widgets", 1)!.status).toBe("cancelled");
+      done(c);
+    });
+  }
+
+  test("22b. an untrusted /factory cancel is ignored", async () => {
+    const c = setup([LABEL.ready]);
+    await reach[LABEL.awaitingApproval]!(c);
+    c.github.say(1, "/factory cancel", "NONE");
+    expect(await c.step()).toBe("waiting");
+    expect(c.github.closed).toEqual([]);
+    done(c);
+  });
+
+  test("22c. every waiting label has a cancel scenario", () => {
+    const waiting = [LABEL.needsInfo, LABEL.awaitingApproval, LABEL.needsHuman, LABEL.failed, LABEL.inReview];
+    expect(Object.keys(reach).sort()).toEqual([...waiting].sort());
   });
 });
 

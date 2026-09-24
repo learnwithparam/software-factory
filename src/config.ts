@@ -76,15 +76,85 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
   };
 }
 
+// Every key is listed here; the Record type makes tsc fail if FactoryConfig
+// gains a key that is not. `riskCriteria` is never read by the runner (the
+// factory-plan skill reads it). A `_`-prefixed key is a comment. Any other
+// unknown key is a typo that would silently do nothing, so boot refuses it.
+type Kind = "string" | "posInt" | "positive" | "boolean" | "strings" | "object";
+const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
+  repo: "string",
+  protectedPaths: "strings",
+  riskPolicy: "object",
+  maxOpenFactoryPrs: "posInt",
+  concurrency: "posInt",
+  pollIntervalSeconds: "posInt",
+  maxBudgetUsd: "object",
+  baselineTag: "string",
+  base: "string",
+  stageTimeoutMinutes: "posInt",
+  maxToolCalls: "posInt",
+  gates: "object",
+  agentCommands: "object",
+  riskCriteria: "object",
+};
+
+function kindOk(value: unknown, kind: Kind): boolean {
+  switch (kind) {
+    case "string": return typeof value === "string" && value.length > 0;
+    case "posInt": return Number.isInteger(value) && (value as number) >= 1;
+    case "positive": return typeof value === "number" && Number.isFinite(value) && value > 0;
+    case "boolean": return typeof value === "boolean";
+    case "strings": return Array.isArray(value) && value.every((v) => typeof v === "string");
+    case "object": return typeof value === "object" && value !== null;
+  }
+}
+
+function checkKeys(obj: Record<string, unknown>, allowed: Record<string, Kind>, where: string, problems: string[]): void {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key.startsWith("_")) continue;
+    const kind = allowed[key];
+    if (!kind) problems.push(`${where}${key}: unknown key (allowed: ${Object.keys(allowed).join(", ")})`);
+    else if (!kindOk(value, kind)) problems.push(`${where}${key}: expected ${kind}, got ${JSON.stringify(value)}`);
+  }
+}
+
+// Returns every problem at once, so one boot shows the whole list.
+export function configProblems(raw: unknown): string[] {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return ["config must be a JSON object"];
+  const cfg = raw as Record<string, unknown>;
+  const problems: string[] = [];
+  checkKeys(cfg, TOP_LEVEL, "", problems);
+  const nested = (key: string, shape: Record<string, Kind>) => {
+    const v = cfg[key];
+    if (v !== undefined && kindOk(v, "object") && !Array.isArray(v)) checkKeys(v as Record<string, unknown>, shape, `${key}.`, problems);
+  };
+  nested("riskPolicy", { autoApproveLowRisk: "boolean" });
+  nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive" });
+  nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
+  if (cfg.gates !== undefined) {
+    if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");
+    else cfg.gates.forEach((g, i) => {
+      if (typeof g !== "object" || g === null) problems.push(`gates[${i}]: expected an object`);
+      else checkKeys(g as Record<string, unknown>, { name: "string", cmd: "string", required: "boolean" }, `gates[${i}].`, problems);
+    });
+  }
+  return problems;
+}
+
+export class ConfigError extends Error {}
+
 export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> {
   const path = `${targetRepoDir}/.factory/config.json`;
   const file = Bun.file(path);
   if (!(await file.exists())) {
-    throw new Error(`${path} not found: run \`factory install ${targetRepoDir}\`, then copy config.example.json to config.json and fill it in`);
+    throw new ConfigError(`${path} not found: run \`factory install ${targetRepoDir}\`, then copy config.example.json to config.json and fill it in`);
   }
-  const config = mergeConfig((await file.json()) as Partial<FactoryConfig>);
+  const raw = await file.json();
+  const problems = configProblems(raw);
+  if (problems.length > 0) throw new ConfigError(`${path} is invalid:\n  - ${problems.join("\n  - ")}`);
+  const config = mergeConfig(raw as Partial<FactoryConfig>);
   if (!/^[^/\s]+\/[^/\s]+$/.test(config.repo)) {
-    throw new Error(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
+    throw new ConfigError(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
   }
   return config;
 }

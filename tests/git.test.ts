@@ -146,7 +146,7 @@ describe("Git.changedFiles", () => {
     await run(["git", "checkout", "-b", "factory/issue-5"], clone);
     writeFileSync(join(clone, "src.ts"), "changed\n");
     await run(["git", "add", "-A"], clone);
-    await run(["git", "commit", "-m", "change"], clone);
+    await run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "change"], clone);
 
     const git = new Git(new GitCommandRunner());
     expect(await git.changedFiles(clone, "main")).toEqual(["src.ts"]);
