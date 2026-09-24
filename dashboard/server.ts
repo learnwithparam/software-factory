@@ -6,7 +6,7 @@
 // works with no local SQLite at all (a CI/VM run with no watcher on this
 // machine).
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,6 +44,8 @@ export function tokenMatches(presented: string, expected: string): boolean {
 }
 
 const SESSION_COOKIE = "factory_session";
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const MAX_SESSIONS = 1000;
 
 function cookie(req: Request, name: string): string {
   for (const part of (req.headers.get("cookie") ?? "").split(";")) {
@@ -61,9 +63,18 @@ const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
 
+function plainRun<T extends { title: string }>(run: T): T {
+  return { ...run, title: plain(run.title) };
+}
+
+function plainIssue<T extends { title: string; body: string; comments: { body: string }[] }>(issue: T): T {
+  return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
+}
+
 export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir()) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
+  const sessions = new Map<string, number>();
   let boardCache: { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> } | null = null;
   let boardInflight: Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>> | null = null;
 
@@ -152,7 +163,8 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       "x-artifact-truncated": String(truncated),
     };
     if (url.searchParams.get("download")) headers["content-disposition"] = `attachment; filename="${name.replace(/[^\w.-]/g, "_")}"`;
-    return new Response(body, { headers });
+    // A preview is text for a person; a download stays byte for byte.
+    return new Response(url.searchParams.get("download") ? body : plain(Buffer.from(body).toString("utf8")), { headers });
   }
 
   type Handler = (req: Request, url: URL, m: RegExpMatchArray) => Response | Promise<Response>;
@@ -191,10 +203,16 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         if (!DASHBOARD_TOKEN || typeof body.token !== "string" || !tokenMatches(body.token, DASHBOARD_TOKEN)) {
           return json({ error: "unauthorized" }, { status: 401 });
         }
-        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${DASHBOARD_TOKEN}; HttpOnly; SameSite=Strict; Path=/` } });
+        // The cookie is a random id, never the token, so a leaked cookie cannot be replayed as a Bearer token.
+        const id = randomBytes(32).toString("hex");
+        const now = Date.now();
+        for (const [k, expires] of sessions) if (expires <= now) sessions.delete(k);
+        if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
+        sessions.set(id, now + SESSION_TTL_MS);
+        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` } });
       },
     },
-    { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined) }) },
+    { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }) },
     {
       method: "GET",
       pattern: /^\/api\/board$/,
@@ -219,7 +237,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/thread$/,
       label: "GET /api/issues/:n/thread",
-      handler: async (_req, _url, m) => needRepo() ?? json({ issue: await github.getIssue(repo, Number(m[1])) }),
+      handler: async (_req, _url, m) => needRepo() ?? json({ issue: plainIssue(await github.getIssue(repo, Number(m[1]))) }),
     },
     {
       method: "GET",
@@ -243,7 +261,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       handler: (_req, _url, m) => {
         const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
         if (!run) return json({ error: "no such run" }, { status: 404 });
-        return json({ run, stages: state.listStageRuns(run.repo, { issue: run.issue }) });
+        return json({ run: plainRun(run), stages: state.listStageRuns(run.repo, { issue: run.issue }) });
       },
     },
     {
@@ -257,7 +275,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         return json({
           repo,
           rows: runs.map((run) => ({
-            run,
+            run: plainRun(run),
             stages: attempts
               .filter((a) => a.issue === run.issue)
               .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason })),
@@ -375,8 +393,9 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
 
   function authorized(req: Request): boolean {
     const header = req.headers.get("authorization") ?? "";
-    const presented = header.startsWith("Bearer ") ? header.slice(7) : cookie(req, SESSION_COOKIE);
-    return tokenMatches(presented, DASHBOARD_TOKEN);
+    if (header.startsWith("Bearer ")) return tokenMatches(header.slice(7), DASHBOARD_TOKEN);
+    const expires = sessions.get(cookie(req, SESSION_COOKIE));
+    return expires !== undefined && expires > Date.now();
   }
 
   // `remoteAddress` comes from `server.requestIP(req)` at the real Bun.serve

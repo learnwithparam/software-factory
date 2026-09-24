@@ -92,3 +92,21 @@ export async function act(
   await github.commentIssue(repo, item.issue, body);
   return body;
 }
+
+// What a chat or push channel implements (v3.1): show the waiting items, and
+// send replies back through `act`, so it shares the trust rule with everything else.
+export interface InboxChannel {
+  readonly name: string;
+  send(items: readonly InboxItem[]): Promise<void>;
+}
+
+// `factory inbox [issue [action]] [--flag value] [--json]`: the positional words after the verb.
+export function inboxPositionals(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 1; i < argv.length; i++) {
+    if (argv[i] === "--json") continue;
+    if (argv[i]!.startsWith("--")) i++; // a flag and its value
+    else out.push(argv[i]!);
+  }
+  return out;
+}

@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import type { GhIssue } from "../src/github";
-import { InboxError, WAITING, WAITING_LABELS, act, buildInbox, commandText } from "../src/inbox";
+import { InboxError, inboxPositionals, type InboxChannel, type InboxAction, WAITING, WAITING_LABELS, act, buildInbox, commandText } from "../src/inbox";
 import { LABELS, LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 
 const at = (n: number) => `2026-09-2${n}T10:00:00Z`;
@@ -88,5 +88,40 @@ describe("act", () => {
     await act({ commentIssue: async (_r, _n, b) => (posted.push(b), 1) }, "o/r", q, "answer", "USD only");
     expect(posted).toEqual(["USD only"]);
     expect(parseChatOps("USD only").type).toBe("answer");
+  });
+});
+
+describe("ChatOps commands, structurally", () => {
+  const ACTIONS: InboxAction[] = ["approve", "revise", "answer", "retry", "cancel"];
+
+  test("every action round-trips through the parser, and every command the parser knows is offered somewhere", () => {
+    for (const a of ACTIONS) expect(parseChatOps(commandText(a, "words")).type, a).toBe(a);
+    const offered = new Set(Object.values(WAITING).flatMap((w) => w.actions));
+    for (const a of ACTIONS) expect(offered.has(a), `${a} is offered by no waiting state`).toBe(true);
+  });
+
+  test("a command typed in a comment is only a command when it starts the comment", () => {
+    for (const a of ["approve", "retry", "cancel"] as const) expect(parseChatOps(`please /factory ${a}`).type).toBe("answer");
+  });
+});
+
+describe("inbox CLI arguments", () => {
+  test("positionals skip flags with their values and --json", () => {
+    expect(inboxPositionals(["inbox"])).toEqual([]);
+    expect(inboxPositionals(["inbox", "12", "revise", "--text", "smaller"])).toEqual(["12", "revise"]);
+    expect(inboxPositionals(["inbox", "--repo", "a/b", "--json", "7", "approve"])).toEqual(["7", "approve"]);
+  });
+});
+
+describe("InboxChannel", () => {
+  test("a channel receives items and replies through act, so the trust rule is shared", async () => {
+    const seen: number[] = [];
+    const channel: InboxChannel = { name: "fake", send: async (items) => void seen.push(...items.map((i) => i.issue)) };
+    const items = buildInbox([issue(5, LABEL.awaitingApproval)]);
+    await channel.send(items);
+    expect(seen).toEqual([5]);
+    const posted: string[] = [];
+    expect(await act({ commentIssue: async (_r, _n, body) => (posted.push(body), 1) }, "a/b", items[0]!, "approve")).toBe("/factory approve");
+    expect(posted).toEqual(["/factory approve"]);
   });
 });
