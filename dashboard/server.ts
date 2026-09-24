@@ -55,7 +55,9 @@ function cookie(req: Request, name: string): string {
 
 // The only routes reachable without a token. Everything else is default-deny;
 // tests/dashboard-routes.test.ts walks every route against this list.
-export const PUBLIC_ROUTES: readonly string[] = ["GET /", "POST /api/session"];
+export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session"];
+
+const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
 
@@ -166,6 +168,20 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
   const routes: readonly Route[] = [
     { method: "GET", pattern: /^\/(index\.html)?$/, label: "GET /", handler: () => new Response(indexHtml, { headers: { "content-type": "text/html; charset=utf-8" } }) },
     {
+      // Static files of the page itself: no data, so public like the shell.
+      method: "GET",
+      pattern: /^\/(styles\.css|app\.js|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+      label: "GET /assets",
+      handler: (_req, _url, m) => {
+        try {
+          const bytes = readFileSync(join(here, "public", m[1]!));
+          return new Response(bytes, { headers: { "content-type": ASSET_TYPES[m[1]!.split(".").pop()!]!, "cache-control": "no-cache" } });
+        } catch {
+          return json({ error: "not found" }, { status: 404 });
+        }
+      },
+    },
+    {
       method: "POST",
       pattern: /^\/api\/session$/,
       label: "POST /api/session",
@@ -228,6 +244,25 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
         if (!run) return json({ error: "no such run" }, { status: 404 });
         return json({ run, stages: state.listStageRuns(run.repo, { issue: run.issue }) });
+      },
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/line$/,
+      label: "GET /api/line",
+      // Each recent run with the stages it went through, for the Line view.
+      handler: () => {
+        const attempts = repo ? allStageRuns() : [];
+        const runs = state.listRuns(repo || undefined).slice(0, 100);
+        return json({
+          repo,
+          rows: runs.map((run) => ({
+            run,
+            stages: attempts
+              .filter((a) => a.issue === run.issue)
+              .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason })),
+          })),
+        });
       },
     },
     {

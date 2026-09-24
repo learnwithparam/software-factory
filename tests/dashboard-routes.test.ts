@@ -189,3 +189,27 @@ describe("artifacts", () => {
     expect(await res.json()).toEqual({ files: [] });
   });
 });
+
+describe("line and assets", () => {
+  test("/api/line lists one row per run with its stages", async () => {
+    const { dashboard, state } = await make("");
+    state.upsertRun({ issue: 1, repo: "acme/widgets", title: "t", stage: "build", status: "running" });
+    state.recordStageRun({
+      repo: "acme/widgets", issue: 1, stage: "triage", agent: "claude", model: null, started_at: "2026-09-24T00:00:00Z",
+      finished_at: "2026-09-24T00:00:05Z", duration_ms: 5000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0.01, exit_code: 0, killed_reason: null,
+    });
+    const body = (await (await dashboard.handle(call("GET /api/line"), "127.0.0.1")).json()) as { rows: { stages: { stage: string; ok: boolean }[] }[] };
+    expect(body.rows).toHaveLength(1);
+    expect(body.rows[0]!.stages).toMatchObject([{ stage: "triage", ok: true }]);
+  });
+
+  test("assets are public, typed, and never escape dashboard/public", async () => {
+    const { dashboard } = await make(TOKEN);
+    const css = await dashboard.handle(new Request("http://localhost:4100/styles.css"), "10.0.0.9");
+    expect(css.status).toBe(200);
+    expect(css.headers.get("content-type")).toContain("text/css");
+    const font = await dashboard.handle(new Request("http://localhost:4100/fonts/manrope-latin.woff2"), "10.0.0.9");
+    expect(font.headers.get("content-type")).toContain("font/woff2");
+    expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(401);
+  });
+});

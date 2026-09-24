@@ -8,6 +8,7 @@ in step. Only MIT-licensed code is copied.
 
 Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain Lewis)
 
+- `dashboard/public/styles.css` from `internal/controlplane/web/src/styles.css`
 - `dashboard/public/lib/run-metrics.js` from `internal/controlplane/web/src/run-metrics.js`
 - `dashboard/public/lib/runs-board.js` from `internal/controlplane/web/src/runs-board.js`
 - `dashboard/public/lib/status-loader.js` from `internal/controlplane/web/src/status-loader.js`
@@ -46,3 +47,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Manrope (font)
+
+`dashboard/public/fonts/manrope-latin.woff2` is the Latin subset of Manrope, copied from the build output
+of owainlewis/machinist@3943516. Copyright 2018 The Manrope Project Authors
+(https://github.com/sharanda/manrope), SIL Open Font License 1.1. The licence text is in
+`dashboard/public/fonts/OFL.txt`, shipped beside the font.

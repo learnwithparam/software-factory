@@ -14,7 +14,7 @@ function walk(dir: string, out: string[] = []): string[] {
     if ([".git", ".worktrees", "node_modules", "template", "workspaces"].includes(name)) continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) walk(path, out);
-    else if (/\.(ts|js)$/.test(name)) out.push(path);
+    else if (/\.(ts|js|css)$/.test(name)) out.push(path);
   }
   return out;
 }
@@ -22,7 +22,7 @@ function walk(dir: string, out: string[] = []): string[] {
 const headers = walk(root).flatMap((file) => {
   const first = readFileSync(file, "utf8").split("\n").slice(0, 2).join("\n");
   const m = HEADER.exec(first);
-  return first.includes("Ported from") ? [{ file: relative(root, file), m }] : [];
+  return first.includes("Ported from ") ? [{ file: relative(root, file), m }] : [];
 });
 
 const notices = readFileSync(join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
