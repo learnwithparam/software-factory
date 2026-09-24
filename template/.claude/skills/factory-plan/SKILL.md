@@ -16,6 +16,8 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
   handoff: type, risk hint, done_when, files_expected.
 - `.factory/runs/issue-<N>/revise.md` — present only when a human sent
   `/factory revise <text>`: their feedback on the previous plan revision.
+  `revision.md` beside it repeats that feedback with every earlier round
+  of feedback and the previous summary; honour all of it.
 - `AGENTS.md`, `.factory/charter.md`, and the repo's skills index
   (`.claude/skills/*/SKILL.md`, minus `factory-*`) — what repo-specific
   skills exist to apply (e.g. `handling-money`).

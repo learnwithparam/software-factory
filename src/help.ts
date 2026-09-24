@@ -8,6 +8,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "tick", usage: "tick (--repo-dir <path> | --repo <owner/name>)", does: "one poll pass over every open issue, then exit (cron)" },
   { name: "park", usage: "park --repo-dir <path> --issue <N> [--reason <text>]", does: "park an issue as needs-human from outside the loop" },
   { name: "dashboard", usage: "dashboard [--repo <owner/name>] [--port <n>]", does: "serve the board (default :4100, loopback)" },
+  { name: "logs", usage: "logs <N> [--repo <owner/name>] [--stage <name>] [--follow] [--json]", does: "print (or follow) a run's events; --json is one object per line" },
   { name: "scan", usage: "scan --repo-dir <path>", does: "file issues from `bun audit` (Bun/npm projects only)" },
   { name: "reset", usage: "reset --repo-dir <path> [--dry-run]", does: "DESTRUCTIVE: force base back to the baseline tag (lists dropped commits), close PRs and issues" },
   { name: "rebaseline", usage: "rebaseline --repo-dir <path> [--dry-run]", does: "move the baseline tag to origin/<base>, keeping merged setup changes across reset" },

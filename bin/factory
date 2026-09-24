@@ -14,6 +14,7 @@ import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
+import { streamLogs } from "../src/logs";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
@@ -145,6 +146,16 @@ async function cmdPark(): Promise<void> {
   if (current) await github.setStateLabel(config.repo, issueNumber, [current], LABEL.needsHuman);
   await github.commentIssue(config.repo, issueNumber, `Parked by \`factory park\`: ${reason}`);
   console.log(`factory park #${issueNumber}: needs-human — ${reason}`);
+}
+
+async function cmdLogs(): Promise<void> {
+  const issue = Number(args[1]);
+  if (!Number.isInteger(issue) || issue < 1) throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
+  const state = new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH);
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? state.listRuns().find((r) => r.issue === issue)?.repo ?? "";
+  const controller = new AbortController();
+  process.on("SIGINT", () => controller.abort());
+  await streamLogs(state, repo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
 }
 
 async function cmdScan(): Promise<void> {
@@ -320,6 +331,8 @@ async function main(): Promise<void> {
       return cmdPark();
     case "dashboard":
       return cmdDashboard();
+    case "logs":
+      return cmdLogs();
     case "scan":
       return cmdScan();
     case "reset":
