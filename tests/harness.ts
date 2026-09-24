@@ -181,6 +181,10 @@ export class FakeGit extends Git {
     return { stdout: "", stderr: "", code: 0 };
   }
 
+  override async treeHash(): Promise<string> {
+    return "faketree";
+  }
+
   override async hasCommits(): Promise<boolean> {
     return true;
   }

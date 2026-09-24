@@ -1,7 +1,7 @@
 #!/bin/sh
 # A stand-in for any coding agent with no preset and no JSON output: it reads
 # the prompt on stdin and writes the stage's artifacts to $FACTORY_ARTIFACT_DIR.
-# FAKE_AGENT_LOG (a directory) keeps each stage's prompt for the tests to read.
+# FAKE_VERDICT overrides verdict.json. FAKE_AGENT_LOG (a directory) keeps each stage's prompt for the tests to read.
 prompt=$(cat)
 [ -n "$FAKE_AGENT_LOG" ] && printf '%s' "$prompt" > "$FAKE_AGENT_LOG/$FACTORY_STAGE.prompt"
 d="$FACTORY_ARTIFACT_DIR"
@@ -18,7 +18,8 @@ case "$FACTORY_STAGE" in
     printf '{"status":"green","gate_line":"make check: 10 pass","rounds":1}\n' > "$d/build.json" ;;
   verify)
     printf '<!-- factory:verdict v1 -->\npass\n' > "$d/verdict-comment.md"
-    printf '{"result":"pass","rounds":1,"findings":[]}\n' > "$d/verdict.json" ;;
+    if [ -n "$FAKE_VERDICT" ]; then printf '%s\n' "$FAKE_VERDICT" > "$d/verdict.json"
+    else printf '{"result":"pass","rounds":1,"findings":[]}\n' > "$d/verdict.json"; fi ;;
   pr)
     printf '## Summary\nDid the thing.\nCloses #%s\n' "$n" > "$d/pr-body.md" ;;
 esac

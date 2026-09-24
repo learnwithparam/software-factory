@@ -4,14 +4,14 @@
 // artifact contract reaches the prompt, and every preset can be diagnosed.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
 import { claudeArgs } from "../src/agents/presets/claude";
 import { PRESETS } from "../src/agents/presets";
-import { COMMENT_FILENAMES, JSON_FILENAMES } from "../src/artifacts";
+import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import type { StageName } from "../src/executor";
 import { STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
@@ -159,6 +159,33 @@ describe("an agent with no preset", () => {
   });
 });
 
+describe("the runner refuses a self-contradicting verdict", () => {
+  test("pass with a blocking finding goes to a human, and the verdict is never posted", async () => {
+    const workspacesDir = mkdtempSync(join(scratch, "ws-"));
+    process.env.FAKE_VERDICT = JSON.stringify({ result: "pass", rounds: 1, findings: [{ severity: "must", confidence: 5, what: "drops a cent" }] });
+    const issue = baseIssue(2, [LABEL.ready]);
+    const github = new FakeGitHub([issue]);
+    const state = new FactoryState(":memory:");
+    const config = mergeConfig({ repo: "acme/widgets", agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } }, stages: { default: "scripted" } });
+    class SkillGit extends FakeGit {
+      override async ensureWorktree(c: string, w: string, n: number) {
+        await super.ensureWorktree(c, w, n);
+        cpSync(join(import.meta.dir, "../template/.claude/skills"), join(w, ".claude/skills"), { recursive: true });
+      }
+    }
+    try {
+      const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: scratch, workspacesDir };
+      state.setToggle("auto_approve_low_risk", true);
+      expect(await processReadyIssue(issue, deps, config)).toBe("needs-human");
+    } finally {
+      delete process.env.FAKE_VERDICT;
+    }
+    expect(state.getRun("acme/widgets", 2)!.reason).toMatch(/blocking finding: drops a cent/);
+    expect(github.createdPrs).toHaveLength(0);
+    state.close();
+  });
+});
+
 describe("every preset is diagnosable", () => {
   test("has a binary, parses a blank line to nothing, and never lets the prompt into argv when it owns stdin", () => {
     for (const [name, preset] of Object.entries(PRESETS)) {
@@ -169,5 +196,55 @@ describe("every preset is diagnosable", () => {
       expect(inv.argv[0]).toBe(preset.binary);
       if (!preset.ownsPrompt) expect(inv.argv.join(" ")).not.toContain("SECRET-PROMPT");
     }
+  });
+});
+
+describe("verdict rules", () => {
+  const f = (severity: string, confidence: number) => ({ severity, confidence, what: "x" });
+  const check = (v: unknown) => validateVerdict(v);
+
+  test("a consistent verdict is accepted, old string findings included", () => {
+    expect(check({ result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-1", status: "pass" }] }).ok).toBe(true);
+    expect(check({ result: "reject", rounds: 1, findings: ["a", f("must", 5)] }).ok).toBe(true);
+    expect(check({ result: "pass", rounds: 1, findings: ["note", f("could", 5), f("must", 2)] }).ok).toBe(true);
+  });
+
+  test.each([
+    [[], /not a JSON object/],
+    [{ result: "pass", rounds: 1, findings: [], extra: 1 }, /unknown field "extra"/],
+    [{ result: "ok", rounds: 1, findings: [] }, /"result" must be/],
+    [{ result: "pass", rounds: 1.5, findings: [] }, /"rounds"/],
+    [{ result: "pass", rounds: 1, findings: [f("must", 9)] }, /confidence/],
+    [{ result: "pass", rounds: 1, findings: [{ ...f("must", 1), color: "red" }] }, /unknown field "color"/],
+    [{ result: "pass", rounds: 1, findings: [f("must", 4)] }, /pass but lists a blocking finding/],
+    [{ result: "pass", rounds: 1, findings: [f("should", 3)] }, /pass but lists a blocking finding/],
+    [{ result: "pass", rounds: 1, findings: [], criteria: [{ id: "AC-2", status: "unverified" }] }, /AC-2 is unverified/],
+    [{ result: "pass", rounds: 1, findings: [], criteria: [{ id: "two", status: "pass" }] }, /look like AC-1/],
+  ])("refuses %j", (v, want) => {
+    const r = check(v);
+    expect(r.ok).toBe(false);
+    expect(r.ok ? "" : r.reason).toMatch(want);
+  });
+
+  test("a step result that is oversize, not JSON or not an object reads as absent", async () => {
+    const cwd = mkdtempSync(join(scratch, "art-"));
+    const dir = join(cwd, ".factory/runs/issue-3");
+    mkdirSync(dir, { recursive: true });
+    for (const [body, name] of [["x".repeat(MAX_STEP_JSON_BYTES + 1), "big"], ["{nope", "junk"], ["[1]", "array"]] as const) {
+      writeFileSync(join(dir, "verdict.json"), name === "big" ? JSON.stringify({ result: "pass", pad: body }) : body);
+      expect((await readStageArtifacts(cwd, 3, "verify")).json, name).toBeUndefined();
+    }
+  });
+
+  test("build hands the verifier gate evidence tied to the tree it measured", async () => {
+    const cwd = mkdtempSync(join(scratch, "gate-"));
+    await writeGateEvidence(cwd, 5, { line: "FACTORY_GATES: status=GREEN", status: "GREEN", tree: "abc" });
+    expect(JSON.parse(readFileSync(join(cwd, ".factory/runs/issue-5/gate.json"), "utf8"))).toEqual({ line: "FACTORY_GATES: status=GREEN", status: "GREEN", tree: "abc" });
+  });
+
+  test("the verify skill and reviewer teach the same schema the runner enforces", () => {
+    const skill = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/SKILL.md"), "utf8");
+    for (const word of ["gate.json", "HEAD^{tree}", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain("confidence 0-5");
   });
 });

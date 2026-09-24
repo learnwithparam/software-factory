@@ -13,6 +13,10 @@ the runner posts the verdict and moves the issue's label.
 - `.factory/runs/issue-<N>/issue.json`, `plan.json`, `plan-comment.md`,
   `build.json` — the plan's AC-n and NG-n, and what build reports it did,
   including build's own `rounds` count.
+- `.factory/runs/issue-<N>/gate.json`: what the runner measured after build
+  (`line`, `status`, `tree`). If its `tree` equals `git rev-parse HEAD^{tree}`,
+  the gate result is current: use it and do not re-run the gates. If the tree
+  differs, or the file is missing, the evidence is stale: report `uncertain`.
 - The worktree at its current state (build's commits, uncommitted or not).
 - `.factory/runs/issue-<N>/verdict.json`, if present from a prior round, to
   read its `rounds` so you increment it, not reset it. The runner tracks
@@ -30,10 +34,16 @@ Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
 security (injection, authz, secrets), and whether the diff crosses any
 NG-n. Collect its findings verbatim; do not soften or drop one.
 
+Then re-check each finding yourself against the diff at the current head. Drop
+one the code does not support (confidence 0-2); keep the rest. Never keep a
+finding you could not reproduce from the diff.
+
 ## 3. Decide the verdict
 
 - **pass** — every AC has evidence, the gate is green, no NG-n crossed, no
-  blocking reviewer finding.
+  blocking reviewer finding. A `pass` that lists a `must` or `should` finding
+  at confidence 3 or more, or a criterion that is not `pass`, is refused by the
+  runner and goes to a human.
 - **reject** — any AC unproven, gate red, an NG-n crossed, or a blocking
   finding. The runner sends the issue back to `factory-build` up to twice;
   a third reject is routed to a human automatically, so just report
@@ -56,9 +66,16 @@ Then write `.factory/runs/issue-<N>/verdict.json`:
 {
   "result": "pass",
   "rounds": 1,
-  "findings": []
+  "findings": [],
+  "criteria": [{ "id": "AC-1", "status": "pass" }]
 }
 ```
+
+A finding is `{ "severity": "must|should|could", "confidence": 0-5, "what": "...",
+"where": "file:line", "why": "...", "fix": "..." }` (`what` is required). A
+criterion is `pass`, `fail`, or `unverified` (with a `gap`); AC ids come from the
+plan and are never renumbered. No other fields are allowed, and the file must be
+one JSON object under 16 KiB.
 
 `result` is `pass`, `reject`, or `uncertain`. `findings` is the reviewer's
 list verbatim (empty array if none). On `reject`, the runner sends the
