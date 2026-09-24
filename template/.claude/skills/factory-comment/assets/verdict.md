@@ -3,7 +3,7 @@
 
 ### Acceptance criteria evidence
 {{#each ac}}
-- **AC-{{n}}:** {{pass_or_fail}} — {{evidence_command_and_result}}
+- **AC-{{n}}:** {{pass|fail|unverified}} — {{evidence_command_and_result}}
 {{/each}}
 
 ### The test that bites

@@ -77,6 +77,8 @@ criterion is `pass`, `fail`, or `unverified` (with a `gap`); AC ids come from th
 plan and are never renumbered. No other fields are allowed, and the file must be
 one JSON object under 16 KiB.
 
+Set `outcome` to `blocked` (with a `summary`) only if you could not review at all.
+
 `result` is `pass`, `reject`, or `uncertain`. `findings` is the reviewer's
 list verbatim (empty array if none). On `reject`, the runner sends the
 issue back to `factory-build`, up to twice; a third reject, or an

@@ -67,6 +67,9 @@ Use the `factory-comment` skill's `triage.md` template to write
 }
 ```
 
+`outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
+look; put the reason in `summary`), or `failed`. No other fields are allowed.
+
 If `disposition` is `needs-info`, also write
 `.factory/runs/issue-<N>/question-comment.md` using the `question.md`
 template: at most 3 numbered questions, 2-3 lettered options each, a

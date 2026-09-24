@@ -33,7 +33,7 @@ own context doing the same search yourself.
 
 ## 3. Write the plan
 
-One line goal. Acceptance criteria `AC-1..n`, each checkable by a named
+One line goal. Acceptance criteria `AC-1..n` (ids are never renumbered on a revision), each checkable by a named
 command or test. Non-goals `NG-1..n`: binding — the verifier fails a diff
 that crosses one, so write ones you actually mean. Files to touch. Tests to
 write first, named. Repo skills to apply, or "none". Risk: low, medium, or
@@ -64,6 +64,9 @@ plan, or the previous revision + 1 when `revise.md` is present. Then write
   "autoApproveEligible": true
 }
 ```
+
+`outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
+look; put the reason in `summary`), or `failed`. No other fields are allowed.
 
 `autoApproveEligible` is your judgment call, not just a mirror of `risk`:
 set it false for anything you'd want a second look at even at low risk.

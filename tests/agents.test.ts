@@ -307,6 +307,21 @@ describe("verdict rules", () => {
   });
 });
 
+describe("skill text the runner depends on", () => {
+  const skill = (n: string) => readFileSync(join(import.meta.dir, `../template/.claude/skills/${n}/SKILL.md`), "utf8");
+  test("build stops at 3 gate runs, plan never renumbers, every step skill teaches outcome", () => {
+    expect(skill("factory-build")).toContain("Stop after 3");
+    expect(skill("factory-build")).not.toContain("a few times");
+    expect(skill("factory-plan")).toContain("never renumbered");
+    for (const n of ["triage", "plan", "build", "verify"]) expect(skill(`factory-${n}`), n).toContain("outcome");
+  });
+  test("the verdict template renders a per-criterion status", () => {
+    const t = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-comment/assets/verdict.md"), "utf8");
+    expect(t).toContain("{{pass|fail|unverified}}");
+    expect(t).not.toContain("pass_or_fail");
+  });
+});
+
 describe("hardening from the verifier report", () => {
   test.each([
     [{ agents: { x: { command: [""] } } }, /must not be empty/],

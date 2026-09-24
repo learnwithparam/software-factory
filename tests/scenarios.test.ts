@@ -378,6 +378,14 @@ describe("failure paths", () => {
     expect(moved.gateRunner.runs).toBe(2);
   });
 
+  test("14e. triage refuses an issue another open PR already closes, and spends no tokens", async () => {
+    const c = setup(["factory:ready"]);
+    c.github.prs.push({ number: 9, url: "u", state: "open", headRefName: "someone/fix", isDraft: false, closingIssuesReferences: [{ number: c.n }] });
+    happy(c);
+    expect(await c.step()).toBe("needs-human");
+    expect((c.state as unknown as { db: { query(q: string): { all(): unknown[] } } }).db.query("SELECT 1 FROM stage_runs").all()).toHaveLength(0);
+  });
+
   test("14c. outcome failed fails the run; an outcome complete does not hide a non-zero exit", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ outcome: "failed", summary: "cannot reproduce" }));
