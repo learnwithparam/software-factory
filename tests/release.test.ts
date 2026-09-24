@@ -13,13 +13,6 @@ test("template-ci FACTORY_RUNNER_REF is v<package.json version>", () => {
   expect(ref).toBe(`v${version}`);
 });
 
-test("the Dockerfile and the CI template pin the same Claude Code version", () => {
-  const docker = /ARG CLAUDE_CODE_VERSION=(\S+)/.exec(read("Dockerfile"))?.[1];
-  const ci = /CLAUDE_CODE_VERSION: "([^"]+)"/.exec(read("template-ci/factory.yml.example"))?.[1];
-  expect(docker).toMatch(/^\d+\.\d+\.\d+$/);
-  expect(ci).toBe(docker);
-});
-
 test("the README describes only what exists: every label is listed and no monitor stage is claimed", () => {
   const readme = read("README.md");
   for (const label of Object.values(LABEL)) expect(readme).toContain(`\`${label}\``);

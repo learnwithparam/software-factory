@@ -28,10 +28,27 @@ const REPOSITORY_GIT_ENV = new Set([
   "GIT_WORK_TREE",
 ]);
 
-export function sanitizeEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+// Every provider key the presets know. An agent keeps only its own `envKeys`, so a
+// Codex stage never sees the Anthropic key. Agents with no preset keep them all.
+export const PROVIDER_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_AUTH_TOKEN",
+  "OPENAI_API_KEY",
+  "GEMINI_API_KEY",
+  "GOOGLE_API_KEY",
+  "CURSOR_API_KEY",
+  "OPENROUTER_API_KEY",
+  "MISTRAL_API_KEY",
+  "GROQ_API_KEY",
+  "XAI_API_KEY",
+  "DEEPSEEK_API_KEY",
+] as const;
+
+export function sanitizeEnv(env: NodeJS.ProcessEnv, keep?: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
+    if (keep && (PROVIDER_KEYS as readonly string[]).includes(key) && !keep.includes(key)) continue;
     if (REPOSITORY_GIT_ENV.has(key) || STRIPPED_ENV_PREFIXES.some((p) => key === p || key.startsWith(p))) continue;
     out[key] = value;
   }

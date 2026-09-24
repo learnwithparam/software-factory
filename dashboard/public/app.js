@@ -17,7 +17,7 @@ const ICONS = {
   agents: "M8 8h8v8H8zM4 10v4M20 10v4M10 4h4M10 20h4",
   theme: "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z",
 };
-const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["analytics", "Analytics"]];
+const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["analytics", "Analytics"], ["agents", "Agents"]];
 
 const state = { route: routeFromHash(location.hash), inbox: [], repo: "", selected: null, thread: null, filter: "all", data: {}, error: {} };
 
@@ -246,9 +246,21 @@ function analyticsView() {
       bars("Cost by stage", a.byStage), bars("Cost by agent", a.byAgent))));
 }
 
+/* ---- Agents ---- */
+function agentsView() {
+  return h("section", null, heading("Agents", "The coding agents the factory can run, and which stages each one serves."),
+    stateOr("agents", (a) => !a.agents.length ? quiet("No agents configured", "Add one under agents in .factory/config.json.") : h("div", { class: "table-wrap" }, h("table", null,
+      h("thead", null, h("tr", null, ["Agent", "Command", "Pinned version", "Verified live", "Stages"].map((c) => h("th", null, c)))),
+      h("tbody", null, a.agents.map((r) => h("tr", null,
+        h("td", null, h("span", { class: "status", "data-tone": r.configured ? "ok" : "" }, r.name), r.configured ? null : h("span", { class: "muted" }, " not configured")),
+        h("td", null, r.binary), h("td", null, r.pin || "Not pinned"),
+        h("td", null, h("span", { class: "status", "data-tone": r.verified ? "ok" : "warn" }, r.verified ? "Verified" : "Verified by participants: not yet")),
+        h("td", null, r.stages.length ? r.stages.join(", ") : "None"))))))));
+}
+
 /* ---- shell ---- */
-const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runsView, analytics: analyticsView };
-const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["runs", "/api/runs"], analytics: ["analytics", "/api/analytics"] };
+const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runsView, analytics: analyticsView, agents: agentsView };
+const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["runs", "/api/runs"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"] };
 
 function renderNav() {
   const nav = document.getElementById("nav");

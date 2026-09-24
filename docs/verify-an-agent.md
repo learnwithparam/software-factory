@@ -23,3 +23,20 @@ It names the agents it skips, and it spends tokens, so `make check` never runs i
 
 The recorder replaces API keys and your home directory in the fixture. Read the files before you
 commit them.
+
+## Per agent
+
+Set the key the agent reads, then run step 3 with that name. `factory doctor` names the pinned CLI version.
+
+| Agent | Install | Key |
+| --- | --- | --- |
+| `codex` | `npm i -g @openai/codex@0.156.1` | `OPENAI_API_KEY` |
+| `gemini` | `npm i -g @google/gemini-cli@0.61.0` | `GEMINI_API_KEY` |
+| `opencode` | `npm i -g opencode-ai@1.18.32`, then `opencode auth login` | the provider's key |
+| `cursor` | Cursor's own installer (no versioned download) | `CURSOR_API_KEY` or `cursor-agent login` |
+| `pi` | `npm i -g @mariozechner/pi-coding-agent@0.73.1` | the provider's key |
+| `mastracode` | `npm i -g mastracode@0.42.0` | the provider's key |
+
+The repo ships a synthetic fixture for each of these, written from the CLI's own docs. Your recording
+replaces it. If the real events do not match the parser, the replay test fails: that is the bug to report.
+

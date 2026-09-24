@@ -45,7 +45,7 @@ describe("visual system", () => {
   });
 
   test("every top-level view is built with the shared heading", () => {
-    for (const view of ["lineView", "inboxView", "runsView", "analyticsView"]) {
+    for (const view of ["lineView", "inboxView", "runsView", "analyticsView", "agentsView"]) {
       const body = app.slice(app.indexOf(`function ${view}`));
       expect(body.slice(0, body.indexOf("\n}\n")), view).toMatch(/heading\("/);
     }

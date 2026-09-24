@@ -15,10 +15,13 @@ describe("recorded agent fixtures", () => {
       test(`${name}/${file} replays through the ${name} preset`, () => {
         const lines = readFileSync(join(root, name, file), "utf8").split("\n").filter(Boolean);
         expect(lines.length).toBeGreaterThan(1);
-        const events = lines.flatMap((l) => preset.parseLine(l));
+        const parse = preset.newParser?.() ?? preset.parseLine;
+        const events = lines.flatMap((l) => parse(l));
         const result = aggregateStageEvents(events, 0);
         expect(result.usageComplete).not.toBe(false);
-        expect(result.tokensIn + result.tokensOut).toBeGreaterThan(0);
+        const meta = JSON.parse(readFileSync(join(root, name, "fixture.json"), "utf8"));
+        // Cursor's stream-json carries no usage, so its cost stays "not reported".
+        if (meta.reportsUsage !== false) expect(result.tokensIn + result.tokensOut).toBeGreaterThan(0);
         expect(result.finalMessage?.length ?? 0).toBeGreaterThan(0);
       });
     }

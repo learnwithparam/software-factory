@@ -44,12 +44,25 @@ export interface AgentPreset {
   readonly binary: string;
   // True once a recorded live run passed (a fixture in tests/fixtures/agents/<name>/). Only Claude is verified by the maintainers; the rest are verified by participants (docs/verify-an-agent.md).
   readonly verified: boolean;
+  // The CLI version the Dockerfile and CI pin; `factory doctor` warns on drift.
+  readonly version: string;
+  // Provider keys this agent may see. Every other known provider key is stripped from its env.
+  readonly envKeys: readonly string[];
+  // What keeps a read-only stage read-only for this agent (shown in docs/agents.md).
+  readonly readOnlyBy: string;
+  // Project directory `install --agents` links the skills into, and the context file it points at.
+  readonly skillsDir: string;
+  readonly contextFile: string;
+  // False when the agent cannot be pinned in the Docker image (no versioned download).
+  readonly docker?: false;
   // Builds argv and stdin. `prompt` is the rendered stage prompt.
   command(opts: StageRunOptions, agent: AgentConfig, prompt: string, ctx?: StageContext): StageInvocation;
   // True when a read-only stage cannot write its files: the agent returns them
   // as its final message and the runner writes them (see reply.ts).
   readonly returnsArtifact?: boolean;
   parseLine(line: string): StageEvent[];
+  // For a CLI whose events span lines: a fresh stateful parser per stage run (used instead of parseLine).
+  newParser?(): (line: string) => StageEvent[];
   // True for a line (or its first bytes) that would have been the terminal usage event.
   isUsageCandidate(line: string): boolean;
   // Claude runs the repo's `/factory-<stage>` skill itself; others get the skill body inlined.

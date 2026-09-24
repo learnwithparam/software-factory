@@ -14,15 +14,38 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: install.sh <target-dir> [--dry-run] [--update] [--ci]" >&2
+  echo "usage: install.sh <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]" >&2
+  echo "  --agents links the skills into each agent's own dir: claude,codex,gemini,opencode,cursor,pi,mastracode" >&2
+}
+
+# Skills stay in .claude/skills; each agent gets a symlink from its own dir. The map is
+# pinned to the PRESETS registry by tests/install.test.ts.
+agent_dirs() {
+  case "$1" in
+    claude) echo ".claude/skills CLAUDE.md" ;;
+    codex) echo ".codex/skills AGENTS.md" ;;
+    gemini) echo ".gemini/skills GEMINI.md" ;;
+    opencode) echo ".opencode/skills AGENTS.md" ;;
+    cursor) echo ".cursor/skills AGENTS.md" ;;
+    pi) echo ".pi/agent/skills AGENTS.md" ;;
+    mastracode) echo ".mastracode/skills AGENTS.md" ;;
+    *) return 1 ;;
+  esac
 }
 
 TARGET=""
 DRY_RUN=0
 UPDATE=0
 CI=0
+AGENTS=""
+NEXT_IS_AGENTS=0
 for arg in "$@"; do
+  if [[ "$NEXT_IS_AGENTS" -eq 1 ]]; then
+    if [[ -z "$arg" || "$arg" == -* ]]; then echo "install.sh: --agents needs a list like claude,codex" >&2; exit 1; fi
+    AGENTS="$arg"; NEXT_IS_AGENTS=0; continue
+  fi
   case "$arg" in
+    --agents) NEXT_IS_AGENTS=1 ;;
     --dry-run) DRY_RUN=1 ;;
     --update) UPDATE=1 ;;
     --ci) CI=1 ;;
@@ -30,6 +53,15 @@ for arg in "$@"; do
     *) TARGET="$arg" ;;
   esac
 done
+
+if [[ "$NEXT_IS_AGENTS" -eq 1 ]]; then echo "install.sh: --agents needs a list like claude,codex" >&2; exit 1; fi
+# Validate before anything is written, so a typo never leaves a partial install.
+if [[ -n "$AGENTS" ]]; then
+  IFS=',' read -r -a CHECK_LIST <<< "$AGENTS"
+  for agent in "${CHECK_LIST[@]}"; do
+    agent_dirs "$agent" >/dev/null || { echo "install.sh: unknown agent \"$agent\" (see --help)" >&2; exit 1; }
+  done
+fi
 
 if [[ -z "$TARGET" ]]; then
   usage
@@ -126,6 +158,41 @@ else
   ln -s "../.claude/skills" "$LINK"
   echo "symlinked: $LINK_REL -> ../.claude/skills"
   wrote=$((wrote + 1))
+fi
+
+if [[ -n "$AGENTS" ]]; then
+  IFS=',' read -r -a AGENT_LIST <<< "$AGENTS"
+  for agent in "${AGENT_LIST[@]}"; do
+    if ! read -r skills_dir context_file < <(agent_dirs "$agent"); then
+      echo "install.sh: unknown agent \"$agent\" (see --help)" >&2
+      exit 1
+    fi
+    [[ "$skills_dir" == ".claude/skills" ]] && continue
+    link="$TARGET/$skills_dir"
+    up="$(dirname "$skills_dir" | sed -E 's#[^/]+#..#g')"
+    if [[ -e "$link" || -L "$link" ]]; then
+      echo "skip (exists): $skills_dir"
+      skipped=$((skipped + 1))
+    elif [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "symlink: $skills_dir -> $up/.claude/skills"
+      wrote=$((wrote + 1))
+    else
+      mkdir -p "$(dirname "$link")"
+      ln -s "$up/.claude/skills" "$link"
+      echo "symlinked: $skills_dir -> $up/.claude/skills"
+      wrote=$((wrote + 1))
+    fi
+    context="$TARGET/$context_file"
+    if [[ "$context_file" != "CLAUDE.md" && ! -e "$context" && ! -L "$context" ]]; then
+      if [[ "$DRY_RUN" -eq 1 ]]; then
+        echo "write: $context_file"
+      else
+        printf '%s\n' "# Factory" "" "Factory skills are in .claude/skills/ (linked into $skills_dir)." "The repo charter is .factory/charter.md; read it before any stage." > "$context"
+        echo "wrote: $context_file"
+      fi
+      wrote=$((wrote + 1))
+    fi
+  done
 fi
 
 if [[ "$CI" -eq 1 ]]; then

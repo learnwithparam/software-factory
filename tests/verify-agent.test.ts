@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../src/agents/executor";
@@ -29,7 +29,7 @@ describe("verify-agent", () => {
   });
 
   test("the matrix runs installed presets and names the skipped", async () => {
-    expect(await matrixPlan(async (bin) => bin === "claude")).toEqual({ run: ["claude"], skipped: ["codex"] });
+    expect(await matrixPlan(async (bin) => bin === "claude")).toEqual({ run: ["claude"], skipped: Object.keys(PRESETS).filter((n) => n !== "claude") });
   });
 
   test("scrubbing removes env secrets, key shapes and home paths", () => {
@@ -72,4 +72,16 @@ describe("verify-agent", () => {
     expect(runbook).toContain("verify-agent");
     expect(runbook).toContain("agent-matrix");
   });
+
+  test("a recording replaces a synthetic fixture instead of appending to it, and keeps extra keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "rec-"));
+    writeFileSync(join(dir, "triage.jsonl"), "synthetic\n");
+    writeFileSync(join(dir, "fixture.json"), JSON.stringify({ agent: "x", synthetic: true, reportsUsage: false }));
+    const rec = new FixtureRecorder(dir, "x", {});
+    rec.line("triage", "one");
+    rec.line("triage", "two");
+    expect(readFileSync(join(dir, "triage.jsonl"), "utf8")).toBe("one\ntwo\n");
+    expect(JSON.parse(readFileSync(join(dir, "fixture.json"), "utf8"))).toEqual({ agent: "x", synthetic: false, reportsUsage: false });
+  });
 });
+

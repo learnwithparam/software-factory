@@ -120,3 +120,43 @@ describe("install.sh scaffold", () => {
     rmSync(target, { recursive: true, force: true });
   });
 });
+
+describe("install.sh --agents", () => {
+  const { PRESETS } = require("../src/agents/presets") as typeof import("../src/agents/presets");
+  const { lstatSync, readlinkSync } = require("node:fs") as typeof import("node:fs");
+
+  test("every preset's skills dir is linked to .claude/skills and resolves to the real skills", () => {
+    const target = scratchTarget();
+    const names = Object.keys(PRESETS);
+    const { code, stderr } = run([target, "--agents", names.join(",")]);
+    expect(code, stderr).toBe(0);
+    for (const p of Object.values(PRESETS)) {
+      if (p.skillsDir === ".claude/skills") continue;
+      expect(lstatSync(join(target, p.skillsDir)).isSymbolicLink(), p.skillsDir).toBe(true);
+      expect(existsSync(join(target, p.skillsDir, "factory-plan", "SKILL.md")), `${p.skillsDir} does not resolve (${readlinkSync(join(target, p.skillsDir))})`).toBe(true);
+    }
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("writes a context pointer per agent only when absent: GEMINI.md for gemini, AGENTS.md otherwise", () => {
+    const target = scratchTarget();
+    writeFileSync(join(target, "AGENTS.md"), "mine");
+    run([target, "--agents", "gemini,pi"]);
+    expect(readFileSync(join(target, "GEMINI.md"), "utf8")).toContain(".claude/skills");
+    expect(readFileSync(join(target, "AGENTS.md"), "utf8")).toBe("mine");
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("an unknown agent fails before anything is linked; --dry-run writes no links", () => {
+    const target = scratchTarget();
+    expect(run([target, "--agents", "nope"]).code).toBe(1);
+    expect(existsSync(join(target, ".claude"))).toBe(false); // nothing written before the check
+    expect(run([target, "--agents", "--dry-run"]).code).toBe(1); // a flag is not an agent list
+    expect(run([target, "--agents"]).code).toBe(1);
+    const dry = scratchTarget();
+    run([dry, "--agents", "pi", "--dry-run"]);
+    expect(existsSync(join(dry, ".pi"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
+    rmSync(dry, { recursive: true, force: true });
+  });
+});

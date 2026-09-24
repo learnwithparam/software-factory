@@ -106,7 +106,7 @@ export class CommandExecutor implements Executor {
       stderr: "pipe",
       detached: true, // its own process group, so a kill reaches the agent's children too
       env: {
-        ...sanitizeEnv(process.env),
+        ...sanitizeEnv(process.env, agent.preset?.envKeys),
         FACTORY_ARTIFACT_DIR: artifactDir,
         FACTORY_ISSUE: String(opts.issue),
         FACTORY_STAGE: opts.stage,
@@ -149,15 +149,17 @@ export class CommandExecutor implements Executor {
       killGroup();
     }, timeoutMinutes * 60_000);
 
+    // A preset whose events span lines gets a fresh parser per stage run.
+    const parseLine = agent.preset?.newParser?.() ?? agent.preset?.parseLine;
     const handle = (line: string) => {
       this.recorder?.line(opts.stage, line);
-      if (!agent.preset) return;
+      if (!agent.preset || !parseLine) return;
       if (Buffer.byteLength(line) > MAX_EVENT_LINE_BYTES) {
         // Dropped, not parsed; if it was the terminal usage event the count is gone.
         if (agent.preset.isUsageCandidate(line.slice(0, 4096))) usageComplete = false;
         return;
       }
-      for (const e of agent.preset.parseLine(line)) {
+      for (const e of parseLine(line)) {
         recorded += Buffer.byteLength(e.text ?? "");
         if (recorded > MAX_RECORDED_OUTPUT_BYTES) {
           if (events.at(-1)?.kind !== "truncated") events.push({ kind: "truncated", text: `recording stopped after ${MAX_RECORDED_OUTPUT_BYTES} output bytes; the agent keeps running` });

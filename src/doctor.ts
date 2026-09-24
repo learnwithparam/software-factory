@@ -19,6 +19,8 @@ export interface DoctorDeps {
   readonly github: GitHub;
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
+  // `<bin> --version` output, or undefined when it cannot be read.
+  readonly versionOf?: (bin: string) => Promise<string | undefined>;
   readonly fileExists: (path: string) => Promise<boolean>;
   readonly readFile: (path: string) => Promise<string | undefined>;
   readonly isExecutable: (path: string) => Promise<boolean>;
@@ -60,6 +62,16 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: `agent "${name}" runs each stage it is assigned`,
       fixable: false,
     });
+    if (preset && deps.versionOf && binary && (await deps.which(binary))) {
+      const found = await deps.versionOf(binary);
+      checks.push({
+        name: `${binary} is version ${preset.version}`,
+        ok: found?.includes(preset.version) ?? false,
+        warn: true,
+        detail: found === undefined ? `could not read \`${binary} --version\`` : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
+        fixable: false,
+      });
+    }
     if (preset && !preset.verified) {
       checks.push({
         name: `agent "${name}" is verified`,
