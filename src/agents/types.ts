@@ -53,6 +53,8 @@ export interface AgentPreset {
   // Project directory `install --agents` links the skills into, and the context file it points at.
   readonly skillsDir: string;
   readonly contextFile: string;
+  // True when the CLI has no --version (Mastra Code treats it as a prompt); doctor skips the drift check.
+  readonly noVersionFlag?: true;
   // False when the agent cannot be pinned in the Docker image (no versioned download).
   readonly docker?: false;
   // How the CLI takes the prompt, and the research line that shows it (checked by tests/agents-registry.test.ts). Claude owns its prompt and has neither.

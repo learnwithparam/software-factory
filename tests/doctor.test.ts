@@ -117,6 +117,14 @@ describe("agents in doctor", () => {
     expect((await runDoctor(deps(), ctx)).map((c) => c.name)).not.toContain('agent "claude" reports usage');
   });
 
+  test("a CLI with no --version flag is not probed", async () => {
+    let probed = false;
+    const d = { ...deps({ which: new Set(["gh", "mastracode", "python3", "jq"]) }), versionOf: async () => ((probed = true), "x") };
+    const checks = await runDoctor(d, { ...ctx, agents: { m: { preset: "mastracode" } }, stages: { default: "m" } });
+    expect(probed).toBe(false);
+    expect(checks.find((c) => c.name === "mastracode is version 0.42.0")!.ok).toBe(true);
+  });
+
   test("a custom command with no approval-bypass flag fails, one with a flag passes", async () => {
     const which = new Set(["gh", "aider", "python3", "jq"]);
     const run = (command: string[]) => runDoctor(deps({ which }), { ...ctx, agents: { x: { command } }, stages: { default: "x" } });

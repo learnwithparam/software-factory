@@ -72,6 +72,7 @@ export const mastracodePreset: AgentPreset = {
   contextFile: "AGENTS.md",
   promptVia: "stdin",
   evidence: "docs/agent-research/mastracode/docs.md:5",
+  noVersionFlag: true,
   returnsArtifact: true,
   command: (opts, agent, prompt) => ({
     argv: [

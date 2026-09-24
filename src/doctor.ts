@@ -68,7 +68,14 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: `agent "${name}" runs each stage it is assigned`,
       fixable: false,
     });
-    if (preset && deps.versionOf && binary && (await deps.which(binary))) {
+    if (preset?.noVersionFlag && binary && (await deps.which(binary))) {
+      checks.push({
+        name: `${binary} is version ${preset.version}`,
+        ok: true,
+        detail: `${binary} has no --version flag, so the pin (${preset.version}) is not checked here; the Dockerfile and CI install it`,
+        fixable: false,
+      });
+    } else if (preset && deps.versionOf && binary && (await deps.which(binary))) {
       const found = await deps.versionOf(binary);
       checks.push({
         name: `${binary} is version ${preset.version}`,
