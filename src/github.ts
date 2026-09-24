@@ -7,13 +7,14 @@ export interface CommandResult {
 }
 
 export interface CommandRunner {
-  run(args: string[], opts?: { cwd?: string }): Promise<CommandResult>;
+  run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult>;
 }
 
 export class GhCommandRunner implements CommandRunner {
-  async run(args: string[], opts?: { cwd?: string }): Promise<CommandResult> {
+  async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     const proc = Bun.spawn(["gh", ...args], {
       cwd: opts?.cwd,
+      env: opts?.env ? { ...process.env, ...opts.env } : undefined,
       stdout: "pipe",
       stderr: "pipe",
     });

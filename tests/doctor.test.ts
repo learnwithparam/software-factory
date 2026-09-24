@@ -117,3 +117,24 @@ describe("agents in doctor", () => {
     expect((await runDoctor(deps(), ctx)).map((c) => c.name)).not.toContain('agent "claude" reports usage');
   });
 });
+
+describe("installed skills drift", () => {
+  const shipped = { ".claude/skills/factory-build/SKILL.md": "new text" };
+  const drift = async (installed: string | undefined) => {
+    const d = { ...deps(), readFile: async (p: string) => (p.endsWith("factory-build/SKILL.md") ? installed : "{}") };
+    return (await runDoctor(d, { ...ctx, templateSkills: shipped })).find((c) => c.name === "installed skills match this runner")!;
+  };
+
+  test("warns with the fix when an installed skill differs or is missing", async () => {
+    for (const installed of ["old text", undefined]) {
+      const check = await drift(installed);
+      expect(check.ok).toBe(false);
+      expect(check.warn).toBe(true);
+      expect(check.detail).toContain("factory install --update");
+    }
+  });
+
+  test("passes when the installed skills equal the template", async () => {
+    expect((await drift("new text")).ok).toBe(true);
+  });
+});

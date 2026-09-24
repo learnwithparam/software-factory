@@ -71,8 +71,6 @@ Write `.factory/runs/issue-<N>/status-comment.md` using the
 look; put the reason in `summary`), or `failed`. No other fields are allowed.
 
 `status` is one of `green`, `red` (gate never went green after reasonable
-effort), or `needs-info` (see step 4). `rounds` is this issue's build
-attempt count so far, including any verify-reject that sent you back here
-— read the previous `build.json` if present and increment it yourself; the
-runner does not track this for you. Leave the worktree exactly as you want
+effort), or `needs-info` (see step 4). Write `"rounds": 1`: the runner counts
+build attempts itself and replaces the value. Leave the worktree exactly as you want
 it committed — the runner commits and pushes it verbatim.

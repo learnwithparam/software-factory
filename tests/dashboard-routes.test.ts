@@ -97,6 +97,11 @@ describe("route walk", () => {
     const setCookie = login.headers.get("set-cookie")!;
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain("Secure");
+    const secureLogin = (url: string, headers: Record<string, string> = {}) =>
+      dashboard.handle(new Request(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ token: TOKEN }) }), "203.0.113.7");
+    expect((await secureLogin("https://dash.example/api/session")).headers.get("set-cookie")).toContain("; Secure");
+    expect((await secureLogin("http://localhost:4100/api/session", { "x-forwarded-proto": "https" })).headers.get("set-cookie")).toContain("; Secure");
     expect((await at("/api/runs", { cookie: setCookie.split(";")[0]! })).status).toBe(200);
   });
 

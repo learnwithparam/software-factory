@@ -3,8 +3,8 @@
 // Thin dispatcher; all logic lives in src/ so it stays testable without a
 // child process.
 
-import { accessSync, constants } from "node:fs";
-import { resolve } from "node:path";
+import { accessSync, constants, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { GitHub } from "../src/github";
 import { GitCommandRunner, Git } from "../src/git";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
@@ -236,6 +236,21 @@ async function cmdRebaseline(): Promise<void> {
   for (const c of moved) console.log(`  ${c}`);
 }
 
+// The skills this runner ships, keyed by their path in a target repo.
+function templateSkills(): Record<string, string> {
+  const root = resolve(import.meta.dir, "..", "template");
+  const out: Record<string, string> = {};
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else out[relative(root, full)] = readFileSync(full, "utf8");
+    }
+  };
+  walk(join(root, ".claude", "skills"));
+  return out;
+}
+
 async function cmdDoctor(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   let config;
@@ -263,11 +278,11 @@ async function cmdDoctor(): Promise<void> {
         }
       },
     },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages },
+    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages, templateSkills: templateSkills() },
   );
-  const allOk = checks.every((c) => c.ok);
+  const allOk = checks.every((c) => c.ok || c.warn);
   if (has("json")) console.log(successJson({ checks }, allOk));
-  else for (const c of checks) console.log(`  [${c.ok ? "ok" : "FAIL"}] ${c.name} — ${c.detail}`);
+  else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
   if (!allOk && has("fix")) {
     console.error("factory doctor --fix: creating missing labels");
     await fixDoctor(github, config.repo);

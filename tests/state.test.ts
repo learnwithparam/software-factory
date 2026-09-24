@@ -78,3 +78,17 @@ test("two processes opening a fresh database at once both get the full schema", 
   }
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("a run's event budget is released when the run stops running, and a resume keeps its bound", () => {
+  const state = new FactoryState(":memory:");
+  state.eventByteLimit = 2 << 10;
+  const run = state.upsertRun({ issue: 1, repo: "a/b", title: "t", stage: "build", status: "running" });
+  for (let i = 0; i < 500; i++) state.appendEvent(run.id, "build", "text", "x");
+  expect(state.openBudgets).toBe(1);
+  state.updateRun("a/b", 1, { status: "failed" });
+  expect(state.openBudgets).toBe(0);
+  for (let i = 0; i < 500; i++) state.appendEvent(run.id, "build", "text", "x");
+  const stored = state.listEvents(run.id, { limit: 5000 }).reduce((n, e) => n + e.text.length + e.kind.length, 0);
+  expect(stored).toBeLessThanOrEqual(2 << 10);
+  state.close();
+});

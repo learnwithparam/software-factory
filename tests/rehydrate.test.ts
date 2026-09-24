@@ -82,6 +82,21 @@ describe("rehydrate", () => {
     rmSync(worktree, { recursive: true, force: true });
   });
 
+  test("a graded build comment ({ build, gate }) rehydrates to the build object alone", async () => {
+    const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
+    const build = { status: "green", gate_line: "x", rounds: 1 };
+    const issue: GhIssue = {
+      number: 5,
+      title: "t",
+      body: "b",
+      labels: [{ name: "factory:verifying" }],
+      comments: [comment(`<!-- factory:status v1 -->\nbuilt\n\n${dataMarker("build", { build, gate: { status: "GREEN" } })}`, 1)],
+    };
+    await rehydrate(worktree, issue);
+    expect(await Bun.file(`${worktree}/${runDir(5)}/build.json`).json()).toEqual(build);
+    rmSync(worktree, { recursive: true, force: true });
+  });
+
   test("a stage with no marker yet writes nothing for it, without throwing", async () => {
     const worktree = mkdtempSync(join(tmpdir(), "factory-rehydrate-"));
     const issue: GhIssue = { number: 4, title: "t", body: "b", labels: [{ name: "factory:triaging" }], comments: [] };

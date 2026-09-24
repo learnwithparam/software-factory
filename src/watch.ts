@@ -353,7 +353,10 @@ async function runFromStage(
     if (stage === "build") {
       const result = await runStage(deps, config, issue, "build", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "build");
-      const { json, problem } = stageJson<BuildArtifact>("build", art.json);
+      const built = stageJson<BuildArtifact>("build", art.json);
+      const problem = built.problem;
+      // The runner owns the attempt count: the agent's copy of the file is cleared every round.
+      const json = built.json && { ...built.json, rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length };
       const buildStop = stepStop(json);
       if (buildStop) return stopStep(deps, config, issueNumber, LABEL.building, buildStop);
 
@@ -422,11 +425,23 @@ async function runFromStage(
         const fresh = await runGates(deps.gateRunner, worktree);
         deps.state.updateRun(config.repo, issueNumber, { gate_line: fresh.raw });
         await writeGateEvidence(worktree, issueNumber, { line: fresh.raw, status: fresh.status, tree });
+        // Red evidence is a build problem, not something for the verifier to judge.
+        if (fresh.status !== "GREEN") {
+          ctx.rejectRound += 1;
+          const capped = ctx.rejectRound > MAX_VERIFY_REJECTS;
+          await moveLabel(deps, config, issueNumber, LABEL.verifying, capped ? LABEL.failed : LABEL.building);
+          if (capped) {
+            finish(deps, config, issueNumber, "failed", `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`);
+            return "failed";
+          }
+          stage = "build";
+          continue;
+        }
       }
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
       const checked = art.json === undefined ? undefined : validateVerdict(art.json);
-      const json = checked?.ok ? checked.verdict : undefined;
+      const json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
       if (checked && !checked.ok) {
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", checked.reason);

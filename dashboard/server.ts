@@ -209,7 +209,10 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         for (const [k, expires] of sessions) if (expires <= now) sessions.delete(k);
         if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
         sessions.set(id, now + SESSION_TTL_MS);
-        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` } });
+        // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
+        const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+        const secure = https ? "; Secure" : "";
+        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}` } });
       },
     },
     { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }) },

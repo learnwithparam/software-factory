@@ -1,7 +1,7 @@
 // The schemas and the validators must agree: same fields, and the fixture
 // artifacts the validators accept satisfy the schema's required list.
 
-import { expect, test } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { STEP_KEYS, validateStepJson, validateVerdict, type ArtifactStage } from "../src/artifacts";
 import { replySchema, stageSchema } from "../src/schemas";
 
@@ -35,4 +35,18 @@ test("a good artifact for each stage satisfies the schema's required list and th
 test("the reply schema wraps the stage schema", () => {
   const r = replySchema("plan") as { properties: { artifact: unknown } };
   expect(r.properties.artifact).toEqual(stageSchema("plan"));
+});
+
+describe("validators enforce the schema, not just the key list", () => {
+  test("a missing required field or a bad enum fails; a blocked step owes only its outcome", () => {
+    expect(validateStepJson("plan", { risk: "low" })).toEqual({ ok: false, reason: 'plan.json: "revision" is required' });
+    expect(validateStepJson("build", { status: "purple", gate_line: "x", rounds: 1 }).ok).toBe(false);
+    expect(validateStepJson("triage", { outcome: "blocked", summary: "no sandbox key" })).toEqual({ ok: true });
+  });
+
+  test("a blocked verify with no verdict is accepted so the runner can route it", () => {
+    const r = validateVerdict({ outcome: "blocked", summary: "cannot run the tests" });
+    expect(r.ok).toBe(true);
+    expect(validateVerdict({ outcome: "complete" }).ok).toBe(false);
+  });
 });
