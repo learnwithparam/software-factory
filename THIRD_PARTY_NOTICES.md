@@ -35,6 +35,12 @@ Source: https://github.com/owainlewis/assembler (MIT, Copyright (c) 2026 Owain L
 - `src/agents/reply.ts` from `src/index.ts` [tested by `tests/ported/assembler/outputs.test.ts`]
 - `src/recheck.ts` from `examples/review-pr.ts` [no upstream test]
 
+## owainlewis/skills@e8cadb3
+
+Source: https://github.com/owainlewis/skills (MIT, Copyright (c) 2026 Owain Lewis)
+
+- `src/agent-dirs.ts` from `internal/agents/agents.go` [tested by `tests/ported/skills/agents.test.ts`]
+
 ## License text (both projects)
 
 MIT License

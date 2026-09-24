@@ -41,6 +41,16 @@ function has(name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+async function versionOf(bin: string): Promise<string | undefined> {
+  try {
+    const proc = Bun.spawn([bin, "--version"], { stdout: "pipe", stderr: "ignore" });
+    const out = await new Response(proc.stdout).text();
+    return (await proc.exited) === 0 ? out.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function which(bin: string): Promise<boolean> {
   const proc = Bun.spawn(["which", bin], { stdout: "pipe", stderr: "pipe" });
   return (await proc.exited) === 0;
@@ -277,6 +287,7 @@ async function cmdDoctor(): Promise<void> {
       github,
       git: new GitCommandRunner(),
       which,
+      versionOf,
       fileExists,
       readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
       isExecutable: async (path) => {
@@ -373,11 +384,12 @@ async function cmdVerifyAgent(): Promise<void> {
 
 async function cmdInstall(): Promise<void> {
   const target = args[1];
-  if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci]");
+  if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]");
   const passthrough = [
     ...(has("dry-run") ? ["--dry-run"] : []),
     ...(has("update") ? ["--update"] : []),
     ...(has("ci") ? ["--ci"] : []),
+    ...(flag("agents") ? ["--agents", flag("agents")!] : []),
   ];
   const script = resolve(import.meta.dir, "..", "install.sh");
   const proc = Bun.spawn(["bash", script, target, ...passthrough], { stdout: "inherit", stderr: "inherit" });

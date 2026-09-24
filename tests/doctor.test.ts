@@ -138,3 +138,35 @@ describe("installed skills drift", () => {
     expect((await drift("new text")).ok).toBe(true);
   });
 });
+
+describe("runDoctor agent versions", () => {
+  const agents = { gemini: { preset: "gemini" } };
+  const stages = { default: "gemini" } as const;
+  const withVersion = (found: string | undefined) => ({ ...deps({ which: new Set(["gh", "gemini", "python3", "jq"]) }), versionOf: async () => found });
+
+  test("warns, never fails, when the installed version is not the pin", async () => {
+    const checks = await runDoctor(withVersion("0.25.2"), { ...ctx, agents, stages });
+    const v = checks.find((c) => c.name === "gemini is version 0.61.0")!;
+    expect([v.ok, v.warn]).toEqual([false, true]);
+    expect(v.detail).toContain("0.25.2");
+  });
+
+  test("passes on the pin, and says when --version cannot be read", async () => {
+    const ok = await runDoctor(withVersion("0.61.0"), { ...ctx, agents, stages });
+    expect(ok.find((c) => c.name === "gemini is version 0.61.0")!.ok).toBe(true);
+    const unreadable = await runDoctor(withVersion(undefined), { ...ctx, agents, stages });
+    expect(unreadable.find((c) => c.name === "gemini is version 0.61.0")!.detail).toContain("could not read");
+  });
+
+  test("every preset that is not verified live warns with the participant path", async () => {
+    const { PRESETS } = await import("../src/agents/presets");
+    for (const preset of Object.values(PRESETS)) {
+      const d = { ...deps({ which: new Set(["gh", preset.binary, "python3", "jq"]) }), versionOf: async () => preset.version };
+      const checks = await runDoctor(d, { ...ctx, agents: { a: { preset: preset.name } }, stages: { default: "a" } });
+      const v = checks.find((c) => c.name === `agent "a" is verified`);
+      expect(v === undefined, preset.name).toBe(preset.verified);
+      expect(checks.filter((c) => !c.ok && !c.warn), preset.name).toEqual([]);
+    }
+  });
+});
+
