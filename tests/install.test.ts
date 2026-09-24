@@ -150,6 +150,9 @@ describe("install.sh --agents", () => {
   test("an unknown agent fails before anything is linked; --dry-run writes no links", () => {
     const target = scratchTarget();
     expect(run([target, "--agents", "nope"]).code).toBe(1);
+    expect(existsSync(join(target, ".claude"))).toBe(false); // nothing written before the check
+    expect(run([target, "--agents", "--dry-run"]).code).toBe(1); // a flag is not an agent list
+    expect(run([target, "--agents"]).code).toBe(1);
     const dry = scratchTarget();
     run([dry, "--agents", "pi", "--dry-run"]);
     expect(existsSync(join(dry, ".pi"))).toBe(false);

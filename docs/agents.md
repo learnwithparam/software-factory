@@ -41,7 +41,7 @@ Skills stay in `.claude/skills`; the other directories are symlinks to it. A con
 | Read-only stages cannot edit files | allow-list | the flag in the table above; the runner writes the artifact | no: stage prompt and gate only |
 | Path guard hook | yes | no | no |
 | Tool-call cap and timeout | yes | yes | yes |
-| Only its own API key in the env | yes | yes | yes (all multi-provider keys) |
+| Only its own provider API keys in the env (GH_TOKEN and dashboard tokens are always stripped) | yes | yes | yes (all multi-provider keys) |
 
 Everything else the runner does (the gate, plan approval, the verdict) is agent-independent.
 

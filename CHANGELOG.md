@@ -13,6 +13,8 @@ from each CLI's docs.
 - Gemini and Mastra Code parse through a per-run parser (`newParser`), because their events arrive as deltas.
 - `factory install --agents a,b,c` links `.claude/skills` into each agent's skills dir and writes an
   `AGENTS.md` (or `GEMINI.md`) pointer only when absent. Ported from skills `internal/agents/agents.go`.
+- The install always links `.agents/skills` too (the shared dir), and the Dockerfile now installs four CLIs by
+  default (`claude codex gemini opencode`); pass `--build-arg AGENTS=claude` for the old image.
 - `factory doctor` warns when an agent binary's version differs from its pin.
 - The Dockerfile takes `--build-arg AGENTS="gemini pi"` and pins every agent's version; a build with two
   agents was run. Cursor is host-only (`docker: false`): it has no pinnable download.

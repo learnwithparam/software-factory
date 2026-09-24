@@ -18,6 +18,21 @@ usage() {
   echo "  --agents links the skills into each agent's own dir: claude,codex,gemini,opencode,cursor,pi,mastracode" >&2
 }
 
+# Skills stay in .claude/skills; each agent gets a symlink from its own dir. The map is
+# pinned to the PRESETS registry by tests/install.test.ts.
+agent_dirs() {
+  case "$1" in
+    claude) echo ".claude/skills CLAUDE.md" ;;
+    codex) echo ".codex/skills AGENTS.md" ;;
+    gemini) echo ".gemini/skills GEMINI.md" ;;
+    opencode) echo ".opencode/skills AGENTS.md" ;;
+    cursor) echo ".cursor/skills AGENTS.md" ;;
+    pi) echo ".pi/agent/skills AGENTS.md" ;;
+    mastracode) echo ".mastracode/skills AGENTS.md" ;;
+    *) return 1 ;;
+  esac
+}
+
 TARGET=""
 DRY_RUN=0
 UPDATE=0
@@ -25,7 +40,10 @@ CI=0
 AGENTS=""
 NEXT_IS_AGENTS=0
 for arg in "$@"; do
-  if [[ "$NEXT_IS_AGENTS" -eq 1 ]]; then AGENTS="$arg"; NEXT_IS_AGENTS=0; continue; fi
+  if [[ "$NEXT_IS_AGENTS" -eq 1 ]]; then
+    if [[ -z "$arg" || "$arg" == -* ]]; then echo "install.sh: --agents needs a list like claude,codex" >&2; exit 1; fi
+    AGENTS="$arg"; NEXT_IS_AGENTS=0; continue
+  fi
   case "$arg" in
     --agents) NEXT_IS_AGENTS=1 ;;
     --dry-run) DRY_RUN=1 ;;
@@ -35,6 +53,15 @@ for arg in "$@"; do
     *) TARGET="$arg" ;;
   esac
 done
+
+if [[ "$NEXT_IS_AGENTS" -eq 1 ]]; then echo "install.sh: --agents needs a list like claude,codex" >&2; exit 1; fi
+# Validate before anything is written, so a typo never leaves a partial install.
+if [[ -n "$AGENTS" ]]; then
+  IFS=',' read -r -a CHECK_LIST <<< "$AGENTS"
+  for agent in "${CHECK_LIST[@]}"; do
+    agent_dirs "$agent" >/dev/null || { echo "install.sh: unknown agent \"$agent\" (see --help)" >&2; exit 1; }
+  done
+fi
 
 if [[ -z "$TARGET" ]]; then
   usage
@@ -132,21 +159,6 @@ else
   echo "symlinked: $LINK_REL -> ../.claude/skills"
   wrote=$((wrote + 1))
 fi
-
-# Skills stay in .claude/skills; each agent gets a symlink from its own dir. The map is
-# pinned to the PRESETS registry by tests/install.test.ts.
-agent_dirs() {
-  case "$1" in
-    claude) echo ".claude/skills CLAUDE.md" ;;
-    codex) echo ".codex/skills AGENTS.md" ;;
-    gemini) echo ".gemini/skills GEMINI.md" ;;
-    opencode) echo ".opencode/skills AGENTS.md" ;;
-    cursor) echo ".cursor/skills AGENTS.md" ;;
-    pi) echo ".pi/agent/skills AGENTS.md" ;;
-    mastracode) echo ".mastracode/skills AGENTS.md" ;;
-    *) return 1 ;;
-  esac
-}
 
 if [[ -n "$AGENTS" ]]; then
   IFS=',' read -r -a AGENT_LIST <<< "$AGENTS"
