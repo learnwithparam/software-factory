@@ -17,6 +17,8 @@ import { buildBoard } from "./board";
 import { LABEL } from "../src/labels";
 import { InboxError, act, buildInbox, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
+import { agentCatalog } from "../src/agents/docs";
+import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
 import { workspacesDir } from "../src/paths";
 import { runDir } from "../src/artifacts";
 import { analytics } from "./analytics";
@@ -76,7 +78,7 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
 
-export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir()) {
+export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();
@@ -296,6 +298,12 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       pattern: /^\/api\/analytics$/,
       label: "GET /api/analytics",
       handler: () => json(analytics(state.listRuns(repo || undefined), repo ? allStageRuns() : [])),
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/agents$/,
+      label: "GET /api/agents",
+      handler: () => json({ agents: agentCatalog(fleet.agents, fleet.stages).map((a) => ({ ...a, name: plain(a.name), binary: plain(a.binary) })) }),
     },
     {
       method: "GET",

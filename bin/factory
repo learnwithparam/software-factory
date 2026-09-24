@@ -318,10 +318,10 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false): number {
+function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
-  const dashboard = createDashboard(state, github, repo, autoApproveDefault);
+  const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet);
   const server = Bun.serve({
     port,
     hostname,
@@ -334,10 +334,11 @@ function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoA
 async function cmdDashboard(): Promise<void> {
   const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
   const repoDir = flag("repo-dir");
-  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : "");
+  const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo ?? "";
   const state = new FactoryState(dbPath);
   const github = new GitHub();
-  serveDashboard(state, github, repo);
+  serveDashboard(state, github, repo, false, config);
   await new Promise(() => {}); // keep the process alive
 }
 
@@ -356,7 +357,7 @@ async function cmdUp(): Promise<void> {
     if (r.paused) console.log(`factory up: paused — ${r.reason}`);
     else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
   });
-  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk);
+  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk, config);
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
 }
