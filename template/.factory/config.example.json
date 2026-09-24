@@ -1,0 +1,19 @@
+{
+  "repo": "owner/name",
+  "base": "main",
+  "baselineTag": "baseline",
+  "gates": [
+    { "name": "test", "cmd": "TODO: the command that runs your tests, e.g. make test", "required": true },
+    { "name": "lint", "cmd": "TODO: optional, e.g. make lint", "required": false }
+  ],
+  "agentCommands": {
+    "read": [],
+    "build": ["TODO: the commands the builder may run, e.g. make *"],
+    "verify": ["TODO: the commands the verifier may run, e.g. make *"]
+  },
+  "protectedPaths": [".factory/**", ".claude/**", ".agents/**", ".github/**"],
+  "riskPolicy": { "autoApproveLowRisk": true },
+  "maxOpenFactoryPrs": 3,
+  "concurrency": 3,
+  "pollIntervalSeconds": 15
+}

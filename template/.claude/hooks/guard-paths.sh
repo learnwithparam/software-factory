@@ -25,7 +25,8 @@ project_dir = sys.argv[1]
 try:
     hook_input = json.load(sys.stdin)
 except Exception:
-    sys.exit(0)  # can't parse our own input: fail open, never fail the session
+    print("guard-paths: blocked, could not parse the hook input, so paths can't be checked (fails closed)", file=sys.stderr)
+    sys.exit(2)
 
 tool_name = hook_input.get("tool_name", "")
 tool_input = hook_input.get("tool_input", {})

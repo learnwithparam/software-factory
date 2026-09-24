@@ -152,3 +152,20 @@ describe("deriveIssueState: statusCommentId", () => {
     expect(deriveIssueState(issue).statusCommentId).toBe(2);
   });
 });
+
+describe("deriveIssueState: question stage and retry-scoped rejects", () => {
+  test("a question marker naming its stage resumes that stage", () => {
+    const issue = issueWith(
+      [LABEL.needsInfo],
+      [comment(marker("triage", {}), 1), comment(marker("question", { round: 1, stage: "plan" }), 2)],
+    );
+    expect(deriveIssueState(issue).resumeStage).toBe("plan");
+  });
+
+  test("verify rejects before a trusted /factory retry are not counted", () => {
+    const reject = marker("verify", { result: "reject" });
+    const retry: GhComment = { ...comment("/factory retry", 3), author: "param", authorAssociation: "OWNER" };
+    const issue = issueWith([LABEL.building], [comment(reject, 1), comment(reject, 2), retry, comment(reject, 4)]);
+    expect(deriveIssueState(issue).rejectRounds).toBe(1);
+  });
+});

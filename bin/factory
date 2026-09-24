@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
-// The `factory` CLI: watch, dashboard, scan, reset, doctor, install.
+// The `factory` CLI. Commands are listed in src/help.ts (a test keeps the two in sync).
 // Thin dispatcher; all logic lives in src/ so it stays testable without a
 // child process.
 
+import { accessSync, constants } from "node:fs";
 import { resolve } from "node:path";
 import { GitHub } from "../src/github";
 import { GitCommandRunner, Git } from "../src/git";
@@ -12,12 +13,13 @@ import { loadConfig } from "../src/config";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
-import { reset } from "../src/reset";
+import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
 import { workspacesDir as defaultWorkspacesDir } from "../src/paths";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
+import { helpText } from "../src/help";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -152,7 +154,7 @@ async function cmdPark(): Promise<void> {
 async function cmdScan(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  // scan shells out to `bun audit`/`bun outdated`, not `git`.
+  // scan shells out to `bun audit`/`bun outdated`, not `git`: Bun projects only.
   const bunRunner = {
     run: async (a: string[], opts?: { cwd?: string }) => {
       const proc = Bun.spawn(["bun", ...a], { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
@@ -177,6 +179,7 @@ async function cmdReset(): Promise<void> {
     repo: config.repo,
     cloneDir,
     baselineTag: config.baselineTag,
+    base: config.base,
     issuesDir: `${cloneDir}/.factory/issues`,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
     statePath: flag("db") ?? DEFAULT_DB_PATH,
@@ -187,13 +190,51 @@ async function cmdReset(): Promise<void> {
   for (const a of summary.actions) console.log(`  ${dryRun ? "would " : ""}${a.kind}: ${a.detail}`);
 }
 
-async function cmdDoctor(): Promise<void> {
+async function cmdRebaseline(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
+  const dryRun = has("dry-run");
+  const ctx = {
+    repo: config.repo,
+    cloneDir,
+    baselineTag: config.baselineTag,
+    base: config.base,
+    issuesDir: "",
+    workspacesDir: "",
+    statePath: "",
+  };
+  const moved = await rebaseline({ github: new GitHub(), git: new GitCommandRunner() }, ctx, dryRun);
+  console.log(`factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`);
+  for (const c of moved) console.log(`  ${c}`);
+}
+
+async function cmdDoctor(): Promise<void> {
+  const cloneDir = await resolveCloneDir();
+  let config;
+  try {
+    config = await loadConfig(cloneDir);
+  } catch (err) {
+    console.log(`  [FAIL] .factory/config.json is usable — ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
   const github = new GitHub();
   const checks = await runDoctor(
-    { github, git: new GitCommandRunner(), which, fileExists },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag },
+    {
+      github,
+      git: new GitCommandRunner(),
+      which,
+      fileExists,
+      readFile: async (path) => ((await fileExists(path)) ? await Bun.file(path).text() : undefined),
+      isExecutable: async (path) => {
+        try {
+          accessSync(path, constants.X_OK);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    },
+    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE },
   );
   let allOk = true;
   for (const c of checks) {
@@ -214,10 +255,10 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: GitHub, repo: string): number {
+function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
-  const dashboard = createDashboard(state, github, repo);
+  const dashboard = createDashboard(state, github, repo, autoApproveDefault);
   const server = Bun.serve({
     port,
     hostname,
@@ -251,7 +292,7 @@ async function cmdUp(): Promise<void> {
     if (r.paused) console.log(`factory up: paused — ${r.reason}`);
     else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
   });
-  serveDashboard(deps.state, deps.github, config.repo);
+  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk);
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
 }
@@ -291,29 +332,21 @@ async function main(): Promise<void> {
       return cmdScan();
     case "reset":
       return cmdReset();
+    case "rebaseline":
+      return cmdRebaseline();
     case "doctor":
       return cmdDoctor();
     case "install":
       return cmdInstall();
     default:
-      console.log(
-        [
-          "factory <command>",
-          "",
-          "  up [--repo-dir <path> | --repo <owner/name>]   watch + dashboard in one process (Docker/VM mode)",
-          "  watch [--repo-dir <path> | --repo <owner/name>] [--once]   poll and drive the loop (local mode)",
-          "  run [--repo-dir <path> | --repo <owner/name>] --issue <N>   advance one issue once, then exit (CI mode)",
-          "  tick [--repo-dir <path> | --repo <owner/name>]   one poll pass across every open issue, then exit (cron)",
-          "  park --repo-dir <path> --issue <N> --reason <text>   park an issue as needs-human from outside the loop",
-          "  dashboard                                 serve the board on :4100",
-          "  scan --repo-dir <path>                     file issues from bun audit/outdated",
-          "  reset --repo-dir <path> [--dry-run]        put the target back to baseline",
-          "  doctor --repo-dir <path> [--fix]           check the loop can run",
-          "  install <target-dir> [--dry-run] [--update] [--ci]   install or update the template",
-        ].join("\n"),
-      );
-      if (command && command !== "help" && command !== "--help") process.exit(1);
+      console.log(helpText());
+      if (command && !["help", "--help", "-h"].includes(command)) process.exit(1);
   }
 }
 
-await main();
+try {
+  await main();
+} catch (err) {
+  console.error(`factory: ${err instanceof Error ? err.message : err}`);
+  process.exit(1);
+}

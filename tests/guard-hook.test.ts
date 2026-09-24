@@ -109,6 +109,13 @@ describe("guard-paths.sh", () => {
     expect(code).toBe(0);
   });
 
+  test("fails CLOSED (blocks) when its input is not valid JSON", async () => {
+    const proc = Bun.spawn([HOOK], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir } });
+    proc.stdin.write("not json");
+    await proc.stdin.end();
+    expect(await proc.exited).toBe(2);
+  });
+
   test("fails open when .factory/config.json is missing", async () => {
     rmSync(join(projectDir, ".factory", "config.json"));
     const { code } = await runHook({

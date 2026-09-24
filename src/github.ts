@@ -132,7 +132,8 @@ export class GitHub {
   }
 
   async editComment(repo: string, commentId: number, body: string): Promise<void> {
-    await this.exec(["issue", "comment", "--repo", repo, "--edit", String(commentId), "--body", body]);
+    // `gh issue comment` can only edit the caller's last comment; a specific one needs the API.
+    await this.exec(["api", "-X", "PATCH", `repos/${repo}/issues/comments/${commentId}`, "-f", `body=${body}`]);
   }
 
   async addLabels(repo: string, number: number, labels: string[]): Promise<void> {
@@ -204,6 +205,41 @@ export class GitHub {
     return JSON.parse(result.stdout || "[]");
   }
 
+  async findPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
+    const prs = await this.listPrs(repo, { state: "open" });
+    return prs.find((p) => p.headRefName === head);
+  }
+
+  // Comments and review bodies on the PR, shaped like issue comments so the
+  // same trust and command parsing applies. Empty when no PR exists yet.
+  async prFeedback(repo: string, head: string): Promise<GhComment[]> {
+    const result = await this.runner.run([
+      "pr", "view", head, "--repo", repo, "--json", "comments,reviews",
+    ]);
+    if (result.code !== 0) return [];
+    const data = JSON.parse(result.stdout || "{}") as {
+      comments?: { author?: { login?: string }; authorAssociation: string; body: string; createdAt: string }[];
+      reviews?: { author?: { login?: string }; authorAssociation: string; body: string; submittedAt: string }[];
+    };
+    const toComment = (c: { author?: { login?: string }; authorAssociation: string; body: string }, createdAt: string): GhComment => ({
+      id: 0,
+      author: c.author?.login ?? "",
+      authorAssociation: c.authorAssociation,
+      body: c.body,
+      createdAt,
+    });
+    return [
+      ...(data.comments ?? []).map((c) => toComment(c, c.createdAt)),
+      ...(data.reviews ?? []).filter((r) => r.body).map((r) => toComment(r, r.submittedAt)),
+    ];
+  }
+
+  // `ref` is a PR number or its head branch. Draft = the factory is working,
+  // ready = a human's turn.
+  async markReady(repo: string, ref: string | number, ready: boolean): Promise<void> {
+    await this.exec(["pr", "ready", String(ref), "--repo", repo, ...(ready ? [] : ["--undo"])]);
+  }
+
   async closePr(repo: string, number: number): Promise<void> {
     await this.exec(["pr", "close", String(number), "--repo", repo]);
   }
@@ -239,7 +275,7 @@ export class GitHub {
 
   // Unlike the methods above, a failed `gh auth status` is an expected,
   // reportable outcome (doctor finding #13 wants a real check here), not an
-  // exceptional one — so this calls the runner directly instead of `exec`,
+  // exceptional one: so this calls the runner directly instead of `exec`,
   // which would throw.
   async authStatus(): Promise<{ ok: boolean; detail: string }> {
     const result = await this.runner.run(["auth", "status"]);

@@ -62,7 +62,7 @@ Use the `factory-comment` skill's `triage.md` template to write
   "risk": "low",
   "done_when": "one sentence, checkable by a command or test",
   "files_expected": ["src/…"],
-  "gate_level": "make check",
+  "gate_level": "full",
   "confidence": 0.8
 }
 ```

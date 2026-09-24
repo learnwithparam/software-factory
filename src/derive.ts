@@ -9,6 +9,7 @@
 // parseDataMarkers recovers those; deriveIssueState turns them, plus the
 // issue's current labels, into "where is this issue and what happened".
 
+import { isHumanComment, parseChatOps } from "./chatops";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL } from "./labels";
 import type { Stage } from "./state";
@@ -73,6 +74,18 @@ function findMarkerComment(comments: readonly GhComment[], needle: string): GhCo
   return undefined;
 }
 
+// A `/factory retry` from a trusted human gives the loop a fresh set of
+// verify rejects, so only rejects posted after the latest one count.
+function countRejectsSinceRetry(comments: readonly GhComment[]): number {
+  let lastRetry = -1;
+  comments.forEach((c, i) => {
+    if (isHumanComment(c) && parseChatOps(c.body).type === "retry") lastRetry = i;
+  });
+  return parseDataMarkers(comments.slice(lastRetry + 1)).filter(
+    (m) => m.stage === "verify" && (m.json as { result?: string } | undefined)?.result === "reject",
+  ).length;
+}
+
 const STAGE_MARKER_NAMES = new Set(["triage", "plan", "build", "verify"]);
 
 export function deriveIssueState(issue: GhIssue): DerivedIssueState {
@@ -88,14 +101,16 @@ export function deriveIssueState(issue: GhIssue): DerivedIssueState {
     // label to read the stage off, since it was already replaced by the
     // parked one. Fall back to whichever stage most recently posted a
     // data marker — that's the stage a `/factory retry` should re-enter.
-    const lastStageMarker = [...markers].reverse().find((m) => STAGE_MARKER_NAMES.has(m.stage));
-    resumeStage = (lastStageMarker?.stage as Stage | undefined) ?? "triage";
+    // A question marker names the stage that asked it, so a plan or build
+    // that stopped to ask resumes there rather than at an earlier stage.
+    const stageOf = (m: DataMarker): string | undefined =>
+      m.stage === "question" ? (m.json as { stage?: string } | undefined)?.stage : STAGE_MARKER_NAMES.has(m.stage) ? m.stage : undefined;
+    const last = [...markers].reverse().find((m) => stageOf(m));
+    resumeStage = ((last && stageOf(last)) as Stage | undefined) ?? "triage";
   }
 
   const statusComment = findMarkerComment(issue.comments, "<!-- factory:status v1");
-  const rejectRounds = markers.filter(
-    (m) => m.stage === "verify" && (m.json as { result?: string } | undefined)?.result === "reject",
-  ).length;
+  const rejectRounds = countRejectsSinceRetry(issue.comments);
 
   return {
     resumeStage,

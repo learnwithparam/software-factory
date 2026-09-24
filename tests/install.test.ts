@@ -4,7 +4,10 @@
 // real script against a scratch target dir — no fakes, this is a shell
 // script.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, setDefaultTimeout } from "bun:test";
+
+// Real git processes: a loaded machine can exceed bun's 5s default.
+setDefaultTimeout(30_000);
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -90,6 +93,30 @@ describe("install.sh --ci", () => {
     const written = join(target, ".github", "workflows", "factory.yml.example");
     expect(existsSync(written)).toBe(true);
     expect(readFileSync(written, "utf8")).toContain("FACTORY_MODE=actions");
+    rmSync(target, { recursive: true, force: true });
+  });
+});
+
+describe("install.sh scaffold", () => {
+  test("writes an executable gates.sh, a config example and a charter", () => {
+    const target = scratchTarget();
+    run([target]);
+    for (const f of ["gates.sh", "config.example.json", "charter.md"]) {
+      expect(existsSync(join(target, ".factory", f))).toBe(true);
+    }
+    expect(Bun.spawnSync(["test", "-x", join(target, ".factory", "gates.sh")]).exitCode).toBe(0);
+    expect(existsSync(join(target, ".factory", "config.json"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("--update refreshes gates.sh but never touches the repo's charter", () => {
+    const target = scratchTarget();
+    run([target]);
+    writeFileSync(join(target, ".factory", "charter.md"), "my charter");
+    writeFileSync(join(target, ".factory", "gates.sh"), "old");
+    run([target, "--update"]);
+    expect(readFileSync(join(target, ".factory", "charter.md"), "utf8")).toBe("my charter");
+    expect(readFileSync(join(target, ".factory", "gates.sh"), "utf8")).not.toBe("old");
     rmSync(target, { recursive: true, force: true });
   });
 });

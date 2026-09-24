@@ -1,21 +1,20 @@
 # CI/CD run mode (plan "Run anywhere"). Written by `factory install --ci` as
-# `factory.yml.example` — GitHub only runs a workflow whose filename ends in
+# `factory.yml.example`, GitHub only runs a workflow whose filename ends in
 # .yml/.yaml, so this stays inert on its own. To turn it on:
 #   1. rename this file to `.github/workflows/factory.yml`
 #   2. add repo secrets FACTORY_GH_TOKEN (fine-grained PAT or GitHub App
-#      install token with contents+issues+pull-requests read/write — a plain
+#      install token with contents+issues+pull-requests read/write, a plain
 #      GITHUB_TOKEN-authored PR never triggers this repo's own CI, which
 #      defeats the point) and ANTHROPIC_API_KEY
 #   3. set the repo VARIABLE FACTORY_MODE=actions (Settings > Secrets and
-#      variables > Actions > Variables) — `factory doctor` on a local machine
-#      warns if this is set while you also start a local watcher, since only
-#      one mode should drive a repo at a time.
+#      variables > Actions > Variables). Only one mode should drive a repo at
+#      a time, so do not also run a local watcher against it.
 #
 # The trust rule matches src/chatops.ts's isTrusted(): OWNER, MEMBER or
 # COLLABORATOR only. The `if:` below is a first filter to avoid spending a
 # runner-minute on an untrusted event; `factory run` re-derives the same
 # check from the issue thread before it does anything (audit finding
-# "prompt injection" lesson — a workflow-level check alone is not enough,
+# "prompt injection" lesson, a workflow-level check alone is not enough,
 # since the comment body itself is attacker-controlled).
 name: factory
 
@@ -42,7 +41,7 @@ env:
 
 # One workflow run in flight per issue at a time; a second labeled/comment
 # event on the same issue queues behind it instead of racing a second
-# Actions runner against the first (claim() is still a real CAS underneath —
+# Actions runner against the first (claim() is still a real CAS underneath,
 # this just avoids burning two runners on the same issue).
 concurrency:
   group: factory-issue-${{ github.event.issue.number || 'scheduled' }}
@@ -97,7 +96,7 @@ jobs:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
         run: |
           bun bin/factory park --repo-dir "${{ github.workspace }}" --issue ${{ github.event.issue.number }} \
-            --reason "CI run failed or timed out — see the Actions run for this workflow"
+            --reason "CI run failed or timed out, see the Actions run for this workflow"
 
   tick:
     if: vars.FACTORY_MODE == 'actions' && github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *'
@@ -149,7 +148,7 @@ jobs:
         run: bun bin/factory scan --repo-dir "${{ github.workspace }}"
 
   # `workflow_dispatch`: run one issue if `issue` was given, otherwise one
-  # tick — the manual escape hatch for "nothing fired and I don't want to
+  # tick, the manual escape hatch for "nothing fired and I don't want to
   # wait 30 minutes."
   manual:
     if: vars.FACTORY_MODE == 'actions' && github.event_name == 'workflow_dispatch'

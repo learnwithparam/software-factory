@@ -47,7 +47,7 @@ only a human can make, stop here rather than guessing:
 
 - Write `.factory/runs/issue-<N>/question-comment.md` with the
   `factory-comment` skill's `question.md` template.
-- Write `.factory/runs/issue-<N>/build.json` with `"status": "needs_info"`.
+- Write `.factory/runs/issue-<N>/build.json` with `"status": "needs-info"`.
 - Leave the worktree and any partial commits as they are — the runner
   preserves both the worktree and the current stage so build can resume
   from here once the question is answered, instead of starting over.
@@ -62,7 +62,7 @@ Write `.factory/runs/issue-<N>/status-comment.md` using the
 ```json
 {
   "status": "green",
-  "gate_line": "make check: 42 pass, 0 fail",
+  "gate_line": "FACTORY_GATES: status=GREEN passed=1 failed=0 skipped=0",
   "rounds": 1
 }
 ```

@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseIssueSeed, planReset, reset, type ResetDeps } from "../src/reset";
+import { parseIssueSeed, planReset, rebaseline, reset, type ResetDeps } from "../src/reset";
 import { GitHub, type CommandResult, type CommandRunner, type GhIssue, type GhPr } from "../src/github";
 import { LABELS } from "../src/labels";
 
@@ -56,10 +56,14 @@ class FakeGitRunner implements CommandRunner {
   calls: string[][] = [];
   lsRemoteOutput = "";
   revParseSha = "abc123";
+  logOutput = "";
+  failPush = false;
 
   async run(args: string[]): Promise<CommandResult> {
     this.calls.push(args);
     if (args[0] === "ls-remote") return { stdout: this.lsRemoteOutput, stderr: "", code: 0 };
+    if (args[0] === "log") return { stdout: this.logOutput, stderr: "", code: 0 };
+    if (args[0] === "push" && this.failPush) return { stdout: "", stderr: "protected branch", code: 1 };
     if (args[0] === "rev-parse") return { stdout: `${this.revParseSha}\n`, stderr: "", code: 0 };
     return { stdout: "", stderr: "", code: 0 };
   }
@@ -111,7 +115,7 @@ describe("factory reset --dry-run", () => {
     const ctx = {
       repo: "acme/widgets",
       cloneDir: "/tmp/does-not-matter",
-      baselineTag: "baseline",
+      baselineTag: "baseline", base: "main",
       issuesDir,
       workspacesDir: "/tmp/factory-ws-does-not-exist",
       statePath: "/tmp/factory-state-does-not-exist",
@@ -129,7 +133,7 @@ describe("factory reset --dry-run", () => {
     expect(actions.find((a) => a.kind === "delete-branch")!.detail).toBe("factory/issue-3");
 
     const forceMain = actions.find((a) => a.kind === "force-main")!;
-    expect(forceMain.detail).toBe("abc123");
+    expect(forceMain.detail).toBe("main <- abc123");
 
     expect(kinds.filter((k) => k === "close-issue")).toHaveLength(2);
     expect(kinds.filter((k) => k === "create-issue")).toHaveLength(2);
@@ -159,7 +163,7 @@ describe("factory reset --dry-run", () => {
     const ctx = {
       repo: "acme/widgets",
       cloneDir: "/tmp/x",
-      baselineTag: "baseline",
+      baselineTag: "baseline", base: "trunk",
       issuesDir,
       workspacesDir: mkdtempSync(join(tmpdir(), "factory-ws-")),
       statePath: mkdtempSync(join(tmpdir(), "factory-state-")),
@@ -173,8 +177,65 @@ describe("factory reset --dry-run", () => {
     expect(github.createdIssues).toHaveLength(1);
     expect(github.ensuredLabels).toHaveLength(LABELS.length);
     expect(git.calls.some((c) => c[0] === "push" && c.includes("--delete") && c.includes("factory/issue-7"))).toBe(true);
-    expect(git.calls.some((c) => c[0] === "push" && c.includes("--force"))).toBe(true);
+    expect(git.calls.some((c) => c[0] === "push" && c.includes("--force") && c.some((a) => a.endsWith(":refs/heads/trunk")))).toBe(true);
 
     rmSync(issuesDir, { recursive: true, force: true });
+  });
+});
+
+describe("reset keeps merged setup safe", () => {
+  const ctxFor = (issuesDir: string) => ({
+    repo: "acme/widgets",
+    cloneDir: "/tmp/x",
+    baselineTag: "baseline",
+    base: "main",
+    issuesDir,
+    workspacesDir: "/tmp/factory-ws-none",
+    statePath: "/tmp/factory-state-none",
+  });
+
+  test("plan lists the commits the force push would drop", async () => {
+    const git = new FakeGitRunner();
+    git.logOutput = "1a2b3c Declare agentCommands\n4d5e6f Add runbook\n";
+    const actions = await planReset({ github: new FakeGitHub([], []), git }, ctxFor("/tmp/none"));
+    expect(actions.filter((a) => a.kind === "drop-commit").map((a) => a.detail)).toEqual([
+      "1a2b3c Declare agentCommands",
+      "4d5e6f Add runbook",
+    ]);
+  });
+
+  test("a rejected force push fails the reset instead of reporting success", async () => {
+    const git = new FakeGitRunner();
+    git.failPush = true;
+    await expect(reset({ github: new FakeGitHub([], []), git }, ctxFor("/tmp/none"), false)).rejects.toThrow(/protected branch/);
+  });
+
+  test("a refused force push of main leaves PRs, branches and issues untouched", async () => {
+    const github = new FakeGitHub([issue(10, "Old bug")], [pr(5, "factory/issue-3")]);
+    const git = new FakeGitRunner();
+    git.failPush = true;
+    git.lsRemoteOutput = "abc\trefs/heads/factory/issue-3\n";
+    await expect(reset({ github, git }, ctxFor("/tmp/none"), false)).rejects.toThrow(/protected branch/);
+    expect(github.closedPrs).toEqual([]);
+    expect(github.closedIssues).toEqual([]);
+    expect(github.createdIssues).toEqual([]);
+    expect(git.calls.some((c) => c[0] === "push" && c.includes("--delete"))).toBe(false);
+  });
+
+  test("rebaseline moves the tag and pushes it; dry-run only lists", async () => {
+    const git = new FakeGitRunner();
+    git.logOutput = "1a2b3c Declare agentCommands\n";
+    const deps = { github: new FakeGitHub([], []), git };
+    expect(await rebaseline(deps, ctxFor("/tmp/none"), true)).toEqual(["1a2b3c Declare agentCommands"]);
+    expect(git.calls.some((c) => c[0] === "tag")).toBe(false);
+    await rebaseline(deps, ctxFor("/tmp/none"), false);
+    expect(git.calls).toContainEqual(["tag", "-f", "baseline", "origin/main"]);
+    expect(git.calls).toContainEqual(["push", "--force", "origin", "refs/tags/baseline"]);
+  });
+
+  test("rebaseline with nothing to move touches nothing", async () => {
+    const git = new FakeGitRunner();
+    await rebaseline({ github: new FakeGitHub([], []), git }, ctxFor("/tmp/none"), false);
+    expect(git.calls.some((c) => c[0] === "tag" || c[0] === "push")).toBe(false);
   });
 });

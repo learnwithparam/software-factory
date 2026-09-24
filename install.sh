@@ -5,7 +5,7 @@
 # customizing a skill keeps its own copy. `--update` is for pulling in
 # runner-side fixes (audit finding #17): every factory-owned file is
 # overwritten EXCEPT .claude/settings.json, which a repo may have hand-tuned
-# (extra allow/deny entries) — that one is diffed instead of clobbered, and
+# (extra deny entries) — that one is diffed instead of clobbered, and
 # a `.claude/settings.json.factory-new` is written next to it when it
 # differs, for the human to reconcile. `--ci` additionally writes an inert
 # `.github/workflows/factory.yml.example` placeholder (the real workflow is
@@ -72,6 +72,13 @@ while IFS= read -r -d '' file; do
     continue
   fi
 
+  # Repo-owned files: the charter and config example are the repo's to edit.
+  if [[ "$rel" == ".factory/charter.md" || "$rel" == ".factory/config.example.json" ]] && [[ -e "$dest" || -L "$dest" ]]; then
+    echo "skip (repo-owned): $rel"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
   if [[ -e "$dest" || -L "$dest" ]]; then
     if [[ "$UPDATE" -eq 0 ]]; then
       echo "skip (exists): $rel"
@@ -85,7 +92,7 @@ while IFS= read -r -d '' file; do
     fi
     cp "$file" "$dest"
     case "$rel" in
-      .claude/hooks/*) chmod +x "$dest" ;;
+      .claude/hooks/*|.factory/gates.sh) chmod +x "$dest" ;;
     esac
     echo "overwrote: $rel"
     wrote=$((wrote + 1))
@@ -100,7 +107,7 @@ while IFS= read -r -d '' file; do
   mkdir -p "$(dirname "$dest")"
   cp "$file" "$dest"
   case "$rel" in
-    .claude/hooks/*) chmod +x "$dest" ;;
+    .claude/hooks/*|.factory/gates.sh) chmod +x "$dest" ;;
   esac
   echo "wrote: $rel"
   wrote=$((wrote + 1))
@@ -144,4 +151,6 @@ action="wrote"
 [[ "$DRY_RUN" -eq 1 ]] && action="would write"
 echo ""
 echo "install.sh: $action $wrote item(s), skipped $skipped existing item(s), $unchanged unchanged in $TARGET"
-echo "install.sh: .factory/config.json is not part of this template — add it (or reconcile with your repo's own) before \`factory watch\`."
+if [[ ! -e "$TARGET/.factory/config.json" ]]; then
+  echo "install.sh: next: cp .factory/config.example.json .factory/config.json, fill in every TODO (config.json, charter.md), then \`factory doctor --repo-dir $TARGET\`."
+fi
