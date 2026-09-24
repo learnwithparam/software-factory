@@ -9,8 +9,11 @@ Corrections to v2.6.0:
 - The CI template did not install every preset or pass its keys; it does, and a test checks it.
 - The Docker note "a build with two agents was run" had no recorded evidence. This release built the default image
   and ran `--version` in it: claude 2.1.281, codex 0.156.1, gemini 0.61.0, opencode 1.18.32, all equal to the pins.
-- OpenCode and Pi were sent the prompt on stdin, but their captured help shows a positional message; both
-  now follow the captures. Pi's skills dir is `.pi/skills`. Each preset cites its evidence line in a test.
+- OpenCode and Pi were read as positional-only from their `--help`, but their docs show both take the prompt on
+  stdin, so it stays on stdin. Each preset now names the doc line that shows how it takes the prompt
+  (`promptVia`, `evidence`), and a test reads that line. Pi's skills dir is `.pi/skills`. OpenCode's read-only
+  stages run `--agent plan`; Cursor's run `--mode plan`.
+- A prompt passed as an argument (Cursor) over 120 KiB is refused with a clear error, not an E2BIG failure.
 - Mastra Code has no `--version` (it reads it as a prompt); doctor skips the drift check for it. Its argv is
   built through flags ported from mastra under Apache-2.0 (`ee/` was not read).
 - R11 was already covered: Codex gets `-s read-only` per stage, and a test pins it.
