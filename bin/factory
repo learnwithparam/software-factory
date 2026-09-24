@@ -268,7 +268,7 @@ async function cmdDoctor(): Promise<void> {
         }
       },
     },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE },
+    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages },
   );
   const allOk = checks.every((c) => c.ok);
   if (has("json")) console.log(successJson({ checks }, allOk));

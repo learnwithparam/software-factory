@@ -98,3 +98,22 @@ describe("runDoctor", () => {
     expect(local.some((c) => c.name.includes("FACTORY_MODE"))).toBe(false);
   });
 });
+
+describe("agents in doctor", () => {
+  const agents = { claude: { preset: "claude" }, codex: { preset: "codex" }, aider: { command: ["aider", "--yes"] }, unused: { preset: "codex" } };
+
+  test("checks the binary of every agent a stage uses, and only those", async () => {
+    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "python3", "jq"]) }), { ...ctx, agents, stages: { default: "claude", verify: "codex", build: "aider" } });
+    const on = (n: string) => checks.find((c) => c.name === `${n} on PATH`);
+    expect(on("claude")!.ok).toBe(true);
+    expect(on("codex")!.ok).toBe(false);
+    expect(on("aider")!.ok).toBe(false);
+    expect(checks.filter((c) => c.name.endsWith(" on PATH")).map((c) => c.name)).not.toContain("unused on PATH");
+  });
+
+  test("a preset-less agent gets a usage warning, a preset agent does not", async () => {
+    const checks = await runDoctor(deps({ which: new Set(["gh", "claude", "aider", "python3", "jq"]) }), { ...ctx, agents, stages: { default: "aider" } });
+    expect(checks.map((c) => c.name)).toContain('agent "aider" reports usage');
+    expect((await runDoctor(deps(), ctx)).map((c) => c.name)).not.toContain('agent "claude" reports usage');
+  });
+});
