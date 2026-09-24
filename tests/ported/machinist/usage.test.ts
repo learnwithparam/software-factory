@@ -1,4 +1,4 @@
-// Ported from owainlewis/machinist@3943516 internal/runner/codex_usage_test.go:17-108 and claude_usage_test.go:143-176 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the Go collector is a stream of Write calls; here each line goes through the preset parser and aggregateStageEvents, and the token total is in + out. The command-recognition and flag-injection cases are not ported: our presets build the command, so nothing is guessed from an arbitrary one.
+// Ported from owainlewis/machinist@3943516 internal/runner/codex_usage_test.go:17-108 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: claude_usage_test.go:143-176 is folded in; the Go collector is a stream of Write calls; here each line goes through the preset parser and aggregateStageEvents, and the token total is in + out. The command-recognition and flag-injection cases are not ported: our presets build the command, so nothing is guessed from an arbitrary one.
 
 import { describe, expect, test } from "bun:test";
 import { aggregateStageEvents, type StageEvent } from "../../../src/executor";

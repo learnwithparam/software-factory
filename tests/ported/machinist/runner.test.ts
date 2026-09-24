@@ -1,4 +1,4 @@
-// Ported from owainlewis/machinist@3943516 internal/runner/runner_test.go:162-260,579-610 and process_unix_test.go (MIT, Copyright (c) 2026 Owain Lewis). Deviations: cases run a shell script through CommandExecutor; the Go run-store, cancellation and darwin-EPERM cases are not ported (there is no run store, and Bun's kill of a negative pid surfaces ESRCH as an exception that the executor already swallows).
+// Ported from owainlewis/machinist@3943516 internal/runner/runner_test.go:162-260,579-610 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the process_unix_test.go group-kill cases are folded in; cases run a shell script through CommandExecutor; the Go run-store, cancellation and darwin-EPERM cases are not ported (there is no run store, and Bun's kill of a negative pid surfaces ESRCH as an exception that the executor already swallows).
 
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
