@@ -17,5 +17,8 @@ Honest foundation: what the README and labels promise now matches what the code 
   is present in that version's `--help`. A test keeps the two pins equal.
 - Docs: the `factory:failed` label text, the dashboard bind comment and the README no longer claim a
   `factory:monitor` stage (that label marks issues filed by `factory scan`).
+- Fix: `claim` and the runner's commits failed on a host with no git identity (a fresh CI runner or
+  container). The runner now supplies a fallback identity only when none is configured. `make test` runs
+  with no identity so this cannot hide on a developer machine again.
 
 Not in this release: a monitor stage (v2.8), any agent besides Claude (v2.5).

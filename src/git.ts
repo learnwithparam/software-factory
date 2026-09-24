@@ -8,15 +8,29 @@
 
 import type { CommandResult, CommandRunner } from "./github";
 
+async function spawnGit(args: string[], cwd?: string): Promise<CommandResult> {
+  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { stdout, stderr, code };
+}
+
+// A bare CI runner or container has no git identity, and `commit` and
+// `commit-tree` refuse to run without one. Supply a fallback only when none is
+// configured, so a developer's own identity is never overridden.
+export const FALLBACK_IDENTITY = ["-c", "user.name=software-factory", "-c", "user.email=factory@users.noreply.github.com"];
+
 export class GitCommandRunner implements CommandRunner {
   async run(args: string[], opts?: { cwd?: string }): Promise<CommandResult> {
-    const proc = Bun.spawn(["git", ...args], { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { stdout, stderr, code };
+    if (args[0] === "commit" || args[0] === "commit-tree") {
+      const name = await spawnGit(["config", "user.name"], opts?.cwd);
+      const email = await spawnGit(["config", "user.email"], opts?.cwd);
+      if (name.stdout.trim() === "" || email.stdout.trim() === "") return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd);
+    }
+    return spawnGit(args, opts?.cwd);
   }
 }
 

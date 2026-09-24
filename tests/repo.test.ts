@@ -96,7 +96,7 @@ describe("ensureRepoClone", () => {
     const dir = await ensureRepoClone(runner, "acme/widgets", { env, remoteUrl: bare });
     writeFileSync(join(dir, "LOCAL.md"), "should not survive\n");
     await run(["add", "-A"], dir);
-    await run(["commit", "-m", "local only"], dir);
+    await run(["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "local only"], dir);
 
     await ensureRepoClone(runner, "acme/widgets", { env, remoteUrl: bare });
     expect(await Bun.file(join(dir, "LOCAL.md")).exists()).toBe(false);

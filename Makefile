@@ -12,8 +12,10 @@ check: typecheck test skills-check
 typecheck:
 	bun x tsc --noEmit
 
+# Run with no git identity, like a fresh CI runner or container, so a code path
+# that needs the developer's own identity fails here and not only on GitHub.
 test:
-	bun test
+	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true bun test
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \
