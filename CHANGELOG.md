@@ -1,5 +1,29 @@
 # Changelog
 
+## v2.5.0
+
+Any coding agent: the factory no longer knows Claude by name. An agent is config.
+
+- `src/agents/`: one `CommandExecutor` (spawn, prompt on stdin or in the command, timeout, process-group
+  kill, stderr tail, bounded event log, tool-call cap) and presets for `claude` and `codex`. Claude's
+  command is unchanged from v2.4.0 (a test pins it), plus `--model` when `agent.model` is set.
+- `.factory/config.json` gains `agents` (a `preset`, or your own `command` with `{{prompt}}`,
+  `{{promptFile}}`, `{{model}}`) and `stages` (`default` plus per-stage overrides, so one agent can build and
+  another verify). Config is validated at boot, including an unknown preset or stage.
+- Any agent that can write files works with no adapter: it gets the stage skill plus an artifact contract, and
+  `FACTORY_ARTIFACT_DIR`, `FACTORY_ISSUE`, `FACTORY_STAGE`, `FACTORY_SCRATCH_DIR`. Runner credentials and repo
+  `GIT_*` variables are stripped from its environment. Without a preset, tokens show as not reported.
+- Token totals follow machinist: the last terminal event wins, malformed usage is "not reported", never zero.
+  `stage_runs` records which agent and model ran each stage.
+- Verify: findings are structured (`must|should|could`, confidence 0-5, what/why/where/fix) and per-criterion
+  `pass|fail|unverified`. The runner sends a self-contradicting `pass` to a human. A step result must be one
+  JSON object under 16 KiB. The runner writes `gate.json` (gate line and git tree hash) so a read-only
+  verifier trusts current evidence instead of re-running the gates.
+- `factory doctor` checks the binary of each agent a stage uses and warns about one with no preset.
+
+Not in this release: Gemini, OpenCode, Pi, omp, Mastra Code and Amp presets (v2.6.0). The Codex preset is
+covered by recorded-shape tests only; a live run is pending.
+
 ## v2.4.0
 
 The cockpit: a redesigned dashboard and one place for everything that waits on a human.

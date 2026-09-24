@@ -26,3 +26,10 @@ test("the README describes only what exists: every label is listed and no monito
   expect(readme).not.toMatch(/verify, PR, monitor/);
   expect(readme).not.toMatch(/the monitor closes/);
 });
+
+test("the README names every agent preset and the config keys that choose one", async () => {
+  const { PRESETS } = await import("../src/agents/presets");
+  const readme = read("README.md");
+  for (const name of Object.keys(PRESETS)) expect(readme).toContain(`"preset": "${name}"`);
+  for (const word of ['"agents"', '"stages"', "{{promptFile}}", "FACTORY_ARTIFACT_DIR"]) expect(readme).toContain(word);
+});

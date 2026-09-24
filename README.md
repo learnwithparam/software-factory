@@ -170,7 +170,8 @@ Checkpoint branches in the example target repo (`learnwithparam/splitbill`) use 
 
 - [Bun](https://bun.sh) ≥ 1.3
 - [`gh`](https://cli.github.com), authenticated (`gh auth status`) with write access to the target repo
-- [`claude`](https://claude.com/claude-code) on `PATH`, logged in, each stage runs as `claude -p`
+- an agent CLI on `PATH`, logged in: [`claude`](https://claude.com/claude-code) by default (each stage runs
+  as `claude -p`), or `codex`, or any CLI you configure under `agents`
 - [`uv`](https://docs.astral.sh/uv/) (for `uvx`, used to validate skills against the
   [agentskills.io](https://agentskills.io) spec)
 - [Docker](https://www.docker.com) only if you're using VM mode
@@ -231,6 +232,27 @@ build). Stages get only what the config grants, through `--settings` on `claude 
 Unknown keys and a missing `repo` are errors, other missing fields take the defaults in
 `src/config.ts`.
 
+### Choosing the agent
+
+The factory knows no agent by name. Each one is config, and `stages` says which agent runs which stage:
+
+```json
+{
+  "agents": {
+    "claude": { "preset": "claude" },
+    "codex": { "preset": "codex", "model": "gpt-5.6-terra" },
+    "aider": { "command": ["aider", "--yes-always", "--message-file", "{{promptFile}}"] }
+  },
+  "stages": { "default": "claude", "verify": "codex" }
+}
+```
+
+Presets: `claude`, `codex`. A `command` agent gets the stage skill plus an artifact contract on stdin, or
+where `{{prompt}}` / `{{promptFile}}` appears, and writes its results as files under
+`$FACTORY_ARTIFACT_DIR`. It runs with no event parser: tokens show as "not reported" and the tool-call cap
+cannot be enforced, so the timeout is the backstop and `factory doctor` says so. The guard hook and
+`--settings` rules are Claude-only. The runner's diff check, gates and commit apply to every agent.
+
 Then bring the target repo up to speed and start the loop:
 
 ```bash
@@ -256,7 +278,7 @@ dependency bump), clone it to see the loop run against something real before wir
 | Command | Does |
 |---|---|
 | `factory install <target-dir> [--dry-run] [--update] [--ci]` | install or update the template in a repo |
-| `factory doctor --repo-dir <path> [--fix]` | check `gh`/`claude`/`python3`/`jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
+| `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
 | `factory up [--repo-dir <path> \| --repo <owner/name>]` | watch + dashboard in one process, the Docker/VM entrypoint |
 | `factory watch [--repo-dir <path> \| --repo <owner/name>] [--once]` | poll and drive the loop (local mode) |
 | `factory run [--repo-dir <path> \| --repo <owner/name>] --issue <N>` | advance one issue once, then exit (CI mode) |
