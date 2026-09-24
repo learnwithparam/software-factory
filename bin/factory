@@ -25,6 +25,8 @@ import { workspacesDir as defaultWorkspacesDir } from "../src/paths";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
+import { FixtureRecorder } from "../src/agents/record";
+import { configFor, formatReport, reportFor } from "../src/verify-agent";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -68,19 +70,19 @@ async function resolveCloneDir(): Promise<string> {
 // step, cron tick) resolve the exact same paths and construct the exact same
 // gate runner — one place, not three copies to drift (audit finding #1).
 // The tool-free re-check calls `claude` directly, so it runs only when Claude does the verify stage.
-function verifierIsClaude(): boolean {
+function verifierIsClaude(config: FactoryConfig): boolean {
   const name = config.stages.verify ?? config.stages.default ?? "claude";
   return config.agents[name]?.preset === "claude";
 }
 
-function buildWatchDeps(cloneDir: string): WatchDeps {
+function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
   return {
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? DEFAULT_DB_PATH),
     executor: new CommandExecutor(config.agents, config.stages),
     gateRunner: new ShellGateRunner(),
-    rechecker: verifierIsClaude() ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
+    rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
   };
@@ -151,7 +153,7 @@ async function cmdPark(): Promise<void> {
   if (!issueNumber) throw new UsageError("park: --issue <N> is required");
   const github = new GitHub();
   const issue = await github.getIssue(config.repo, issueNumber);
-  const runningLabels = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
+  const runningLabels: string[] = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
   const current = issue.labels.map((l) => l.name).find((n) => runningLabels.includes(n));
   if (current) await github.setStateLabel(config.repo, issueNumber, [current], LABEL.needsHuman);
   await github.commentIssue(config.repo, issueNumber, `Parked by \`factory park\`: ${reason}`);
@@ -348,6 +350,24 @@ async function cmdUp(): Promise<void> {
   await new Promise(() => {}); // keep the process alive
 }
 
+// Runs the whole loop for one issue on one preset, with the raw output recorded as a fixture.
+async function cmdVerifyAgent(): Promise<void> {
+  const name = args[1];
+  if (!name || name.startsWith("--")) throw new UsageError("verify-agent: <name> is required");
+  const cloneDir = await resolveCloneDir();
+  const issueNumber = Number(flag("issue"));
+  if (!issueNumber) throw new UsageError("verify-agent: --issue <N> is required");
+  const loaded = await loadConfig(cloneDir);
+  const config: FactoryConfig = { ...loaded, ...configFor(name) };
+  const out = resolve(flag("out") ?? `tests/fixtures/agents/${name}`);
+  const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, new FixtureRecorder(out, name)) };
+  const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
+  const report = reportFor(name, deps.state.listStageRuns(config.repo, { issue: issueNumber }), outcome);
+  console.log(formatReport(report));
+  console.log(`fixture: ${out}`);
+  if (!report.pass) process.exit(EXIT.runFailed);
+}
+
 async function cmdInstall(): Promise<void> {
   const target = args[1];
   if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci]");
@@ -390,6 +410,8 @@ async function main(): Promise<void> {
       return cmdDoctor();
     case "install":
       return cmdInstall();
+    case "verify-agent":
+      return cmdVerifyAgent();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

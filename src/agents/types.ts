@@ -42,6 +42,8 @@ export interface AgentPreset {
   readonly name: string;
   // The binary `factory doctor` looks for.
   readonly binary: string;
+  // True once a recorded live run passed (a fixture in tests/fixtures/agents/<name>/). Only Claude is verified by the maintainers; the rest are verified by participants (docs/verify-an-agent.md).
+  readonly verified: boolean;
   // Builds argv and stdin. `prompt` is the rendered stage prompt.
   command(opts: StageRunOptions, agent: AgentConfig, prompt: string, ctx?: StageContext): StageInvocation;
   // True when a read-only stage cannot write its files: the agent returns them

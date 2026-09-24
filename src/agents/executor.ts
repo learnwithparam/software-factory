@@ -14,6 +14,7 @@ import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
 import { replySchema } from "../schemas";
 import { writeReply } from "./reply";
+import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
@@ -55,6 +56,7 @@ export class CommandExecutor implements Executor {
   constructor(
     private readonly agents: Record<string, AgentConfig>,
     private readonly stages: StageAgents,
+    private readonly recorder?: FixtureRecorder,
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
@@ -148,6 +150,7 @@ export class CommandExecutor implements Executor {
     }, timeoutMinutes * 60_000);
 
     const handle = (line: string) => {
+      this.recorder?.line(opts.stage, line);
       if (!agent.preset) return;
       if (Buffer.byteLength(line) > MAX_EVENT_LINE_BYTES) {
         // Dropped, not parsed; if it was the terminal usage event the count is gone.

@@ -60,6 +60,15 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: `agent "${name}" runs each stage it is assigned`,
       fixable: false,
     });
+    if (preset && !preset.verified) {
+      checks.push({
+        name: `agent "${name}" is verified`,
+        ok: false,
+        warn: true,
+        detail: `verified by participants: not yet (docs/verify-an-agent.md, \`factory verify-agent ${preset.name}\`)`,
+        fixable: false,
+      });
+    }
     if (agent && !preset) {
       checks.push({
         name: `agent "${name}" reports usage`,

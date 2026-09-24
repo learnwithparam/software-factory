@@ -1,4 +1,4 @@
-.PHONY: install check typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix install check typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -53,3 +53,7 @@ doctor:
 
 scan:
 	bun bin/factory scan --repo-dir "$${REPO_DIR:-.}"
+
+# Spends tokens, so it is not part of `make check`. See docs/verify-an-agent.md.
+agent-matrix:
+	bun scripts/agent-matrix.ts

@@ -40,6 +40,7 @@ export function parseCodexLine(line: string): StageEvent[] {
 export const codexPreset: AgentPreset = {
   name: "codex",
   binary: "codex",
+  verified: false,
   returnsArtifact: true,
   command: (opts, agent, prompt, ctx) => ({
     argv: [

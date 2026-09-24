@@ -14,6 +14,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "reset", usage: "reset --repo-dir <path> [--dry-run]", does: "DESTRUCTIVE: force base back to the baseline tag (lists dropped commits), close PRs and issues" },
   { name: "rebaseline", usage: "rebaseline --repo-dir <path> [--dry-run]", does: "move the baseline tag to origin/<base>, keeping merged setup changes across reset" },
   { name: "doctor", usage: "doctor --repo-dir <path> [--fix]", does: "check the loop can run; --fix creates missing labels" },
+  { name: "verify-agent", usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]", does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens" },
   { name: "install", usage: "install <target-dir> [--dry-run] [--update] [--ci]", does: "install or update the template in a repo" },
 ];
 

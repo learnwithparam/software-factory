@@ -10,7 +10,7 @@ const bin = join(import.meta.dir, "..", "bin", "factory");
 
 describe("factory help", () => {
   test("lists exactly the dispatcher's commands", () => {
-    const handled = [...readFileSync(bin, "utf8").matchAll(/^ {4}case "([a-z]+)":/gm)].map((m) => m[1]!).sort();
+    const handled = [...readFileSync(bin, "utf8").matchAll(/^ {4}case "([a-z-]+)":/gm)].map((m) => m[1]!).sort();
     expect(COMMANDS.map((c) => c.name).sort()).toEqual(handled);
     expect(handled.length).toBeGreaterThan(5);
   });
