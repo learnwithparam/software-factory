@@ -7,7 +7,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "run", usage: "run (--repo-dir <path> | --repo <owner/name>) --issue <N>", does: "advance one issue once, then exit (CI)" },
   { name: "tick", usage: "tick (--repo-dir <path> | --repo <owner/name>)", does: "one poll pass over every open issue, then exit (cron)" },
   { name: "park", usage: "park --repo-dir <path> --issue <N> [--reason <text>]", does: "park an issue as needs-human from outside the loop" },
-  { name: "dashboard", usage: "dashboard [--repo <owner/name>] [--port <n>]", does: "serve the board (default :4100, loopback)" },
+  { name: "dashboard", usage: "dashboard [--repo <owner/name> | --repo-dir <path>] [--port <n>]", does: "serve the board (default :4100, loopback)" },
   { name: "logs", usage: "logs <N> [--repo <owner/name>] [--stage <name>] [--follow] [--json]", does: "print (or follow) a run's events; --json is one object per line" },
   { name: "inbox", usage: "inbox [<N> <action> [--text <words>]] --repo <owner/name> [--json]", does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would" },
   { name: "scan", usage: "scan --repo-dir <path>", does: "file issues from `bun audit` (Bun/npm projects only)" },

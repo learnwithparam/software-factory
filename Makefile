@@ -36,7 +36,7 @@ skills-check:
 up:
 	@trap 'kill 0' EXIT INT TERM; \
 	bun bin/factory watch --repo-dir "$${REPO_DIR:-.}" & \
-	bun bin/factory dashboard & \
+	bun bin/factory dashboard --repo-dir "$${REPO_DIR:-.}" & \
 	wait
 
 watch:
