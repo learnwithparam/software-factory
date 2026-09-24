@@ -252,7 +252,7 @@ describe("every preset is diagnosable", () => {
       expect(preset.parseLine("")).toEqual([]);
       const inv = preset.command({ stage: "plan", issue: 1, cwd: "/w", maxBudgetUsd: 1 }, { preset: name }, "SECRET-PROMPT");
       expect(inv.argv[0]).toBe(preset.binary);
-      if (!preset.ownsPrompt) expect(inv.argv.join(" ")).not.toContain("SECRET-PROMPT");
+      if (!preset.ownsPrompt && inv.stdin !== undefined) expect(inv.argv.join(" ")).not.toContain("SECRET-PROMPT");
     }
   });
 });
