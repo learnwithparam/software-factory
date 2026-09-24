@@ -51,6 +51,7 @@ export const geminiPreset: AgentPreset = {
   verified: false,
   version: "0.61.0",
   envKeys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+  readOnlyBy: "`--approval-mode plan`",
   skillsDir: ".gemini/skills",
   contextFile: "GEMINI.md",
   returnsArtifact: true,

@@ -100,6 +100,7 @@ export const claudePreset: AgentPreset = {
   verified: true,
   version: "2.1.281",
   envKeys: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+  readOnlyBy: "the stage allow-list under `dontAsk`",
   skillsDir: ".claude/skills",
   contextFile: "CLAUDE.md",
   ownsPrompt: true,

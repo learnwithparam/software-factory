@@ -43,6 +43,7 @@ export const codexPreset: AgentPreset = {
   verified: false,
   version: "0.156.1",
   envKeys: ["OPENAI_API_KEY"],
+  readOnlyBy: "`-s read-only`",
   skillsDir: ".codex/skills",
   contextFile: "AGENTS.md",
   returnsArtifact: true,

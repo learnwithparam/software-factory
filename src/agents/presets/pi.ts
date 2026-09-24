@@ -48,6 +48,7 @@ export const piPreset: AgentPreset = {
   verified: false,
   version: "0.73.1",
   envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
+  readOnlyBy: "`--tools read,grep,find,ls`",
   skillsDir: ".pi/agent/skills",
   contextFile: "AGENTS.md",
   returnsArtifact: true,

@@ -41,6 +41,7 @@ export const cursorPreset: AgentPreset = {
   verified: false,
   version: "2026.01.23-916f423",
   envKeys: ["CURSOR_API_KEY"],
+  readOnlyBy: "`--mode plan`",
   skillsDir: ".cursor/skills",
   contextFile: "AGENTS.md",
   // Cursor's installer has no versioned download URL, so the Docker image cannot pin it.

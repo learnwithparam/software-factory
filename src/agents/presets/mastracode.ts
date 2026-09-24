@@ -66,6 +66,7 @@ export const mastracodePreset: AgentPreset = {
   verified: false,
   version: "0.42.0",
   envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
+  readOnlyBy: "`--mode plan`",
   skillsDir: ".mastracode/skills",
   contextFile: "AGENTS.md",
   returnsArtifact: true,

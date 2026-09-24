@@ -1,7 +1,7 @@
 // Records an agent's raw stdout, scrubbed, so a participant's `factory verify-agent`
 // run becomes a replayable fixture (tests/fixtures/agents/<name>/<stage>.jsonl).
 
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -28,11 +28,23 @@ export class FixtureRecorder {
     private readonly paths: readonly string[] = [homedir()],
   ) {
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "fixture.json"), JSON.stringify({ agent, synthetic: false }, null, 2) + "\n");
+    // Keep extra keys (Cursor's reportsUsage: false); a recording is never synthetic.
+    const path = join(dir, "fixture.json");
+    const prior = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>) : {};
+    writeFileSync(path, JSON.stringify({ ...prior, agent, synthetic: false }, null, 2) + "\n");
   }
+
+  // The first line of a stage replaces any file already there (a synthetic fixture), later lines append.
+  private readonly started = new Set<string>();
 
   line(stage: string, raw: string): void {
     if (!raw.trim()) return;
-    appendFileSync(join(this.dir, `${stage}.jsonl`), scrubLine(raw, this.env, this.paths) + "\n");
+    const file = join(this.dir, `${stage}.jsonl`);
+    const scrubbed = scrubLine(raw, this.env, this.paths) + "\n";
+    if (this.started.has(stage)) appendFileSync(file, scrubbed);
+    else {
+      this.started.add(stage);
+      writeFileSync(file, scrubbed);
+    }
   }
 }

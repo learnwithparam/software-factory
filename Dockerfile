@@ -13,7 +13,15 @@ FROM oven/bun:1.3.4-slim
 
 ARG GH_CLI_VERSION=2.63.2
 ARG NODE_MAJOR=20
+# Which agent CLIs the image carries. Every version below equals its preset's `version`
+# (tests/agents-registry.test.ts). Cursor has no versioned download, so it is host-only.
+ARG AGENTS="claude codex gemini opencode"
 ARG CLAUDE_CODE_VERSION=2.1.281
+ARG CODEX_VERSION=0.156.1
+ARG GEMINI_VERSION=0.61.0
+ARG OPENCODE_VERSION=1.18.32
+ARG PI_VERSION=0.73.1
+ARG MASTRACODE_VERSION=0.42.0
 ARG UV_VERSION=0.5.11
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -29,10 +37,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        -o /tmp/uv.tar.gz \
     && tar -xzf /tmp/uv.tar.gz -C /tmp \
     && mv /tmp/uv-*/uv /tmp/uv-*/uvx /usr/local/bin/ \
-    && npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     && rm -rf /tmp/gh* /tmp/uv* \
     && apt-get purge -y curl gnupg xz-utils && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+
+RUN set -e; for agent in $AGENTS; do \
+      case "$agent" in \
+        claude) pkg="@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" ;; \
+        codex) pkg="@openai/codex@${CODEX_VERSION}" ;; \
+        gemini) pkg="@google/gemini-cli@${GEMINI_VERSION}" ;; \
+        opencode) pkg="opencode-ai@${OPENCODE_VERSION}" ;; \
+        pi) pkg="@mariozechner/pi-coding-agent@${PI_VERSION}" ;; \
+        mastracode) pkg="mastracode@${MASTRACODE_VERSION}" ;; \
+        *) echo "unknown agent $agent (cursor is host-only)" >&2; exit 1 ;; \
+      esac; \
+      npm install -g "$pkg"; \
+    done
 
 WORKDIR /app
 COPY package.json bun.lock ./

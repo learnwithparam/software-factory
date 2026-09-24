@@ -47,6 +47,7 @@ export const opencodePreset: AgentPreset = {
   verified: false,
   version: "1.18.32",
   envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
+  readOnlyBy: "nothing: `run` has no read-only mode, so only the stage prompt and the gate hold",
   skillsDir: ".opencode/skills",
   contextFile: "AGENTS.md",
   command: (opts, agent, prompt) => ({

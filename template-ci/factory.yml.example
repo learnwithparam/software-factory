@@ -38,6 +38,13 @@ env:
   FACTORY_RUNNER_REF: v2.5.2 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
   CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
+  # Pins for the other agents. For each one your config uses, add `npm install -g <package>@<version>`
+  # beside the claude install step and its API key beside ANTHROPIC_API_KEY (docs/agents.md lists both).
+  CODEX_VERSION: "0.156.1"
+  GEMINI_VERSION: "0.61.0"
+  OPENCODE_VERSION: "1.18.32"
+  PI_VERSION: "0.73.1"
+  MASTRACODE_VERSION: "0.42.0"
 
 # One workflow run in flight per issue at a time; a second labeled/comment
 # event on the same issue queues behind it instead of racing a second
