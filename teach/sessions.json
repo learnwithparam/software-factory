@@ -1,0 +1,13 @@
+{
+  "note": "One row per teaching session. `tag` is the factory release it teaches; `planned` means it has no CHANGELOG entry yet. `checkpoint` is the splitbill branch a participant starts from, or null when the session has none. `issue` is a file in splitbill's .factory/issues/. `demo` lists the DEMO.md steps to run.",
+  "sessions": [
+    { "id": "lesson-1", "title": "Boundary", "tag": "v2.3.0", "planned": false, "checkpoint": "01-boundary", "issue": "01-readme-missing-run-steps.md", "demo": ["Setup", "Live sequence 1"] },
+    { "id": "interim-a", "title": "Cockpit and inbox", "tag": "v2.4.0", "planned": false, "checkpoint": null, "issue": "03-csv-raw-cents.md", "demo": ["Live sequence 1", "Live sequence 2"] },
+    { "id": "lesson-2", "title": "Execution: any agent, checked and costed", "tag": "v2.5.2", "planned": false, "checkpoint": "02-execution", "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "Live sequence 3"] },
+    { "id": "interim-b", "title": "One factory, any agent", "tag": "v2.6.1", "planned": false, "checkpoint": null, "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1"] },
+    { "id": "lesson-3", "title": "Context routing", "tag": "v2.7.0", "planned": true, "checkpoint": "03-context", "issue": "04-search-sql-injection.md", "demo": ["Live sequence 3"] },
+    { "id": "lesson-5", "title": "Self-healing loop", "tag": "v2.8.0", "planned": true, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Live sequence 1"] },
+    { "id": "lesson-6", "title": "Risk-gated merge", "tag": "v2.9.0", "planned": true, "checkpoint": "06-delivery", "issue": "01-readme-missing-run-steps.md", "demo": ["Deliver and reset"] },
+    { "id": "interim-c", "title": "Enterprise hardening", "tag": "v3.0.0", "planned": true, "checkpoint": null, "issue": "05-delete-expense-idor.md", "demo": ["Live sequence 5"] }
+  ]
+}
