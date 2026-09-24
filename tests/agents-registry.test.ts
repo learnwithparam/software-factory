@@ -56,7 +56,7 @@ describe("every preset is fully registered", () => {
     if (p.ownsPrompt) continue;
     test(`${p.name}: its prompt delivery is backed by a captured line and matches its argv`, () => {
       expect(p.promptVia).toBeDefined();
-      const [file, line] = (p.evidence ?? "").split(":");
+      const [file = "", line] = (p.evidence ?? "").split(":");
       const cited = read(file).split("\n")[Number(line) - 1] ?? "";
       expect(cited).toMatch(p.promptVia === "stdin" ? /stdin/i : /positional/i);
       const marker = "PROMPT-MARKER";

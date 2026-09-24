@@ -8,7 +8,7 @@ import { join, relative } from "node:path";
 
 const root = join(import.meta.dir, "..");
 const HEADER =
-  /Ported from (?:owainlewis|mastra-ai)\/([a-z.-]+)@([0-9a-f]{7}) (\S+) \((?:MIT, Copyright \(c\) 2026 Owain Lewis|Apache-2\.0, [^)]+)\)\. Deviations: \S/;
+  /Ported from (?:owainlewis|mastra-ai)\/([a-z.-]+)@([0-9a-f]{7}) (\S+) \((?:MIT, Copyright \(c\) 2026 Owain Lewis|Apache-2\.0, (?:[^()]|\([^)]*\))+)\)\. Deviations: \S/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -39,7 +39,7 @@ const headers = sources.flatMap((file) => {
 });
 
 const notices = readFileSync(join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
-const entries = [...notices.matchAll(/^## owainlewis\/([a-z.-]+)@([0-9a-f]{7})$/gm)].map((m) => `${m[1]}@${m[2]}`);
+const entries = [...notices.matchAll(/^## (?:owainlewis|mastra-ai)\/([a-z.-]+)@([0-9a-f]{7})$/gm)].map((m) => `${m[1]}@${m[2]}`);
 const rows = [...notices.matchAll(/^- `([^`]+)` from .*$/gm)].map((m) => ({ file: m[1]!, line: m[0] }));
 const listed = rows.map((r) => r.file);
 

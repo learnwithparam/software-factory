@@ -7,6 +7,7 @@
 import type { StageEvent } from "../../executor";
 import { type AgentPreset, stagePolicy } from "../types";
 import { isUsageResultCandidate } from "../usage";
+import { mastraArgv } from "./mastracode-flags";
 
 interface MastraLine {
   type?: string;
@@ -75,14 +76,13 @@ export const mastracodePreset: AgentPreset = {
   command: (opts, agent, prompt) => ({
     argv: [
       "mastracode",
-      "--permission-mode",
-      "auto",
-      "-o",
-      "jsonl",
-      "--mode",
-      stagePolicy(opts.stage).write ? "build" : "plan",
-      ...(opts.timeoutMinutes ? ["--timeout", String(opts.timeoutMinutes * 60)] : []),
-      ...(agent.model ? ["-m", agent.model] : []),
+      ...mastraArgv({
+        "permission-mode": "auto",
+        output: "jsonl",
+        mode: stagePolicy(opts.stage).write ? "build" : "plan",
+        timeout: opts.timeoutMinutes ? String(opts.timeoutMinutes * 60) : undefined,
+        model: agent.model,
+      }),
     ],
     stdin: prompt,
   }),

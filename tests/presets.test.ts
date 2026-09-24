@@ -32,7 +32,7 @@ describe("preset argv", () => {
   });
   test("mastracode: jsonl, plan mode when read-only, timeout in seconds", () => {
     const p = PRESETS.mastracode!.command({ ...opts("plan"), timeoutMinutes: 3 }, { preset: "mastracode" }, "PROMPT");
-    expect(p.argv).toEqual(["mastracode", "--permission-mode", "auto", "-o", "jsonl", "--mode", "plan", "--timeout", "180"]);
+    expect(p.argv).toEqual(["mastracode", "--timeout", "180", "--permission-mode", "auto", "--output", "jsonl", "--mode", "plan"]);
     expect(argv("mastracode", "build")).toContain("build");
   });
 });

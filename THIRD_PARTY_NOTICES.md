@@ -2,7 +2,7 @@
 
 Code ported from other projects. Each ported file starts with a `Ported from` header naming the
 upstream repo, commit, path and lines; `tests/provenance.test.ts` keeps this file and those headers
-in step. Only MIT-licensed code is copied.
+in step. Only MIT and Apache-2.0 code is copied; mastra's `ee/` directories are never read or copied.
 
 ## owainlewis/machinist@3943516
 
@@ -78,3 +78,9 @@ SOFTWARE.
 of owainlewis/machinist@3943516. Copyright 2018 The Manrope Project Authors
 (https://github.com/sharanda/manrope), SIL Open Font License 1.1. The licence text is in
 `dashboard/public/fonts/OFL.txt`, shipped beside the font.
+
+## mastra-ai/mastra@68fece5
+
+Source: https://github.com/mastra-ai/mastra (Apache-2.0, Copyright (c) 2025 Kepler Software, Inc.). Only `mastracode/` was used; the licence excludes `ee/` directories and none was read.
+
+- `src/agents/presets/mastracode-flags.ts` from `mastracode/sdk/src/headless/flags.ts` [tested by `tests/ported/mastra/flags.test.ts`]
