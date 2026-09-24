@@ -11,7 +11,8 @@ import { aggregateStageEvents, type Executor, type StageEvent, type StageRunOpti
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
-import type { AgentConfig, AgentPreset, StageAgents } from "./types";
+import { writeReply } from "./reply";
+import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -65,12 +66,14 @@ export class CommandExecutor implements Executor {
     const artifactDir = join(opts.cwd, runDir(opts.issue));
     mkdirSync(artifactDir, { recursive: true });
 
+    // A read-only stage on a preset that cannot write files returns them instead.
+    const readOnly = !stagePolicy(opts.stage).write && agent.preset?.returnsArtifact === true && !agent.config.command;
     let argv: readonly string[];
     let stdin: string | undefined;
     if (agent.preset?.ownsPrompt) {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, ""));
     } else {
-      const prompt = await renderPrompt(opts);
+      const prompt = await renderPrompt(opts, readOnly);
       if (agent.config.command) {
         const promptFile = join(scratch, "prompt.md");
         writeFileSync(promptFile, prompt);
@@ -185,6 +188,11 @@ export class CommandExecutor implements Executor {
     const stderrTail = stderr.trim().slice(-4000) || undefined;
     const base0 = aggregateStageEvents(events, exitCode, stderrTail);
     const base = { ...base0, agent: agent.name, model: agent.config.model ?? null, usageComplete: usageComplete && base0.usageComplete !== false };
+    if (readOnly && exitCode === 0 && !killedReason) {
+      const problem = await writeReply(opts.cwd, opts.issue, opts.stage, base.finalMessage);
+      // No file is left behind, so the runner reports "no valid <stage>.json".
+      if (problem) base.events.push({ kind: "text", text: `read-only reply rejected: ${problem}` });
+    }
     return killedReason ? { ...base, exitCode: exitCode || 1, killedReason } : base;
   }
 }

@@ -4,7 +4,7 @@
 // artifact contract reaches the prompt, and every preset can be diagnosed.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
@@ -50,10 +50,12 @@ describe("claude preset", () => {
 });
 
 describe("codex preset", () => {
-  test("prompt on stdin, JSON events, workspace-write", () => {
-    const inv = PRESETS.codex!.command({ stage: "plan", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex", model: "gpt-5.6-terra" }, "the prompt");
+  test("prompt on stdin, JSON events, sandbox by stage policy", () => {
+    const inv = PRESETS.codex!.command({ stage: "build", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex", model: "gpt-5.6-terra" }, "the prompt");
     expect(inv.argv).toEqual(["codex", "exec", "--json", "-s", "workspace-write", "-m", "gpt-5.6-terra", "-"]);
     expect(inv.stdin).toBe("the prompt");
+    for (const stage of ["triage", "plan", "verify"] as const) expect(PRESETS.codex!.command({ stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("read-only");
+    expect(PRESETS.codex!.command({ stage: "pr", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("workspace-write");
   });
 });
 
@@ -155,6 +157,55 @@ describe("an agent with no preset", () => {
     const rows = state.listStageRuns("acme/widgets");
     expect(rows.map((r) => r.agent)).toEqual(Array(rows.length).fill("scripted"));
     expect(rows.length).toBe(5);
+    state.close();
+  });
+});
+
+describe("codex with read-only stages", () => {
+  class SkillGit extends FakeGit {
+    override async ensureWorktree(cloneDir: string, worktreeDir: string, issue: number) {
+      await super.ensureWorktree(cloneDir, worktreeDir, issue);
+      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), { recursive: true });
+    }
+  }
+  const bin = mkdtempSync(join(scratch, "bin-"));
+  symlinkSync(join(import.meta.dir, "fixtures/agents/fake-codex.ts"), join(bin, "codex"));
+
+  async function run(n: number, bad?: string) {
+    const log = mkdtempSync(join(scratch, "log-"));
+    const saved = process.env.PATH;
+    process.env.PATH = `${bin}:${saved}`;
+    process.env.FAKE_AGENT_LOG = log;
+    if (bad !== undefined) process.env.FAKE_BAD_REPLY = bad;
+    const issue = baseIssue(n, [LABEL.ready]);
+    const github = new FakeGitHub([issue]);
+    const state = new FactoryState(":memory:");
+    state.setToggle("auto_approve_low_risk", true);
+    const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra" } }, stages: { default: "codex" } });
+    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
+    try {
+      return { result: await processReadyIssue(issue, deps, config), github, state, log };
+    } finally {
+      process.env.PATH = saved;
+      delete process.env.FAKE_AGENT_LOG;
+      delete process.env.FAKE_BAD_REPLY;
+    }
+  }
+
+  test("triage, plan and verify run read-only and the runner writes their files; build writes its own", async () => {
+    const { result, github, state, log } = await run(5);
+    expect(result).toBe("shipped");
+    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only", "plan=read-only", "build=workspace-write", "verify=read-only", "pr=workspace-write"]);
+    expect(github.createdPrs[0]!.body).toContain("Closes #5");
+    // Cached tokens are stored, and gpt-5.6-terra has no price, so the cost is "not reported".
+    const [row] = state.listStageRuns("acme/widgets");
+    expect([row!.tokens_cached, row!.usage_complete]).toEqual([40, 0]);
+    state.close();
+  });
+
+  test("a read-only reply that is not the envelope fails the stage instead of shipping", async () => {
+    const { result, state } = await run(6, "I looked at the code and it seems fine.");
+    expect(result).toBe("failed");
     state.close();
   });
 });

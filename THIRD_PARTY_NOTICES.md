@@ -30,6 +30,7 @@ Source: https://github.com/owainlewis/assembler (MIT, Copyright (c) 2026 Owain L
 - `src/display.ts` from `src/display.ts` [tested by `tests/ported/assembler/display.test.ts`]
 - `src/logs.ts` from `src/runs.ts` [tested by `tests/ported/assembler/logs.test.ts`]
 - `src/config.ts` from `src/index.ts` [tested by `tests/ported/assembler/config.test.ts`]
+- `src/agents/reply.ts` from `src/index.ts` [tested by `tests/ported/assembler/outputs.test.ts`]
 
 ## License text (both projects)
 
