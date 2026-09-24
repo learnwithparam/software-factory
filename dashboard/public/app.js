@@ -3,7 +3,7 @@
 
 import { routeFromHash } from "/lib/routes.js";
 import { createStatusLoader } from "/lib/status-loader.js";
-import { formatDurationMillis } from "/lib/run-metrics.js";
+import { formatElapsed } from "/lib/run-metrics.js";
 
 const STAGES = ["triage", "plan", "build", "verify", "pr"];
 const WAITING = new Set(["needs-info", "awaiting-approval", "needs-human", "failed"]);
@@ -86,7 +86,7 @@ function stationsFor(row) {
     const failed = attempts.length > 0 && !attempts[attempts.length - 1].ok && (i < at || run.status === "failed");
     const done = i < at || run.status === "shipped" || (i === at && attempts.length > 0 && !live && !failed && !WAITING.has(run.status));
     const grow = Math.max(1, Math.min(8, Math.round(ms / 30000)));
-    return { name, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatDurationMillis(ms)}` : ""}` }) };
+    return { name, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
   });
 }
 
@@ -214,7 +214,7 @@ function renderSheet() {
       run.reason && [h("dt", null, "Reason"), h("dd", null, run.reason)]),
     h("h2", null, "Stages"),
     !sheet.stages ? h("p", { class: "muted" }, "Loading") : sheet.stages.length ? h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, ["Stage", "Agent", "Took", "Tokens", "Cost"].map((c, i) => h("th", { class: i >= 2 ? "num" : "" }, c)))),
-      h("tbody", null, sheet.stages.map((s) => h("tr", null, h("td", null, h("span", { class: "status", "data-tone": s.exit_code === 0 && !s.killed_reason ? "ok" : "bad" }, s.stage)), h("td", null, s.agent), h("td", { class: "num" }, formatDurationMillis(s.duration_ms)),
+      h("tbody", null, sheet.stages.map((s) => h("tr", null, h("td", null, h("span", { class: "status", "data-tone": s.exit_code === 0 && !s.killed_reason ? "ok" : "bad" }, s.stage)), h("td", null, s.agent), h("td", { class: "num" }, formatElapsed(s.duration_ms)),
         h("td", { class: "num" }, s.usage_complete !== 0 && s.tokens_in + s.tokens_out ? compact(s.tokens_in + s.tokens_out) : "Not reported"), h("td", { class: "num" }, s.usage_complete === 0 ? "Not reported" : money(s.cost_usd))))))) : h("p", { class: "muted" }, "No stage has finished yet."),
     h("h2", { style: "margin-top:1.5rem" }, "Files from the run"),
     !sheet.artifacts ? h("p", { class: "muted" }, "Loading") : sheet.artifacts.length ? h("div", { class: "actions" }, sheet.artifacts.map((f) => h("button", { class: "btn", type: "button", onclick: () => preview(f.name) }, `${f.name} (${compact(f.size)}B)`))) : h("p", { class: "muted" }, "This run left no files on this machine."),
@@ -234,7 +234,7 @@ function bars(title, buckets, unit) {
   const max = Math.max(...buckets.map((b) => b.costUsd), 0.0001);
   return h("div", null, h("h2", null, title), h("div", { class: "bars" }, buckets.map((b) =>
     h("div", { class: "bar" }, h("span", null, b.key), h("div", { class: "bar-track" }, h("div", { class: "bar-fill", style: `width:${Math.max(2, (b.costUsd / max) * 100)}%` })),
-      h("span", { class: "bar-note" }, `${money(b.costUsd)} · ${b.attempts} ${b.attempts === 1 ? "attempt" : "attempts"} · ${formatDurationMillis(b.avgDurationMs)} avg`)))));
+      h("span", { class: "bar-note" }, `${money(b.costUsd)} · ${b.attempts} ${b.attempts === 1 ? "attempt" : "attempts"} · ${formatElapsed(b.avgDurationMs)} avg`)))));
 }
 
 function analyticsView() {
