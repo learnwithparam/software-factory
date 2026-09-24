@@ -7,7 +7,7 @@ import { matrixPlan } from "../src/verify-agent";
 const repoDir = process.env.REPO_DIR;
 const issue = process.env.ISSUE;
 if (!repoDir || !issue) {
-  console.error("agent-matrix: set REPO_DIR (a splitbill fork) and ISSUE (the cent-split issue number)");
+  console.error("agent-matrix: set REPO_DIR (a fork of the demo app) and ISSUE (its seeded bug issue number)");
   process.exit(2);
 }
 const which = async (bin: string) => (await Bun.spawn(["which", bin], { stdout: "pipe", stderr: "pipe" }).exited) === 0;

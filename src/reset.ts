@@ -32,6 +32,8 @@ export interface ResetContext {
   readonly issuesDir: string; // target's .factory/issues/*.md
   readonly workspacesDir: string;
   readonly statePath: string;
+  // Close every open issue, not just the factory's and the seeded ones (a sandbox that holds nothing else).
+  readonly allIssues?: boolean;
 }
 
 export interface ResetDeps {
@@ -135,6 +137,8 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
   // push, and nothing destructive should have run by then.
   const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
   const sha = tag.stdout.trim();
+  // Checked before any plan is made: a missing tag must not leave a half-done reset.
+  if (tag.code !== 0 || !sha) throw new Error(`baseline tag ${ctx.baselineTag} not found in ${ctx.cloneDir}`);
   // Show what the force push throws away, so a merged setup change is
   // noticed before it is lost (keep it with `factory rebaseline`).
   for (const commit of await commitsAheadOfTag(deps, ctx)) {
@@ -152,12 +156,16 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
     actions.push({ kind: "delete-branch", detail: branch, data: { branch } });
   }
 
+  // Only the factory's own issues (a factory:* label) and the seeded ones are closed; anything else belongs to a human.
+  const seeds = await readIssueSeeds(ctx.issuesDir);
+  const seeded = new Set(seeds.map((seed) => seed.title));
   const openIssues = await deps.github.listOpenIssues(ctx.repo);
   for (const issue of openIssues) {
+    const ours = issue.labels.some((l) => l.name.startsWith("factory:")) || seeded.has(issue.title);
+    if (!ours && !ctx.allIssues) continue;
     actions.push({ kind: "close-issue", detail: `#${issue.number} ${issue.title}`, data: { number: issue.number } });
   }
 
-  const seeds = await readIssueSeeds(ctx.issuesDir);
   for (const seed of seeds) {
     actions.push({ kind: "create-issue", detail: seed.title, data: { seed } });
   }

@@ -295,11 +295,12 @@ Also `--db`, `--workspaces`, `--port` and the `FACTORY_*` env vars; `factory --h
 
 ## Reset any time
 
-> **Danger.** `reset` force-pushes the base branch back to the baseline tag and closes every open
-> issue and PR. Run `--dry-run` first, and never against a repo with real work on it.
+> **Danger.** `reset` force-pushes the base branch back to the baseline tag and closes factory PRs
+> and the factory's own issues. Run `--dry-run` first, and never against a repo with real work on it.
 
 `factory reset` (or `--dry-run` first) closes factory PRs, deletes `factory/*` branches, forces
-the base branch (`config.base`) back to the baseline tag, closes open issues, recreates the seeded ones from
+the base branch (`config.base`) back to the baseline tag, closes issues that carry a `factory:*` label or match a seed
+(`--all-issues` closes every open issue), recreates the seeded ones from
 `.factory/issues/*.md`, and wipes worktrees and local state. Idempotent, run it before every
 workshop or demo run. The dry-run lists each commit the force push would drop as `drop-commit`.
 

@@ -217,6 +217,7 @@ async function cmdReset(): Promise<void> {
     issuesDir: `${cloneDir}/.factory/issues`,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
     statePath: flag("db") ?? DEFAULT_DB_PATH,
+    allIssues: has("all-issues"),
   };
   const deps = { github: new GitHub(), git: new GitCommandRunner() };
   const summary = await reset(deps, ctx, dryRun);

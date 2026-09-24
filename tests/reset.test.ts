@@ -1,6 +1,6 @@
 // `factory reset --dry-run` must plan the right actions without touching a
 // real `gh` or `git`: close factory PRs, delete factory/* branches, force
-// main back to the baseline tag, close every open issue, recreate the
+// main back to the baseline tag, close the factory's issues, recreate the
 // seeded issues, ensure every label exists, and wipe worktrees/state. This
 // drives planReset directly against an injected fake gh/git.
 
@@ -69,8 +69,8 @@ class FakeGitRunner implements CommandRunner {
   }
 }
 
-function issue(number: number, title: string): GhIssue {
-  return { number, title, body: "", labels: [], comments: [] };
+function issue(number: number, title: string, labels: string[] = []): GhIssue {
+  return { number, title, body: "", labels: labels.map((name) => ({ name })), comments: [] };
 }
 
 function pr(number: number, headRefName: string): GhPr {
@@ -102,7 +102,8 @@ describe("factory reset --dry-run", () => {
     writeFileSync(join(issuesDir, "002-second.md"), "# Seed two\n\nBody two.");
 
     const github = new FakeGitHub(
-      [issue(10, "Old bug"), issue(11, "Old feature")],
+      // #10 has a factory label, #11 matches a seed title, #12 is a human's issue and stays open.
+      [issue(10, "Old bug", ["factory:failed"]), issue(11, "Seed one"), issue(12, "Customer question")],
       [pr(5, "factory/issue-3"), pr(6, "human/manual-branch")],
     );
     const git = new FakeGitRunner();
@@ -135,7 +136,7 @@ describe("factory reset --dry-run", () => {
     const forceMain = actions.find((a) => a.kind === "force-main")!;
     expect(forceMain.detail).toBe("main <- abc123");
 
-    expect(kinds.filter((k) => k === "close-issue")).toHaveLength(2);
+    expect(actions.filter((a) => a.kind === "close-issue").map((a) => a.data!.number)).toEqual([10, 11]);
     expect(kinds.filter((k) => k === "create-issue")).toHaveLength(2);
     expect(kinds.filter((k) => k === "ensure-label")).toHaveLength(LABELS.length);
     expect(kinds).toContain("wipe-worktrees");
@@ -156,7 +157,7 @@ describe("factory reset --dry-run", () => {
   test("a real (non-dry-run) reset applies every planned action", async () => {
     const issuesDir = mkdtempSync(join(tmpdir(), "factory-issues-"));
     writeFileSync(join(issuesDir, "001.md"), "# Only seed\n\nBody.");
-    const github = new FakeGitHub([issue(20, "Stale")], [pr(7, "factory/issue-7")]);
+    const github = new FakeGitHub([issue(20, "Stale", ["factory:building"]), issue(21, "Human issue")], [pr(7, "factory/issue-7")]);
     const git = new FakeGitRunner();
     git.lsRemoteOutput = "sha\trefs/heads/factory/issue-7\n";
     const deps: ResetDeps = { github, git };
@@ -250,5 +251,21 @@ describe("reset keeps merged setup safe", () => {
     const git = new FakeGitRunner();
     await rebaseline({ github: new FakeGitHub([], []), git }, ctxFor("/tmp/none"), false);
     expect(git.calls.some((c) => c[0] === "tag" || c[0] === "push")).toBe(false);
+  });
+});
+
+describe("reset stays inside what the factory owns", () => {
+  const ctx = { repo: "acme/widgets", cloneDir: "/tmp/x", baselineTag: "baseline", base: "main", issuesDir: "/tmp/none", workspacesDir: "/tmp/ws-none", statePath: "/tmp/st-none" };
+
+  test("--all-issues closes a human's issue too", async () => {
+    const github = new FakeGitHub([issue(1, "Customer question")], []);
+    const actions = await planReset({ github, git: new FakeGitRunner() }, { ...ctx, allIssues: true });
+    expect(actions.filter((a) => a.kind === "close-issue")).toHaveLength(1);
+  });
+
+  test("a missing baseline tag refuses before any action is planned", async () => {
+    const git = new FakeGitRunner();
+    git.revParseSha = "";
+    await expect(planReset({ github: new FakeGitHub([issue(1, "x", ["factory:ready"])], []), git }, ctx)).rejects.toThrow(/baseline tag baseline not found/);
   });
 });

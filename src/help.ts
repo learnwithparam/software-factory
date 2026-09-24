@@ -11,7 +11,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "logs", usage: "logs <N> [--repo <owner/name>] [--stage <name>] [--follow] [--json]", does: "print (or follow) a run's events; --json is one object per line" },
   { name: "inbox", usage: "inbox [<N> <action> [--text <words>]] --repo <owner/name> [--json]", does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would" },
   { name: "scan", usage: "scan --repo-dir <path>", does: "file issues from `bun audit` (Bun/npm projects only)" },
-  { name: "reset", usage: "reset --repo-dir <path> [--dry-run]", does: "DESTRUCTIVE: force base back to the baseline tag (lists dropped commits), close PRs and issues" },
+  { name: "reset", usage: "reset --repo-dir <path> [--dry-run] [--all-issues]", does: "DESTRUCTIVE: force base back to the baseline tag (lists dropped commits), close PRs and factory issues (--all-issues: every open issue)" },
   { name: "rebaseline", usage: "rebaseline --repo-dir <path> [--dry-run]", does: "move the baseline tag to origin/<base>, keeping merged setup changes across reset" },
   { name: "doctor", usage: "doctor --repo-dir <path> [--fix]", does: "check the loop can run; --fix creates missing labels" },
   { name: "verify-agent", usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]", does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens" },
