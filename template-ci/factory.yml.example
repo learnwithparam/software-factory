@@ -35,7 +35,7 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v2.5.1 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REF: v2.5.2 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
   CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
 
