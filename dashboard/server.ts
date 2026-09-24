@@ -18,6 +18,8 @@ import { LABEL } from "../src/labels";
 import { InboxError, act, buildInbox, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
+import { agentChecks } from "../src/doctor";
+import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
 import { workspacesDir } from "../src/paths";
 import { runDir } from "../src/artifacts";
@@ -78,12 +80,38 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
 
-export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG) {
+export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();
   let boardCache: { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> } | null = null;
   let boardInflight: Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>> | null = null;
+
+  // The Agents page shows each configured agent's installed version and doctor rows.
+  // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
+  let agentsCache: { at: number; rows: unknown[] } | null = null;
+  let agentsInflight: Promise<unknown[]> | null = null;
+  async function probedAgents(): Promise<unknown[]> {
+    if (agentsCache && Date.now() - agentsCache.at < 60_000) return agentsCache.rows;
+    agentsInflight ??= Promise.all(
+      agentCatalog(fleet.agents, fleet.stages).map(async (a) => {
+        const row = { ...a, name: plain(a.name), binary: plain(a.binary) };
+        if (!a.configured) return { ...row, installed: null, version: null, checks: [] };
+        const checks = await agentChecks(a.name, fleet.agents, probes);
+        const installed = await probes.which(a.binary);
+        const version = installed ? ((await probes.versionOf(a.binary)) ?? "").split("\n")[0]!.trim() || null : null;
+        return { ...row, installed, version: version === null ? null : plain(version), checks: checks.map((c) => ({ name: plain(c.name), ok: c.ok, warn: c.warn === true, detail: plain(c.detail) })) };
+      }),
+    )
+      .then((rows) => {
+        agentsCache = { at: Date.now(), rows };
+        return rows;
+      })
+      .finally(() => {
+        agentsInflight = null;
+      });
+    return agentsInflight;
+  }
 
   // Single-flight + 10s cache in front of `gh issue list` (plan: "cached gh
   // listing, single-flight, 10s") so a browser polling every few seconds,
@@ -303,7 +331,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       method: "GET",
       pattern: /^\/api\/agents$/,
       label: "GET /api/agents",
-      handler: () => json({ agents: agentCatalog(fleet.agents, fleet.stages).map((a) => ({ ...a, name: plain(a.name), binary: plain(a.binary) })) }),
+      handler: async () => json({ agents: await probedAgents() }),
     },
     {
       method: "GET",

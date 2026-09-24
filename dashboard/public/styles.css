@@ -114,6 +114,8 @@ h1 { margin: 0; font-size: 1.5rem; line-height: 1.35; font-weight: 600; letter-s
 h2 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; letter-spacing: -.012em; }
 .lede { margin: .25rem 0 0; color: var(--muted-foreground); }
 .muted { color: var(--muted-foreground); }
+.plain-list { margin: 0; padding: 0; list-style: none; }
+.plain-list li { color: var(--muted-foreground); }
 
 /* Controls */
 .btn { min-height: 2.25rem; padding: 0 .9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); transition: border-color .15s ease, background .15s ease; }

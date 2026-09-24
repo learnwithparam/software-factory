@@ -50,7 +50,8 @@ export interface AgentRow {
 
 // One row per configured agent, then one per preset nobody has configured yet.
 export function agentCatalog(agents: Readonly<Record<string, AgentConfig>>, stages: StageAgents): AgentRow[] {
-  const serves = (name: string) => STAGE_NAMES.filter((s) => (stages[s] ?? stages.default) === name);
+  // A stage with no agent set runs on "claude", as the executor does.
+  const serves = (name: string) => STAGE_NAMES.filter((s) => (stages[s] ?? stages.default ?? "claude") === name);
   const rows: AgentRow[] = Object.entries(agents).map(([name, cfg]) => {
     const preset = cfg.preset ? PRESETS[cfg.preset] : undefined;
     return {
