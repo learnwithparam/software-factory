@@ -16,7 +16,12 @@ export function scrubLine(line: string, env: NodeJS.ProcessEnv, paths: readonly 
     if (value && value.length >= 8 && SECRET_ENV.test(key)) out = out.split(value).join("<redacted>");
   }
   out = out.replace(KEY_SHAPES, "<redacted>");
-  for (const p of paths) if (p.length > 1) out = out.split(p).join("<path>");
+  for (const p of paths) {
+    if (p.length <= 1) continue;
+    out = out.split(p).join("<path>");
+    // Claude names its project dirs by turning every "/" and "." of the path into "-".
+    out = out.split(p.replace(/[/.]/g, "-")).join("<path>");
+  }
   return out;
 }
 

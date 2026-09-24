@@ -1,5 +1,5 @@
 // Gemini CLI: `gemini -o stream-json --approval-mode <mode>` with the prompt on stdin.
-// Shapes read from gemini-cli 0.61.0's docs and bundle (research/agents/gemini/docs.md).
+// Shapes read from gemini-cli 0.61.0's docs and bundle (docs/agent-research/gemini/docs.md).
 // Read-only stages run in `plan` mode and return their artifacts as the final message.
 
 import type { StageEvent } from "../../executor";
@@ -54,6 +54,8 @@ export const geminiPreset: AgentPreset = {
   readOnlyBy: "`--approval-mode plan`",
   skillsDir: ".gemini/skills",
   contextFile: "GEMINI.md",
+  promptVia: "stdin",
+  evidence: "docs/agent-research/gemini/docs.md:3",
   returnsArtifact: true,
   command: (opts, agent, prompt) => ({
     // Headless runs have no one to approve a tool call, so write stages use yolo.

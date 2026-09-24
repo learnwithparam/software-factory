@@ -1,5 +1,46 @@
 # Changelog
 
+## v2.6.1
+
+Residue fixes for v2.6.0. No new features.
+
+Corrections to v2.6.0:
+- The doctor did not fail a custom agent that had no bypass flag; it does now, and `--version` has a timeout.
+- The CI template did not install every preset or pass its keys; it does, and a test checks it.
+- The Docker note "a build with two agents was run" had no recorded evidence. This release built the default image
+  and ran `--version` in it: claude 2.1.281, codex 0.156.1, gemini 0.61.0, opencode 1.18.32, all equal to the pins.
+- OpenCode and Pi were read as positional-only from their `--help`, but their docs show both take the prompt on
+  stdin, so it stays on stdin. Each preset now names the doc line that shows how it takes the prompt
+  (`promptVia`, `evidence`), and a test reads that line. Pi's skills dir is `.pi/skills`. OpenCode's read-only
+  stages run `--agent plan`; Cursor's run `--mode plan`.
+- A prompt passed as an argument (Cursor) over 120 KiB is refused with a clear error, not an E2BIG failure.
+- Mastra Code has no `--version` (it reads it as a prompt); doctor skips the drift check for it. Its argv is
+  built through flags ported from mastra under Apache-2.0 (`ee/` was not read).
+- R11 was already covered: Codex gets `-s read-only` per stage, and a test pins it.
+
+Fixes:
+- A live Claude run on a fresh sandbox (`factory verify-agent claude`) passed all six stages in 281 s for $1.77;
+  its build, verify and pr output is recorded in `tests/fixtures/agents/claude/`. The recorder now also scrubs
+  Claude's dash-encoded home paths (`-Users-name-`), which it used to leave in.
+- `teach/sessions.json` names immutable splitbill tags `checkpoint/<name>` instead of force-pushed branches.
+- R10: `stage_runs.cost_usd` is nullable in old databases too; an unknown cost stays NULL, not $0.
+- `factory reset` and `watch` act on the clone's origin. A config whose `repo` disagrees with origin is
+  refused, and a missing `repo` is read from origin. Before this, a copied config could close and reseed
+  issues on the wrong repo.
+- `factory reset` creates labels before seeding issues, so it works on a fresh repo (found on the first sandbox reset).
+- `factory reset` checks the baseline tag before closing anything, and closes only issues labelled
+  `factory:*` or seeded from `.factory/issues`. `--all-issues` keeps the old behaviour for a sandbox.
+- `tests/app-agnostic.test.ts`: runtime code never names the demo app outside comments, and a Python repo on
+  a `trunk` branch loads, gates and refuses a wrong origin.
+- The Agents page shows the installed version and doctor rows, and stages fall back to Claude like the executor.
+- `install.sh`'s agent map is pinned to `src/agent-dirs.ts` and every preset's `skillsDir`.
+- `docs/verify-an-agent.md` has a section per preset. `teach/sessions.json` maps each session to its release.
+
+Not in v2.6.1:
+- Live runs of any agent except Claude.
+- The P40 re-check has still never fired live: the recorded run's verify stage raised no findings.
+- The `resettable` opt-in, per-repo state databases and a base default from origin/HEAD (v2.6.2).
+
 ## v2.6.0
 
 One factory, any agent. Every preset except Claude ships `verified: false`; participants verify them with
@@ -110,7 +151,7 @@ Not in this release:
 - `gpt-5.6-terra` is unpriced, so its cost is not reported. Incomplete usage stores `cost_usd = 0` with
   `usage_complete = 0`, not NULL.
 - A read-only reply's artifact is capped at 16 KiB.
-- The tool-free finding re-check call (P40) is still prompt text only.
+- The tool-free finding re-check call (P40) was still prompt text only here; v2.5.2 made it a second tool-free call.
 - Sub-minute durations keep the upstream `42.5s` format.
 - Upstream `runs-view.test.js`, `artifacts_test.go` and the auth tests are not ported.
 - Real Claude fixtures per stage are not recorded; they spend tokens.

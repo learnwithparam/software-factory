@@ -37,6 +37,70 @@ export interface DoctorContext {
   readonly templateSkills?: Record<string, string>;
 }
 
+// Flags that let a CLI run headless without waiting on an approval prompt.
+export const BYPASS_FLAGS: ReadonlySet<string> = new Set([
+  "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox", "--yolo", "--force", "-f", "--auto", "--full-auto",
+  "--yes", "--yes-always", "-y", "--permission-mode", "--approval-mode", "--auto-approve", "--trust", "--allow-all",
+]);
+
+// The checks for one agent a stage uses; the dashboard's Agents page shows the same rows.
+export async function agentChecks(name: string, agents: Readonly<Record<string, AgentConfig>>, deps: Pick<DoctorDeps, "which" | "versionOf">): Promise<DoctorCheck[]> {
+  const out: DoctorCheck[] = [];
+  const agent = agents[name];
+  const preset = agent?.preset ? PRESETS[agent.preset] : undefined;
+  const binary = agent?.command?.[0] ?? preset?.binary;
+  out.push({
+    name: `${binary ?? name} on PATH`,
+    ok: binary !== undefined && (await deps.which(binary)),
+    detail: `agent "${name}" runs each stage it is assigned`,
+    fixable: false,
+  });
+  if (preset?.noVersionFlag && binary && (await deps.which(binary))) {
+    out.push({
+      name: `${binary} is version ${preset.version}`,
+      ok: true,
+      detail: `${binary} has no --version flag, so the pin (${preset.version}) is not checked here; the Dockerfile and CI install it`,
+      fixable: false,
+    });
+  } else if (preset && deps.versionOf && binary && (await deps.which(binary))) {
+    const found = await deps.versionOf(binary);
+    out.push({
+      name: `${binary} is version ${preset.version}`,
+      ok: found?.includes(preset.version) ?? false,
+      warn: true,
+      detail: found === undefined ? `could not read \`${binary} --version\`` : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
+      fixable: false,
+    });
+  }
+  if (preset && !preset.verified) {
+    out.push({
+      name: `agent "${name}" is verified`,
+      ok: false,
+      warn: true,
+      detail: `verified live: no (participants verify it with \`factory verify-agent ${preset.name}\`, see docs/verify-an-agent.md)`,
+      fixable: false,
+    });
+  }
+  if (agent?.command && !preset) {
+    const hasBypass = agent.command.some((a) => BYPASS_FLAGS.has(a) || [...BYPASS_FLAGS].some((f) => a.startsWith(`${f}=`)));
+    out.push({
+      name: `agent "${name}" runs without prompting`,
+      ok: hasBypass,
+      detail: hasBypass ? "its command carries an approval-bypass flag" : `its command has no approval-bypass flag (${[...BYPASS_FLAGS].slice(0, 6).join(", ")}, ...): an unattended run would wait for a prompt until the timeout`,
+      fixable: false,
+    });
+  }
+  if (agent && !preset) {
+    out.push({
+      name: `agent "${name}" reports usage`,
+      ok: true,
+      detail: "no preset, so tokens show as not reported and the tool-call cap is not enforced; the timeout is the backstop (consider a sandbox)",
+      fixable: false,
+    });
+  }
+  return out;
+}
+
 export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
 
@@ -52,44 +116,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   // The default only counts if some stage falls back to it.
   const STAGES = ["triage", "plan", "build", "verify", "pr"] as const;
   const used = new Set(STAGES.map((st) => stages[st] ?? stages.default ?? "claude"));
-  for (const name of [...used].sort()) {
-    const agent = agents[name];
-    const preset = agent?.preset ? PRESETS[agent.preset] : undefined;
-    const binary = agent?.command?.[0] ?? preset?.binary;
-    checks.push({
-      name: `${binary ?? name} on PATH`,
-      ok: binary !== undefined && (await deps.which(binary)),
-      detail: `agent "${name}" runs each stage it is assigned`,
-      fixable: false,
-    });
-    if (preset && deps.versionOf && binary && (await deps.which(binary))) {
-      const found = await deps.versionOf(binary);
-      checks.push({
-        name: `${binary} is version ${preset.version}`,
-        ok: found?.includes(preset.version) ?? false,
-        warn: true,
-        detail: found === undefined ? `could not read \`${binary} --version\`` : `found "${found.split("\n")[0]!.trim()}", pinned ${preset.version} (Dockerfile and CI install the pin)`,
-        fixable: false,
-      });
-    }
-    if (preset && !preset.verified) {
-      checks.push({
-        name: `agent "${name}" is verified`,
-        ok: false,
-        warn: true,
-        detail: `verified by participants: not yet (docs/verify-an-agent.md, \`factory verify-agent ${preset.name}\`)`,
-        fixable: false,
-      });
-    }
-    if (agent && !preset) {
-      checks.push({
-        name: `agent "${name}" reports usage`,
-        ok: true,
-        detail: "no preset, so tokens show as not reported and the tool-call cap is not enforced; the timeout is the backstop (consider a sandbox)",
-        fixable: false,
-      });
-    }
-  }
+  for (const name of [...used].sort()) checks.push(...(await agentChecks(name, agents, deps)));
   checks.push({
     name: "python3 on PATH",
     ok: await deps.which("python3"),

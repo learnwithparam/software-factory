@@ -64,7 +64,8 @@ export interface StageRun {
   tokens_in: number;
   tokens_out: number;
   tokens_cached: number;
-  cost_usd: number;
+  // NULL when the cost is unknown (no price, or usage not fully counted).
+  cost_usd: number | null;
   // 0 when tokens or cost are not a full count; the dashboard shows "Not reported".
   usage_complete: number;
   exit_code: number;
@@ -143,7 +144,7 @@ export class FactoryState {
         tool_calls INTEGER NOT NULL DEFAULT 0,
         tokens_in INTEGER NOT NULL DEFAULT 0,
         tokens_out INTEGER NOT NULL DEFAULT 0,
-        cost_usd REAL NOT NULL DEFAULT 0,
+        cost_usd REAL,
         exit_code INTEGER NOT NULL,
         killed_reason TEXT
       );
@@ -166,6 +167,42 @@ export class FactoryState {
         if (!/duplicate column/i.test(String(e))) throw e;
       }
     }
+    this.makeCostNullable();
+  }
+
+  // Databases from before v2.6.1 declare stage_runs.cost_usd NOT NULL DEFAULT 0, so an
+  // unknown cost was stored as $0. Rebuild the table once; rows already flagged
+  // usage_complete = 0 become NULL. Runs inside the migrate() write transaction.
+  private makeCostNullable(): void {
+    const cols = this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string; notnull: number }[];
+    if (!cols.find((c) => c.name === "cost_usd")?.notnull) return;
+    const names = cols.map((c) => c.name).join(", ");
+    this.db.exec(`
+      CREATE TABLE stage_runs_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo TEXT NOT NULL,
+        issue INTEGER NOT NULL,
+        stage TEXT NOT NULL,
+        agent TEXT NOT NULL,
+        model TEXT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        tool_calls INTEGER NOT NULL DEFAULT 0,
+        tokens_in INTEGER NOT NULL DEFAULT 0,
+        tokens_out INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL,
+        exit_code INTEGER NOT NULL,
+        killed_reason TEXT,
+        tokens_cached INTEGER NOT NULL DEFAULT 0,
+        usage_complete INTEGER NOT NULL DEFAULT 1
+      );
+      INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
+      UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
+      DROP TABLE stage_runs;
+      ALTER TABLE stage_runs_new RENAME TO stage_runs;
+      CREATE INDEX IF NOT EXISTS stage_runs_repo_issue_id ON stage_runs(repo, issue, id);
+    `);
   }
 
   upsertRun(input: {

@@ -39,6 +39,7 @@ describe("verify-agent", () => {
     expect(out).not.toContain("sk-abcdef");
     expect(out).not.toContain("/Users/x");
     expect(out).toContain("keep me");
+    expect(scrubLine("/.claude/projects/-Users-x-repo/memory", {}, ["/Users/x"])).not.toContain("Users-x");
   });
 
   test("the executor records each stage's scrubbed stdout beside a fixture.json", async () => {

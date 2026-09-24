@@ -52,12 +52,36 @@ describe("every preset is fully registered", () => {
     });
   }
 
+  for (const p of Object.values(PRESETS)) {
+    if (p.ownsPrompt) continue;
+    test(`${p.name}: its prompt delivery is backed by a captured line and matches its argv`, () => {
+      expect(p.promptVia).toBeDefined();
+      const [file = "", line] = (p.evidence ?? "").split(":");
+      const cited = read(file).split("\n")[Number(line) - 1] ?? "";
+      expect(cited).toMatch(p.promptVia === "stdin" ? /stdin/i : /positional/i);
+      const marker = "PROMPT-MARKER";
+      const inv = p.command({ cwd: "/w", issue: 1, stage: "build" } as never, { model: undefined } as never, marker);
+      expect(inv.stdin === marker).toBe(p.promptVia === "stdin");
+      expect(inv.argv.includes(marker)).toBe(p.promptVia === "argv");
+    });
+  }
+
   test("docs/agents.md's generated table equals the registry", () => {
     expect(agentsDoc).toContain(agentsTable());
     expect(renderAgentsDoc(agentsDoc)).toBe(agentsDoc);
   });
 
-  test("the version and secrets in the CI template are complete", () => {
-    for (const p of Object.values(PRESETS)) if (p.docker !== false) expect(ci).toContain(dockerVar(p.name));
+  test("the CI template pins, installs and passes the key of every preset", () => {
+    const pkg = (text: string, name: string) => new RegExp(`\\b${name}\\) pkg="([^"]+)"`).exec(text)?.[1]?.replace(/\$\{[A-Z_]+\}/, "");
+    const secrets = new Set(Object.values(PRESETS).flatMap((p) => p.envKeys));
+    for (const p of Object.values(PRESETS)) {
+      if (p.docker !== false) {
+        expect(ci).toContain(`${dockerVar(p.name)}: "${p.version}"`);
+        expect(pkg(ci, p.name), `${p.name}: install case`).toBeDefined();
+        expect(pkg(ci, p.name), `${p.name}: same package as the Dockerfile`).toBe(pkg(docker, p.name));
+      }
+    }
+    // Every job that runs an agent passes every key: 3 jobs (run-issue, tick, manual).
+    for (const key of secrets) expect(ci.split(`${key}: \${{ secrets.${key} }}`).length - 1, key).toBe(3);
   });
 });

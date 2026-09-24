@@ -11,9 +11,9 @@ backs them.
 | `claude` | `claude` | `2.1.281` | yes | the stage allow-list under `dontAsk` | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | `.claude/skills` | pinned |
 | `codex` | `codex` | `0.156.1` | not yet | `-s read-only` | `OPENAI_API_KEY` | `.codex/skills` | pinned |
 | `gemini` | `gemini` | `0.61.0` | not yet | `--approval-mode plan` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | `.gemini/skills` | pinned |
-| `opencode` | `opencode` | `1.18.32` | not yet | nothing: `run` has no read-only mode, so only the stage prompt and the gate hold | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.opencode/skills` | pinned |
+| `opencode` | `opencode` | `1.18.32` | not yet | `--agent plan` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.opencode/skills` | pinned |
 | `cursor` | `cursor-agent` | `2026.01.23-916f423` | not yet | `--mode plan` | `CURSOR_API_KEY` | `.cursor/skills` | host only |
-| `pi` | `pi` | `0.73.1` | not yet | `--tools read,grep,find,ls` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.pi/agent/skills` | pinned |
+| `pi` | `pi` | `0.73.1` | not yet | `--tools read,grep,find,ls` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.pi/skills` | pinned |
 | `mastracode` | `mastracode` | `0.42.0` | not yet | `--mode plan` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.mastracode/skills` | pinned |
 <!-- agents-table:end -->
 

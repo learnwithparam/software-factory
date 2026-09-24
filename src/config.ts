@@ -4,6 +4,7 @@
 // only reads it, and `factory doctor` checks it exists. Missing fields fall
 // back to DEFAULT_CONFIG so a minimal config.json still works.
 
+import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
 import type { AgentConfig, StageAgents } from "./agents/types";
 
@@ -207,9 +208,28 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   const raw = await file.json();
   const problems = configProblems(raw);
   if (problems.length > 0) throw new ConfigError(`${path} is invalid:\n  - ${problems.join("\n  - ")}`);
-  const config = mergeConfig(raw as Partial<FactoryConfig>);
+  let config = mergeConfig(raw as Partial<FactoryConfig>);
+  // GitHub calls follow config.repo but git pushes follow origin; a copied config must not aim one at the wrong repo.
+  const origin = originRepo(targetRepoDir);
+  if (config.repo === "" && origin) config = { ...config, repo: origin };
   if (!/^[^/\s]+\/[^/\s]+$/.test(config.repo)) {
     throw new ConfigError(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
   }
+  if (origin && origin.toLowerCase() !== config.repo.toLowerCase()) {
+    throw new ConfigError(`${path}: "repo" is ${config.repo} but this clone's origin is ${origin}; fix "repo" or remove it to use the origin`);
+  }
   return config;
+}
+
+// owner/name from a github.com https or ssh remote URL; anything else (a file path, another host) is not ours to judge.
+export function repoFromRemoteUrl(url: string): string | undefined {
+  const m = url.trim().match(/^(?:https?:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/);
+  return m ? `${m[1]}/${m[2]}` : undefined;
+}
+
+// Only a directory that is itself a git checkout counts, so a temp dir under some other repo does not inherit its origin.
+function originRepo(dir: string): string | undefined {
+  if (!existsSync(`${dir}/.git`)) return undefined;
+  const r = Bun.spawnSync(["git", "-C", dir, "remote", "get-url", "origin"], { stdout: "pipe", stderr: "ignore" });
+  return r.exitCode === 0 ? repoFromRemoteUrl(r.stdout.toString()) : undefined;
 }

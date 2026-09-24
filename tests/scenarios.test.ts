@@ -188,11 +188,11 @@ describe("approval paths", () => {
     c.push("pr", pr());
     expect(await c.step()).toBe("shipped");
     const rows = Object.fromEntries(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => [r.stage, r]));
-    expect([rows.triage!.usage_complete, rows.triage!.cost_usd]).toEqual([0, 0]);
+    expect([rows.triage!.usage_complete, rows.triage!.cost_usd]).toEqual([0, null]);
     expect(rows.plan!.usage_complete).toBe(1);
     expect(rows.plan!.tokens_cached).toBe(400);
     expect(rows.plan!.cost_usd).toBeCloseTo((600 * 1 + 400 * 0.1 + 100 * 5) / 1e6, 12);
-    expect(rows.build!.usage_complete).toBe(0);
+    expect([rows.build!.usage_complete, rows.build!.cost_usd]).toEqual([0, null]);
     expect([rows.verify!.usage_complete, rows.verify!.cost_usd]).toEqual([1, 0.25]);
     done(c);
   });

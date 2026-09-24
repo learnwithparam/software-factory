@@ -21,6 +21,7 @@ import { act, buildInbox, inboxPositionals, type InboxAction } from "../src/inbo
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
+import { versionOf, which } from "../src/probes";
 import { workspacesDir as defaultWorkspacesDir } from "../src/paths";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
@@ -39,21 +40,6 @@ function flag(name: string): string | undefined {
 
 function has(name: string): boolean {
   return args.includes(`--${name}`);
-}
-
-async function versionOf(bin: string): Promise<string | undefined> {
-  try {
-    const proc = Bun.spawn([bin, "--version"], { stdout: "pipe", stderr: "ignore" });
-    const out = await new Response(proc.stdout).text();
-    return (await proc.exited) === 0 ? out.trim() : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function which(bin: string): Promise<boolean> {
-  const proc = Bun.spawn(["which", bin], { stdout: "pipe", stderr: "pipe" });
-  return (await proc.exited) === 0;
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -231,6 +217,7 @@ async function cmdReset(): Promise<void> {
     issuesDir: `${cloneDir}/.factory/issues`,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
     statePath: flag("db") ?? DEFAULT_DB_PATH,
+    allIssues: has("all-issues"),
   };
   const deps = { github: new GitHub(), git: new GitCommandRunner() };
   const summary = await reset(deps, ctx, dryRun);

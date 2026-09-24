@@ -12,6 +12,10 @@ const opts = (stage: StageName) => ({ stage, issue: 7, cwd: "/work", maxBudgetUs
 const argv = (name: string, stage: StageName, model?: string) => PRESETS[name]!.command(opts(stage), { preset: name, model }, "PROMPT").argv;
 
 describe("preset argv", () => {
+  test("codex: read-only sandbox on triage, plan and verify, workspace-write on build and pr", () => {
+    for (const stage of ["triage", "plan", "verify"] as const) expect(argv("codex", stage)).toContain("read-only");
+    for (const stage of ["build", "pr"] as const) expect(argv("codex", stage)).toContain("workspace-write");
+  });
   test("gemini: plan mode for read-only stages, yolo for write stages, prompt on stdin", () => {
     expect(argv("gemini", "plan")).toEqual(["gemini", "-o", "stream-json", "--approval-mode", "plan", "-p", ""]);
     expect(argv("gemini", "build", "gemini-3-pro")).toEqual(["gemini", "-o", "stream-json", "--approval-mode", "yolo", "-m", "gemini-3-pro", "-p", ""]);
@@ -23,14 +27,16 @@ describe("preset argv", () => {
   });
   test("opencode: json events, auto-approve, run in the worktree", () => {
     expect(argv("opencode", "build", "anthropic/claude-sonnet-5")).toEqual(["opencode", "run", "--format", "json", "--auto", "--dir", "/work", "-m", "anthropic/claude-sonnet-5"]);
+    expect(argv("opencode", "plan")).toEqual(["opencode", "run", "--format", "json", "--auto", "--dir", "/work", "--agent", "plan"]);
   });
   test("cursor: plan mode when read-only, the prompt is the last argument", () => {
-    expect(argv("cursor", "triage")).toEqual(["cursor-agent", "-p", "--output-format", "stream-json", "--force", "--workspace", "/work", "--mode", "plan", "PROMPT"]);
+    expect(argv("cursor", "triage")).toEqual(["cursor-agent", "-p", "--output-format", "stream-json", "--workspace", "/work", "--mode", "plan", "PROMPT"]);
     expect(argv("cursor", "build").includes("--mode")).toBe(false);
+    expect(argv("cursor", "build").includes("--force")).toBe(true);
   });
   test("mastracode: jsonl, plan mode when read-only, timeout in seconds", () => {
     const p = PRESETS.mastracode!.command({ ...opts("plan"), timeoutMinutes: 3 }, { preset: "mastracode" }, "PROMPT");
-    expect(p.argv).toEqual(["mastracode", "--permission-mode", "auto", "-o", "jsonl", "--mode", "plan", "--timeout", "180"]);
+    expect(p.argv).toEqual(["mastracode", "--timeout", "180", "--permission-mode", "auto", "--output", "jsonl", "--mode", "plan"]);
     expect(argv("mastracode", "build")).toContain("build");
   });
 });
@@ -106,5 +112,19 @@ describe("the executor applies the env allow-list", () => {
     }
     expect(readFileSync(join(cwd, ".factory/runs/issue-7/keys.txt"), "utf8")).toBe("openai|none");
     rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
+describe("argument size guard", () => {
+  test("an argument over the Linux per-argument limit is refused before spawn", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "factory-argmax-"));
+    try {
+      mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
+      writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\ndescription: x\n---\nplan\n");
+      const ex = new CommandExecutor({ big: { command: ["true", "x".repeat(130 * 1024)] } }, { default: "big" });
+      await expect(ex.runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1 })).rejects.toThrow(/over the 122880 byte limit/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

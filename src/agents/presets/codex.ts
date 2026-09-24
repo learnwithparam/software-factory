@@ -46,6 +46,8 @@ export const codexPreset: AgentPreset = {
   readOnlyBy: "`-s read-only`",
   skillsDir: ".codex/skills",
   contextFile: "AGENTS.md",
+  promptVia: "stdin",
+  evidence: "docs/agent-research/codex/docs.md:5",
   returnsArtifact: true,
   command: (opts, agent, prompt, ctx) => ({
     argv: [

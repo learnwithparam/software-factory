@@ -217,14 +217,14 @@ async function runStage(
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
   // The agent's own cost wins; otherwise price the tokens. No price means the
-  // cost is unknown, which is stored as 0 with usage_complete = 0, never as real.
+  // cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
   const cached = result.tokensCached ?? 0;
   const priced =
     result.costReported === false
       ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
       : result.costUsd;
   const usageComplete = result.usageComplete !== false && priced !== undefined;
-  const costUsd = usageComplete ? (priced ?? 0) : 0;
+  const costUsd = usageComplete ? (priced ?? null) : null;
   deps.state.recordStageRun({
     repo: config.repo,
     issue: issueNumber,
@@ -247,7 +247,7 @@ async function runStage(
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
     tokens_out: run.tokens_out + result.tokensOut,
-    cost_usd: run.cost_usd + costUsd,
+    cost_usd: run.cost_usd + (costUsd ?? 0),
   });
   return result;
 }

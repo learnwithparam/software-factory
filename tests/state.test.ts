@@ -64,6 +64,23 @@ test("a v2.5.0 stage_runs table gains tokens_cached and usage_complete once, kee
   state.close();
 });
 
+test("an old NOT NULL cost_usd column is rebuilt nullable, twice over, and an unknown cost stays NULL", () => {
+  const path = join(dir, "v251.db");
+  const old = new Database(path);
+  old.exec("CREATE TABLE stage_runs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo TEXT NOT NULL, issue INTEGER NOT NULL, stage TEXT NOT NULL, agent TEXT NOT NULL, model TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, duration_ms INTEGER NOT NULL, tool_calls INTEGER NOT NULL DEFAULT 0, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, cost_usd REAL NOT NULL DEFAULT 0, exit_code INTEGER NOT NULL, killed_reason TEXT, tokens_cached INTEGER NOT NULL DEFAULT 0, usage_complete INTEGER NOT NULL DEFAULT 1)");
+  old.exec("INSERT INTO stage_runs (repo, issue, stage, agent, started_at, finished_at, duration_ms, cost_usd, exit_code, usage_complete) VALUES ('acme/widgets', 7, 'plan', 'claude', 'a', 'b', 1, 0.25, 0, 1), ('acme/widgets', 7, 'build', 'codex', 'a', 'b', 1, 0, 0, 0)");
+  old.close();
+  for (let i = 0; i < 2; i++) new FactoryState(path).close();
+  const state = new FactoryState(path);
+  state.recordStageRun(row(8, { cost_usd: null, usage_complete: 0 }));
+  const costs = state.listStageRuns("acme/widgets").map((r) => r.cost_usd);
+  expect(costs).toEqual([0.25, null, null]);
+  state.close();
+  const check = new Database(path);
+  expect(check.query("PRAGMA index_list(stage_runs)").all().map((i) => (i as { name: string }).name)).toContain("stage_runs_repo_issue_id");
+  check.close();
+});
+
 test("two processes opening a fresh database at once both get the full schema", async () => {
   const dir = mkdtempSync(join(tmpdir(), "factory-race-"));
   const path = join(dir, "factory.db");
