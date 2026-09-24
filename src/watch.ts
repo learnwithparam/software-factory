@@ -27,7 +27,9 @@ import {
   type BuildArtifact,
   type PlanArtifact,
   type TriageArtifact,
+  type VerdictArtifact,
 } from "./artifacts";
+import { hasBlocking, isChecked, keepSupported, type Rechecker } from "./recheck";
 import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { deriveIssueState } from "./derive";
 import { rehydrate } from "./rehydrate";
@@ -68,6 +70,8 @@ export interface WatchDeps {
   readonly state: FactoryState;
   readonly executor: Executor;
   readonly gateRunner: GateRunner;
+  // A tool-free second look at must/should findings; absent means findings stand as written.
+  readonly rechecker?: Rechecker;
   readonly cloneDir: string;
   readonly workspacesDir: string;
 }
@@ -110,6 +114,24 @@ async function postComment(
   // No marker means it would read as an OWNER-authored human comment.
   const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body.includes("<!-- factory:") ? body : `${body}\n\n<!-- factory:notice -->`;
   await deps.github.commentIssue(config.repo, issueNumber, full);
+}
+
+// Drop the must/should findings the diff does not support. A reject that loses
+// every blocking finding becomes uncertain (a human looks), never a silent pass.
+async function recheckFindings(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  worktree: string,
+  verdict: VerdictArtifact,
+): Promise<{ verdict: VerdictArtifact; note: string }> {
+  const checked = verdict.findings.filter(isChecked);
+  const supported = await deps.rechecker!.supported(checked, await deps.git.diff(worktree, config.base));
+  if (supported === undefined) return { verdict, note: "" };
+  const { kept, dropped } = keepSupported(verdict.findings, supported);
+  if (dropped.length === 0) return { verdict, note: "" };
+  const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
+  const list = dropped.map((f) => `- ${f.what}`).join("\n");
+  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nA second check found the diff does not support ${dropped.length} finding(s), so they were dropped:\n${list}` };
 }
 
 // Build's status-comment.md is the one comment the runner keeps and edits in
@@ -441,7 +463,13 @@ async function runFromStage(
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
       const checked = art.json === undefined ? undefined : validateVerdict(art.json);
-      const json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
+      let json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
+      let recheckNote = "";
+      if (json && deps.rechecker && json.findings.some(isChecked)) {
+        const rechecked = await recheckFindings(deps, config, worktree, json);
+        json = rechecked.verdict;
+        recheckNote = rechecked.note;
+      }
       if (checked && !checked.ok) {
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", checked.reason);
@@ -450,6 +478,8 @@ async function runFromStage(
       const verifyStop = stepStop(json);
       if (verifyStop) return stopStep(deps, config, issueNumber, LABEL.verifying, verifyStop);
       if (result.exitCode !== 0 || !json || json.result === "uncertain") {
+        // The human needs to see why the re-check left nothing to act on.
+        if (recheckNote && art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(
           deps,
@@ -460,7 +490,7 @@ async function runFromStage(
         );
         return "needs-human";
       }
-      if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "verify", json });
+      if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
       if (json.result === "reject") {
         ctx.rejectRound += 1;
         if (ctx.rejectRound > MAX_VERIFY_REJECTS) {

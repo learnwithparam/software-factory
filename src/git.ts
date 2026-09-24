@@ -130,6 +130,11 @@ export class Git {
     return Number(result.stdout.trim() || "0") > 0;
   }
 
+  // The patch of this branch against its base, for a reviewer that has no tools.
+  async diff(worktreeDir: string, base: string): Promise<string> {
+    return (await this.runner.run(["diff", `origin/${base}...HEAD`], { cwd: worktreeDir })).stdout;
+  }
+
   // Files changed on this branch versus its base, regardless of how they
   // were changed — the check that catches a Bash-made edit the Edit/Write
   // guard hook never saw (audit finding #12).

@@ -187,6 +187,11 @@ export class FakeGit extends Git {
     return this.trees.length > 1 ? this.trees.shift()! : this.trees[0]!;
   }
 
+  diffText = "diff --git a/x b/x";
+  override async diff(): Promise<string> {
+    return this.diffText;
+  }
+
   override async hasCommits(): Promise<boolean> {
     return true;
   }

@@ -419,6 +419,39 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("14h. a tool-free re-check drops unsupported findings, and a reject left with none goes to a human", async () => {
+    const finding = (what: string) => ({ severity: "must", confidence: 4, what });
+    const rejected = (findings: unknown[]) => ({ "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result: "reject", rounds: 1, findings }) });
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const asked: unknown[] = [];
+    (c.deps as { rechecker?: unknown }).rechecker = { supported: async (f: unknown[]) => (asked.push(f), [] as number[]) };
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    c.push("verify", rejected([finding("invented bug")]));
+    expect(await c.step()).toBe("needs-human");
+    expect(asked).toHaveLength(1);
+    const body = c.github.issues.get(1)!.comments.map((m) => m.body).join("\n");
+    expect(body).toContain("does not support 1 finding(s)");
+    expect(body).toContain("- invented bug");
+    // A supported finding stands: the reject still sends the issue back to build.
+    const d = setup([LABEL.ready]);
+    d.state.setToggle("auto_approve_low_risk", true);
+    (d.deps as { rechecker?: unknown }).rechecker = { supported: async () => [0] };
+    d.push("triage", triage());
+    d.push("plan", plan("low"));
+    d.push("build", build());
+    d.push("verify", rejected([finding("real bug")]));
+    d.push("build", build());
+    d.push("verify", verdict("pass"));
+    d.push("pr", pr());
+    expect(await d.step()).toBe("shipped");
+    expect(d.github.seenLabels.has(LABEL.building)).toBe(true);
+    done(c);
+    done(d);
+  });
+
   test("14e. triage refuses an issue another open PR already closes, and spends no tokens", async () => {
     const c = setup(["factory:ready"]);
     c.github.prs.push({ number: 9, url: "u", state: "open", headRefName: "someone/fix", isDraft: false, closingIssuesReferences: [{ number: c.n }] });
