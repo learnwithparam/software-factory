@@ -15,12 +15,13 @@ import { writeRevision } from "./revision";
 import type { Executor, StageName, StageRunResult } from "./executor";
 import {
   clearStageArtifacts,
+  validateVerdict,
+  writeGateEvidence,
   readStageArtifacts,
   runDir,
   type BuildArtifact,
   type PlanArtifact,
   type TriageArtifact,
-  type VerdictArtifact,
 } from "./artifacts";
 import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { deriveIssueState } from "./derive";
@@ -192,8 +193,8 @@ async function runStage(
     repo: config.repo,
     issue: issueNumber,
     stage: stage as Stage,
-    agent: "claude", // the only executor until v2.5 makes the agent a config choice
-    model: null,
+    agent: result.agent ?? "claude", // ReplayExecutor reports none
+    model: result.model ?? null,
     started_at: startedAt.toISOString(),
     finished_at: finishedAt.toISOString(),
     duration_ms: finishedAt.getTime() - startedAt.getTime(),
@@ -358,6 +359,7 @@ async function runFromStage(
       }
 
       deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
+      await writeGateEvidence(worktree, issueNumber, { line: gate.raw, status: gate.status, tree: await deps.git.treeHash(worktree) });
       await deps.git.push(worktree, issueNumber);
       await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.verifying);
       stage = "verify";
@@ -367,7 +369,13 @@ async function runFromStage(
     if (stage === "verify") {
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
-      const json = art.json as VerdictArtifact | undefined;
+      const checked = art.json === undefined ? undefined : validateVerdict(art.json);
+      const json = checked?.ok ? checked.verdict : undefined;
+      if (checked && !checked.ok) {
+        await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
+        finish(deps, config, issueNumber, "needs-human", checked.reason);
+        return "needs-human";
+      }
       if (result.exitCode !== 0 || !json || json.result === "uncertain") {
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(

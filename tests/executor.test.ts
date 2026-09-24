@@ -11,13 +11,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  aggregateStageEvents,
-  claudeArgs,
-  parseStreamJsonLine,
-  ReplayExecutor,
-  type StageName,
-} from "../src/executor";
+import { aggregateStageEvents, ReplayExecutor, type StageName } from "../src/executor";
+import { claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, fixtureFor, MultiStageExecutor } from "./harness";

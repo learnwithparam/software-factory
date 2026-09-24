@@ -27,9 +27,11 @@ build stage (or a human) fixes them.
 
 ## How to report
 
-One finding per line, each naming the file and line, what's wrong, and why
-it matters — not a style pass. Severity matters: separate "blocks this
-verdict" from "worth a follow-up issue, not blocking." If you find
+One finding per item, each with: severity (`must` fix, `should` fix, or
+`could` fix), confidence 0-5, what is wrong, where (file and line), why it
+matters, and the fix. Not a style pass. Confidence 0-2 means you could not
+show it from the diff: leave it out. `must` and `should` at 3 or more block
+the verdict; `could` does not. If you find
 nothing, say "None" plainly; do not manufacture a nitpick to look
 thorough.
 

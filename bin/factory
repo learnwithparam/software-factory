@@ -8,8 +8,8 @@ import { resolve } from "node:path";
 import { GitHub } from "../src/github";
 import { GitCommandRunner, Git } from "../src/git";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
-import { ClaudeExecutor } from "../src/executor";
-import { loadConfig } from "../src/config";
+import { CommandExecutor } from "../src/agents/executor";
+import { loadConfig, type FactoryConfig } from "../src/config";
 import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
@@ -70,7 +70,7 @@ function buildWatchDeps(cloneDir: string): WatchDeps {
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? DEFAULT_DB_PATH),
-    executor: new ClaudeExecutor(),
+    executor: new CommandExecutor(config.agents, config.stages),
     gateRunner: new ShellGateRunner(),
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
@@ -80,7 +80,7 @@ function buildWatchDeps(cloneDir: string): WatchDeps {
 async function cmdWatch(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const deps = buildWatchDeps(cloneDir);
+  const deps = buildWatchDeps(cloneDir, config);
   console.log(`factory watch: polling ${config.repo} every ${config.pollIntervalSeconds}s`);
   // Re-drive anything a crashed or previously-killed process left sitting in
   // a running label before the first poll — otherwise it just sits there,
@@ -110,7 +110,7 @@ async function cmdRun(): Promise<void> {
   const config = await loadConfig(cloneDir);
   const issueNumber = Number(flag("issue"));
   if (!issueNumber) throw new UsageError("run: --issue <N> is required");
-  const deps = buildWatchDeps(cloneDir);
+  const deps = buildWatchDeps(cloneDir, config);
   const issue = await deps.github.getIssue(config.repo, issueNumber);
   const outcome = await advanceIssue(deps, config, issue);
   if (has("json")) console.log(successJson({ issue: issueNumber, outcome }, outcome !== "failed"));
@@ -124,7 +124,7 @@ async function cmdRun(): Promise<void> {
 async function cmdTick(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const deps = buildWatchDeps(cloneDir);
+  const deps = buildWatchDeps(cloneDir, config);
   const result = await pollOnce(deps, config);
   console.log(has("json") ? successJson(result, !result.paused) : JSON.stringify(result, null, 2));
   if (result.paused) process.exit(EXIT.paused);
@@ -268,7 +268,7 @@ async function cmdDoctor(): Promise<void> {
         }
       },
     },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE },
+    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages },
   );
   const allOk = checks.every((c) => c.ok);
   if (has("json")) console.log(successJson({ checks }, allOk));
@@ -318,7 +318,7 @@ async function cmdDashboard(): Promise<void> {
 async function cmdUp(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const deps = buildWatchDeps(cloneDir);
+  const deps = buildWatchDeps(cloneDir, config);
   const recovered = await recoverInFlight(deps, config);
   if (recovered.length) console.log(`factory up: recovered #${recovered.join(", #")}`);
   startWatch(deps, config, (r) => {

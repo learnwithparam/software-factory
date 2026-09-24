@@ -106,6 +106,12 @@ export class Git {
     return this.runner.run(["push", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
 
+  // The tree of HEAD: the same hash for the same content, whatever the commit.
+  async treeHash(worktreeDir: string): Promise<string> {
+    const result = await this.runner.run(["rev-parse", "HEAD^{tree}"], { cwd: worktreeDir });
+    return result.stdout.trim();
+  }
+
   async hasCommits(worktreeDir: string, base: string): Promise<boolean> {
     const result = await this.runner.run(["rev-list", `origin/${base}..HEAD`, "--count"], { cwd: worktreeDir });
     return Number(result.stdout.trim() || "0") > 0;

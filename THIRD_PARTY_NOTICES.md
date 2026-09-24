@@ -16,6 +16,11 @@ Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain L
 - `dashboard/public/lib/task-presentation.js` from `internal/controlplane/web/src/task-presentation.js`
 - `dashboard/public/lib/routes.js` from `internal/controlplane/web/src/routes.js`
 - `src/revision.ts` from `internal/runner/revision.go` (shape from `internal/protocol/revision.go`)
+- `src/agents/executor.ts` from `internal/runner/runner.go` (process group kill from `process_unix.go`)
+- `src/agents/env.ts` from `internal/runner/runner.go`
+- `src/agents/final-message.ts` from `internal/runner/codex_usage.go`
+- `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go`
+- `src/agents/usage.ts` from `internal/runner/codex_usage.go`
 
 ## owainlewis/assembler@7cac671
 

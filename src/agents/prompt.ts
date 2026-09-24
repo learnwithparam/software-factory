@@ -1,0 +1,39 @@
+// The prompt a non-Claude agent receives: the stage skill's body, then the
+// artifact contract. Any agent that can write a file can do a stage, so the
+// contract is the only interface. Claude runs `/factory-<stage> N` itself.
+// Shape after owainlewis/machinist@3943516 internal/runner/runner.go:220 (the contract suffix).
+
+import { readFile } from "node:fs/promises";
+import { COMMENT_FILENAMES, JSON_FILENAMES, runDir } from "../artifacts";
+import type { StageRunOptions } from "../executor";
+
+export function stripFrontmatter(text: string): string {
+  return text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4).replace(/^\n+/, "") : text;
+}
+
+export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">): string {
+  return [
+    "## Artifact contract",
+    "",
+    `You run in the issue's worktree. Write your results as files in $FACTORY_ARTIFACT_DIR (${runDir(opts.issue)}/):`,
+    `- ${JSON_FILENAMES[opts.stage]}: the structured result, exactly as the instructions above describe.`,
+    `- ${COMMENT_FILENAMES[opts.stage]}: the comment the runner posts on the issue.`,
+    "- question-comment.md: only when you cannot proceed without an answer from a human.",
+    "",
+    "You have no GitHub access and cannot push or merge; the runner does that. Finish by exiting.",
+  ].join("\n");
+}
+
+export async function renderPrompt(opts: StageRunOptions): Promise<string> {
+  const skill = await readFile(`${opts.cwd}/.claude/skills/factory-${opts.stage}/SKILL.md`, "utf8").catch(() => {
+    throw new Error(`stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``);
+  });
+  return [
+    `Stage: ${opts.stage}. Issue number: ${opts.issue}. Wherever the instructions say <N>, use ${opts.issue}.`,
+    "",
+    stripFrontmatter(skill).trim(),
+    "",
+    artifactContract(opts),
+    "",
+  ].join("\n");
+}

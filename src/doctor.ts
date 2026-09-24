@@ -3,6 +3,8 @@
 
 import type { CommandRunner, GitHub } from "./github";
 import { LABELS } from "./labels";
+import type { AgentConfig, StageAgents } from "./agents/types";
+import { PRESETS } from "./agents/presets";
 
 export interface DoctorCheck {
   readonly name: string;
@@ -25,6 +27,8 @@ export interface DoctorContext {
   readonly cloneDir: string;
   readonly baselineTag: string;
   readonly factoryMode?: string; // FACTORY_MODE, "actions" when CI drives the loop
+  readonly agents?: Record<string, AgentConfig>;
+  readonly stages?: StageAgents;
 }
 
 export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<DoctorCheck[]> {
@@ -36,12 +40,31 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     detail: "gh CLI must be installed and authenticated (`gh auth status`)",
     fixable: false,
   });
-  checks.push({
-    name: "claude on PATH",
-    ok: await deps.which("claude"),
-    detail: "the Claude Code CLI runs each stage",
-    fixable: false,
-  });
+  // One check per agent a stage actually uses, not one for every agent in config.
+  const agents = ctx.agents ?? { claude: { preset: "claude" } };
+  const stages = ctx.stages ?? { default: "claude" };
+  // The default only counts if some stage falls back to it.
+  const STAGES = ["triage", "plan", "build", "verify", "pr"] as const;
+  const used = new Set(STAGES.map((st) => stages[st] ?? stages.default ?? "claude"));
+  for (const name of [...used].sort()) {
+    const agent = agents[name];
+    const preset = agent?.preset ? PRESETS[agent.preset] : undefined;
+    const binary = agent?.command?.[0] ?? preset?.binary;
+    checks.push({
+      name: `${binary ?? name} on PATH`,
+      ok: binary !== undefined && (await deps.which(binary)),
+      detail: `agent "${name}" runs each stage it is assigned`,
+      fixable: false,
+    });
+    if (agent && !preset) {
+      checks.push({
+        name: `agent "${name}" reports usage`,
+        ok: true,
+        detail: "no preset, so tokens show as not reported and the tool-call cap is not enforced; the timeout is the backstop (consider a sandbox)",
+        fixable: false,
+      });
+    }
+  }
   checks.push({
     name: "python3 on PATH",
     ok: await deps.which("python3"),

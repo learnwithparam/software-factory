@@ -3,6 +3,9 @@
 // only reads it, and `factory doctor` checks it exists. Missing fields fall
 // back to DEFAULT_CONFIG so a minimal config.json still works.
 
+import { PRESETS } from "./agents/presets";
+import type { AgentConfig, StageAgents } from "./agents/types";
+
 export interface RiskPolicy {
   // Low risk (docs, test-only, a single non-protected module) is eligible for
   // auto-approve; the toggle in state.ts still has to be on.
@@ -48,6 +51,9 @@ export interface FactoryConfig {
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
   readonly agentCommands: AgentCommands;
+  // Named agents, each a preset or a command; `stages` says which one runs a stage.
+  readonly agents: Readonly<Record<string, AgentConfig>>;
+  readonly stages: StageAgents;
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -64,6 +70,8 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   maxToolCalls: 60,
   gates: [],
   agentCommands: { read: [], build: [], verify: [] },
+  agents: { claude: { preset: "claude" } },
+  stages: { default: "claude" },
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -73,6 +81,8 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     riskPolicy: { ...DEFAULT_CONFIG.riskPolicy, ...partial.riskPolicy },
     maxBudgetUsd: { ...DEFAULT_CONFIG.maxBudgetUsd, ...partial.maxBudgetUsd },
     agentCommands: { ...DEFAULT_CONFIG.agentCommands, ...partial.agentCommands },
+    agents: { ...DEFAULT_CONFIG.agents, ...partial.agents },
+    stages: { ...DEFAULT_CONFIG.stages, ...partial.stages },
   };
 }
 
@@ -95,6 +105,8 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   maxToolCalls: "posInt",
   gates: "object",
   agentCommands: "object",
+  agents: "object",
+  stages: "object",
   riskCriteria: "object",
 };
 
@@ -138,6 +150,48 @@ export function configProblems(raw: unknown): string[] {
       else checkKeys(g as Record<string, unknown>, { name: "string", cmd: "string", required: "boolean" }, `gates[${i}].`, problems);
     });
   }
+  problems.push(...agentProblems(cfg.agents, cfg.stages));
+  return problems;
+}
+
+const STAGE_KEYS = ["default", "triage", "plan", "build", "verify", "pr"];
+
+// An agent is a preset or a command. `{{prompt}}` in the executable slot would
+// run the prompt as a program (assembler validateConfig), so it is refused.
+function agentProblems(agents: unknown, stages: unknown): string[] {
+  const problems: string[] = [];
+  const named = new Set(["claude"]);
+  if (agents !== undefined && typeof agents === "object" && agents !== null && !Array.isArray(agents)) {
+    for (const [name, raw] of Object.entries(agents as Record<string, unknown>)) {
+      if (name.startsWith("_")) continue;
+      named.add(name);
+      const where = `agents.${name}.`;
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        problems.push(`agents.${name}: expected an object`);
+        continue;
+      }
+      const a = raw as Record<string, unknown>;
+      checkKeys(a, { preset: "string", command: "strings", model: "string" }, where, problems);
+      if (typeof a.preset === "string" && !PRESETS[a.preset]) problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
+      if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
+      if (Array.isArray(a.command)) {
+        if (a.command.length === 0) problems.push(`${where}command: must not be empty`);
+        else if (!String(a.command[0]).trim()) problems.push(`${where}command: the executable must not be empty`);
+        else if (/\{\{/.test(String(a.command[0]))) problems.push(`${where}command: the executable cannot be a placeholder`);
+        // `sh -c "{{prompt}}"` would run issue text as shell code.
+        else if (/^(ba|z|da|k|c)?sh$/.test(String(a.command[0]).split("/").pop()!) && a.command.slice(1).some((x) => /\{\{prompt\}\}/.test(String(x)))) {
+          problems.push(`${where}command: {{prompt}} must not be an argument of a shell (use {{promptFile}} or stdin)`);
+        }
+      }
+    }
+  } else if (agents !== undefined) problems.push("agents: expected an object");
+  if (stages !== undefined && typeof stages === "object" && stages !== null && !Array.isArray(stages)) {
+    for (const [stage, agent] of Object.entries(stages as Record<string, unknown>)) {
+      if (stage.startsWith("_")) continue;
+      if (!STAGE_KEYS.includes(stage)) problems.push(`stages.${stage}: unknown stage (allowed: ${STAGE_KEYS.join(", ")})`);
+      else if (typeof agent !== "string" || !named.has(agent)) problems.push(`stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
+    }
+  } else if (stages !== undefined) problems.push("stages: expected an object");
   return problems;
 }
 
