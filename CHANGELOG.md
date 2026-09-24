@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.6.1
+
+Residue fixes for v2.6.0. No new features.
+
+Corrections to v2.6.0:
+- The doctor did not fail a custom agent that had no bypass flag; it does now, and `--version` has a timeout.
+- The CI template did not install every preset or pass its keys; it does, and a test checks it.
+- The Docker note "a build with two agents was run" had no recorded evidence. It is not repeated here.
+- OpenCode and Pi were sent the prompt on stdin, but their captured help shows a positional message; both
+  now follow the captures. Pi's skills dir is `.pi/skills`. Each preset cites its evidence line in a test.
+- Mastra Code has no `--version` (it reads it as a prompt); doctor skips the drift check for it. Its argv is
+  built through flags ported from mastra under Apache-2.0 (`ee/` was not read).
+- R11 was already covered: Codex gets `-s read-only` per stage, and a test pins it.
+
+Fixes:
+- R10: `stage_runs.cost_usd` is nullable in old databases too; an unknown cost stays NULL, not $0.
+- `factory reset` and `watch` act on the clone's origin. A config whose `repo` disagrees with origin is
+  refused, and a missing `repo` is read from origin. Before this, a copied config could close and reseed
+  issues on the wrong repo.
+- `factory reset` checks the baseline tag before closing anything, and closes only issues labelled
+  `factory:*` or seeded from `.factory/issues`. `--all-issues` keeps the old behaviour for a sandbox.
+- `tests/app-agnostic.test.ts`: runtime code never names the demo app outside comments, and a Python repo on
+  a `trunk` branch loads, gates and refuses a wrong origin.
+- The Agents page shows the installed version and doctor rows, and stages fall back to Claude like the executor.
+- `install.sh`'s agent map is pinned to `src/agent-dirs.ts` and every preset's `skillsDir`.
+- `docs/verify-an-agent.md` has a section per preset. `teach/sessions.json` maps each session to its release.
+
+Not in v2.6.1:
+- Live runs of any agent except Claude. Docker build evidence per agent.
+- The `resettable` opt-in, per-repo state databases and a base default from origin/HEAD (v2.6.2).
+
 ## v2.6.0
 
 One factory, any agent. Every preset except Claude ships `verified: false`; participants verify them with
