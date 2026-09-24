@@ -4,6 +4,7 @@
 
 import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
+import { EventBudget, MAX_EVENT_LOG_BYTES, TRUNCATION_KIND } from "./event-budget";
 import { dirname } from "node:path";
 import { defaultStatePath } from "./paths";
 
@@ -241,7 +242,23 @@ export class FactoryState {
     return this.db.query("SELECT * FROM runs ORDER BY updated_at DESC").all() as Run[];
   }
 
+  private readonly budgets = new Map<number, EventBudget>();
+  // Per-run cap on stored event bytes (machinist events.go); tests lower it.
+  eventByteLimit = MAX_EVENT_LOG_BYTES;
+
   appendEvent(runId: number, stage: Stage, kind: string, text: string): void {
+    let budget = this.budgets.get(runId);
+    if (!budget) {
+      const row = this.db.query("SELECT COALESCE(SUM(LENGTH(CAST(text AS BLOB)) + LENGTH(kind)), 0) AS n FROM events WHERE run_id = $id").get({ $id: runId }) as { n: number };
+      budget = new EventBudget(row.n, this.eventByteLimit);
+      this.budgets.set(runId, budget);
+    }
+    const verdict = budget.admit(Buffer.byteLength(text) + kind.length);
+    if (verdict === "drop") return;
+    if (verdict === "truncate") {
+      kind = TRUNCATION_KIND;
+      text = budget.message();
+    }
     this.db
       .query("INSERT INTO events (run_id, ts, stage, kind, text) VALUES ($run_id, $ts, $stage, $kind, $text)")
       .run({ $run_id: runId, $ts: new Date().toISOString(), $stage: stage, $kind: kind, $text: text });

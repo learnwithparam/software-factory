@@ -11,6 +11,7 @@ import { aggregateStageEvents, type Executor, type StageEvent, type StageRunOpti
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
+import { replySchema } from "../schemas";
 import { writeReply } from "./reply";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
 
@@ -81,7 +82,12 @@ export class CommandExecutor implements Executor {
         argv = rendered.argv;
         stdin = rendered.usesStdin ? prompt : undefined;
       } else if (agent.preset) {
-        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt));
+        let schemaFile: string | undefined;
+        if (readOnly && agent.config.outputSchema) {
+          schemaFile = join(scratch, "reply.schema.json");
+          writeFileSync(schemaFile, JSON.stringify(replySchema(opts.stage)));
+        }
+        ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile }));
       } else {
         throw new Error(`agent "${agent.name}" has neither a preset nor a command`);
       }

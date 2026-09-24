@@ -10,6 +10,8 @@ export interface AgentConfig {
   // With no placeholder the prompt goes to stdin.
   readonly command?: readonly string[];
   readonly model?: string;
+  // Pass the reply schema to the CLI (Codex --output-schema). Off until a live run confirms the CLI accepts it.
+  readonly outputSchema?: boolean;
 }
 
 // stages.default is the agent for every stage; a stage name overrides it.

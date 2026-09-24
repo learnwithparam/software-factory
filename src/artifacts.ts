@@ -76,7 +76,8 @@ export interface VerdictArtifact {
 
 // A step result is one JSON object of at most 16 KiB (machinist workflow.go).
 export const MAX_STEP_JSON_BYTES = 16 * 1024;
-const VERDICT_KEYS = new Set(["result", "rounds", "findings", "criteria", "outcome", "summary"]);
+export const VERDICT_KEY_LIST = ["result", "rounds", "findings", "criteria", "outcome", "summary"] as const;
+const VERDICT_KEYS = new Set<string>(VERDICT_KEY_LIST);
 const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix"]);
 const CRITERION_KEYS = new Set(["id", "status", "gap"]);
 // A finding this sure and this serious contradicts a pass.
@@ -94,7 +95,7 @@ function stepEnvelopeProblem(o: Record<string, unknown>): string | undefined {
 
 // Every stage artifact rejects a field it does not define, so a typo cannot
 // pass as a silent no-op. The verdict has its own, deeper validator above.
-const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
+export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
   triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence", "outcome", "summary"],
   plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "outcome", "summary"],
   build: ["status", "gate_line", "rounds", "outcome", "summary"],

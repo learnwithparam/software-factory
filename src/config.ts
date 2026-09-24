@@ -172,7 +172,7 @@ function agentProblems(agents: unknown, stages: unknown): string[] {
         continue;
       }
       const a = raw as Record<string, unknown>;
-      checkKeys(a, { preset: "string", command: "strings", model: "string" }, where, problems);
+      checkKeys(a, { preset: "string", command: "strings", model: "string", outputSchema: "boolean" }, where, problems);
       if (typeof a.preset === "string" && !PRESETS[a.preset]) problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
       if (Array.isArray(a.command)) {

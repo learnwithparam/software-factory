@@ -12,6 +12,7 @@
 
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
+import { TRUNCATION_KIND } from "./event-budget";
 import { costFor } from "./pricing";
 import type { Executor, StageName, StageRunResult } from "./executor";
 import {
@@ -190,7 +191,7 @@ async function runStage(
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
   });
-  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind, e.text ?? e.toolName ?? "");
+  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
   // The agent's own cost wins; otherwise price the tokens. No price means the
   // cost is unknown, which is stored as 0 with usage_complete = 0, never as real.

@@ -5,6 +5,7 @@
 
 import { readFile } from "node:fs/promises";
 import { COMMENT_FILENAMES, JSON_FILENAMES, runDir } from "../artifacts";
+import { stageSchema } from "../schemas";
 import type { StageRunOptions } from "../executor";
 
 export function stripFrontmatter(text: string): string {
@@ -19,6 +20,8 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
       "This stage is read-only: you cannot write files. Do not try. Your final message must be ONE JSON object and nothing else, with no code fence:",
       `{"artifact": <the structured result, exactly as the instructions above describe for ${JSON_FILENAMES[opts.stage]}>, "comment": "<the comment the runner posts on the issue, in markdown>", "question": "<only when you cannot proceed without a human answer>"}`,
       "",
+      `The artifact must match this JSON Schema: ${JSON.stringify(stageSchema(opts.stage))}`,
+      "",
       "You have no GitHub access and cannot push or merge; the runner does that.",
     ].join("\n");
   }
@@ -26,7 +29,7 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
     "## Artifact contract",
     "",
     `You run in the issue's worktree. Write your results as files in $FACTORY_ARTIFACT_DIR (${runDir(opts.issue)}/):`,
-    `- ${JSON_FILENAMES[opts.stage]}: the structured result, exactly as the instructions above describe.`,
+    `- ${JSON_FILENAMES[opts.stage]}: the structured result, exactly as the instructions above describe. Schema: ${JSON.stringify(stageSchema(opts.stage))}`,
     `- ${COMMENT_FILENAMES[opts.stage]}: the comment the runner posts on the issue.`,
     "- question-comment.md: only when you cannot proceed without an answer from a human.",
     "",

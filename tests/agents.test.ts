@@ -171,7 +171,7 @@ describe("codex with read-only stages", () => {
   const bin = mkdtempSync(join(scratch, "bin-"));
   symlinkSync(join(import.meta.dir, "fixtures/agents/fake-codex.ts"), join(bin, "codex"));
 
-  async function run(n: number, bad?: string) {
+  async function run(n: number, bad?: string, outputSchema?: boolean) {
     const log = mkdtempSync(join(scratch, "log-"));
     const saved = process.env.PATH;
     process.env.PATH = `${bin}:${saved}`;
@@ -181,7 +181,7 @@ describe("codex with read-only stages", () => {
     const github = new FakeGitHub([issue]);
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
-    const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra" } }, stages: { default: "codex" } });
+    const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra", ...(outputSchema ? { outputSchema } : {}) } }, stages: { default: "codex" } });
     const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
     try {
       return { result: await processReadyIssue(issue, deps, config), github, state, log };
@@ -200,6 +200,13 @@ describe("codex with read-only stages", () => {
     // Cached tokens are stored, and gpt-5.6-terra has no price, so the cost is "not reported".
     const [row] = state.listStageRuns("acme/widgets");
     expect([row!.tokens_cached, row!.usage_complete]).toEqual([40, 0]);
+    state.close();
+  });
+
+  test("outputSchema hands the read-only stages a schema file, and only those", async () => {
+    const { result, log, state } = await run(7, undefined, true);
+    expect(result).toBe("shipped");
+    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only schema", "plan=read-only schema", "build=workspace-write", "verify=read-only schema", "pr=workspace-write"]);
     state.close();
   });
 
