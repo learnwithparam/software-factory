@@ -37,6 +37,12 @@ export interface DoctorContext {
   readonly templateSkills?: Record<string, string>;
 }
 
+// Flags that let a CLI run headless without waiting on an approval prompt.
+export const BYPASS_FLAGS: ReadonlySet<string> = new Set([
+  "--dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox", "--yolo", "--force", "-f", "--auto", "--full-auto",
+  "--yes", "--yes-always", "-y", "--permission-mode", "--approval-mode", "--auto-approve", "--trust", "--allow-all",
+]);
+
 export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
 
@@ -77,7 +83,16 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
         name: `agent "${name}" is verified`,
         ok: false,
         warn: true,
-        detail: `verified by participants: not yet (docs/verify-an-agent.md, \`factory verify-agent ${preset.name}\`)`,
+        detail: `verified live: no (participants verify it with \`factory verify-agent ${preset.name}\`, see docs/verify-an-agent.md)`,
+        fixable: false,
+      });
+    }
+    if (agent?.command && !preset) {
+      const hasBypass = agent.command.some((a) => BYPASS_FLAGS.has(a) || [...BYPASS_FLAGS].some((f) => a.startsWith(`${f}=`)));
+      checks.push({
+        name: `agent "${name}" runs without prompting`,
+        ok: hasBypass,
+        detail: hasBypass ? "its command carries an approval-bypass flag" : `its command has no approval-bypass flag (${[...BYPASS_FLAGS].slice(0, 6).join(", ")}, ...): an unattended run would wait for a prompt until the timeout`,
         fixable: false,
       });
     }

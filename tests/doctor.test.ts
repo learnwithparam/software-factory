@@ -116,6 +116,16 @@ describe("agents in doctor", () => {
     expect(checks.map((c) => c.name)).toContain('agent "aider" reports usage');
     expect((await runDoctor(deps(), ctx)).map((c) => c.name)).not.toContain('agent "claude" reports usage');
   });
+
+  test("a custom command with no approval-bypass flag fails, one with a flag passes", async () => {
+    const which = new Set(["gh", "aider", "python3", "jq"]);
+    const run = (command: string[]) => runDoctor(deps({ which }), { ...ctx, agents: { x: { command } }, stages: { default: "x" } });
+    const bare = (await run(["aider", "--model", "m"])).find((c) => c.name === 'agent "x" runs without prompting')!;
+    expect(bare.ok).toBe(false);
+    expect(bare.warn).toBeUndefined();
+    expect((await run(["aider", "--yes"])).find((c) => c.name === 'agent "x" runs without prompting')!.ok).toBe(true);
+    expect((await run(["tool", "--permission-mode=auto"])).find((c) => c.name === 'agent "x" runs without prompting')!.ok).toBe(true);
+  });
 });
 
 describe("installed skills drift", () => {

@@ -44,8 +44,14 @@ function has(name: string): boolean {
 async function versionOf(bin: string): Promise<string | undefined> {
   try {
     const proc = Bun.spawn([bin, "--version"], { stdout: "pipe", stderr: "ignore" });
-    const out = await new Response(proc.stdout).text();
-    return (await proc.exited) === 0 ? out.trim() : undefined;
+    // A CLI that hangs on --version (an update prompt, a login wall) must not hang the doctor.
+    const timer = setTimeout(() => proc.kill(), 5000);
+    try {
+      const out = await new Response(proc.stdout).text();
+      return (await proc.exited) === 0 ? out.trim() : undefined;
+    } finally {
+      clearTimeout(timer);
+    }
   } catch {
     return undefined;
   }

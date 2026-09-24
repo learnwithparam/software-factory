@@ -1,7 +1,7 @@
 # Verify an agent
 
 Only Claude is verified by the maintainers. Every other preset ships `verified: false`, and
-`factory doctor` says "verified by participants: not yet". You can change that with your own
+`factory doctor` says "verified live: no". You can change that with your own
 credentials and one pull request.
 
 1. Install the agent's CLI and sign in to it (or set its API key in your shell).
