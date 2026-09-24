@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.4.0
+
+The cockpit: a redesigned dashboard and one place for everything that waits on a human.
+
+- `src/inbox.ts` and `factory inbox [<N> <action> [--text <words>]] [--json]`: what is waiting (plan to
+  approve, question, PR in review, parked, failed) derived from labels and the thread. Acting posts the same
+  `/factory` comment a human would type, so GitHub stays the only state.
+- Dashboard redesign, no build step: machinist design tokens (light, dark, system), self-hosted Manrope
+  (OFL), a sidebar that becomes a bottom nav under 768px. Views: Inbox (conversation and composer), Line
+  (one row per issue, stations sized by duration), Runs, Analytics, and a run side sheet with stages,
+  artifact preview and log.
+- New routes: `/api/inbox`, `/api/inbox/:n/act`, `/api/analytics`, `/api/runs/:id/stages`,
+  `/api/issues/:n/artifacts`, `/api/line`. Artifacts are text only, capped at 1 MiB, sandboxed headers.
+- Dashboard auth: constant-time token compare, header or HttpOnly session cookie (`POST /api/session`),
+  no `?token=`, and a default-deny route allow-list proven by a test that walks every route.
+- `factory logs N [--follow] [--json]`; terminal control sequences stripped from displayed text; revision
+  history keeps every earlier `/factory revise`.
+- Ports from owainlewis/machinist and assembler, with their tests, recorded in `THIRD_PARTY_NOTICES.md`
+  and enforced by `tests/provenance.test.ts`.
+
+Not in this release: the merge dry-run inbox item (v2.9), the Agents page (v2.6).
+
 ## v2.3.0
 
 Honest foundation: what the README and labels promise now matches what the code does.
