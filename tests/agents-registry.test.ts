@@ -52,6 +52,20 @@ describe("every preset is fully registered", () => {
     });
   }
 
+  for (const p of Object.values(PRESETS)) {
+    if (p.ownsPrompt) continue;
+    test(`${p.name}: its prompt delivery is backed by a captured line and matches its argv`, () => {
+      expect(p.promptVia).toBeDefined();
+      const [file, line] = (p.evidence ?? "").split(":");
+      const cited = read(file).split("\n")[Number(line) - 1] ?? "";
+      expect(cited).toMatch(p.promptVia === "stdin" ? /stdin/i : /positional/i);
+      const marker = "PROMPT-MARKER";
+      const inv = p.command({ cwd: "/w", issue: 1, stage: "build" } as never, { model: undefined } as never, marker);
+      expect(inv.stdin === marker).toBe(p.promptVia === "stdin");
+      expect(inv.argv.includes(marker)).toBe(p.promptVia === "argv");
+    });
+  }
+
   test("docs/agents.md's generated table equals the registry", () => {
     expect(agentsDoc).toContain(agentsTable());
     expect(renderAgentsDoc(agentsDoc)).toBe(agentsDoc);

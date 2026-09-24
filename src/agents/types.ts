@@ -55,6 +55,9 @@ export interface AgentPreset {
   readonly contextFile: string;
   // False when the agent cannot be pinned in the Docker image (no versioned download).
   readonly docker?: false;
+  // How the CLI takes the prompt, and the research line that shows it (checked by tests/agents-registry.test.ts). Claude owns its prompt and has neither.
+  readonly promptVia?: "stdin" | "argv";
+  readonly evidence?: string;
   // Builds argv and stdin. `prompt` is the rendered stage prompt.
   command(opts: StageRunOptions, agent: AgentConfig, prompt: string, ctx?: StageContext): StageInvocation;
   // True when a read-only stage cannot write its files: the agent returns them

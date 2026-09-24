@@ -27,7 +27,7 @@ agent_dirs() {
     gemini) echo ".gemini/skills GEMINI.md" ;;
     opencode) echo ".opencode/skills AGENTS.md" ;;
     cursor) echo ".cursor/skills AGENTS.md" ;;
-    pi) echo ".pi/agent/skills AGENTS.md" ;;
+    pi) echo ".pi/skills AGENTS.md" ;;
     mastracode) echo ".mastracode/skills AGENTS.md" ;;
     *) return 1 ;;
   esac

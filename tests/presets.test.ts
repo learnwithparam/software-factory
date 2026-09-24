@@ -23,10 +23,12 @@ describe("preset argv", () => {
   });
   test("opencode: json events, auto-approve, run in the worktree", () => {
     expect(argv("opencode", "build", "anthropic/claude-sonnet-5")).toEqual(["opencode", "run", "--format", "json", "--auto", "--dir", "/work", "-m", "anthropic/claude-sonnet-5"]);
+    expect(argv("opencode", "plan")).toEqual(["opencode", "run", "--format", "json", "--auto", "--dir", "/work", "--agent", "plan"]);
   });
   test("cursor: plan mode when read-only, the prompt is the last argument", () => {
-    expect(argv("cursor", "triage")).toEqual(["cursor-agent", "-p", "--output-format", "stream-json", "--force", "--workspace", "/work", "--mode", "plan", "PROMPT"]);
+    expect(argv("cursor", "triage")).toEqual(["cursor-agent", "-p", "--output-format", "stream-json", "--workspace", "/work", "--mode", "plan", "PROMPT"]);
     expect(argv("cursor", "build").includes("--mode")).toBe(false);
+    expect(argv("cursor", "build").includes("--force")).toBe(true);
   });
   test("mastracode: jsonl, plan mode when read-only, timeout in seconds", () => {
     const p = PRESETS.mastracode!.command({ ...opts("plan"), timeoutMinutes: 3 }, { preset: "mastracode" }, "PROMPT");
@@ -106,5 +108,19 @@ describe("the executor applies the env allow-list", () => {
     }
     expect(readFileSync(join(cwd, ".factory/runs/issue-7/keys.txt"), "utf8")).toBe("openai|none");
     rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
+describe("argument size guard", () => {
+  test("an argument over the Linux per-argument limit is refused before spawn", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "factory-argmax-"));
+    try {
+      mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
+      writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\ndescription: x\n---\nplan\n");
+      const ex = new CommandExecutor({ big: { command: ["true", "x".repeat(130 * 1024)] } }, { default: "big" });
+      await expect(ex.runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1 })).rejects.toThrow(/over the 122880 byte limit/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

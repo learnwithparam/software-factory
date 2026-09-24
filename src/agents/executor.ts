@@ -19,6 +19,8 @@ import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } fro
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
+export const MAX_ARG_BYTES = 120 * 1024;
+
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
 
@@ -98,6 +100,10 @@ export class CommandExecutor implements Executor {
         throw new Error(`agent "${agent.name}" has neither a preset nor a command`);
       }
     }
+
+    // Linux caps one argument at 128 KiB; past that spawn fails with E2BIG and no hint.
+    const big = argv.find((a) => Buffer.byteLength(a) > MAX_ARG_BYTES);
+    if (big !== undefined) throw new Error(`${agent.name}: the prompt is passed as an argument and is ${Buffer.byteLength(big)} bytes, over the ${MAX_ARG_BYTES} byte limit; configure a stdin agent or shorten the issue`);
 
     const proc = Bun.spawn([...argv], {
       cwd: opts.cwd,

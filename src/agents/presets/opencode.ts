@@ -1,10 +1,10 @@
 // OpenCode: `opencode run --format json --auto --dir <cwd>` with the prompt on stdin.
 // Events are `{type, part}`: `tool_use` parts name the tool, `step_finish` parts carry
-// `tokens {input, output, cache {read, write}}`. `run` has no read-only mode, so every
-// stage writes its own files and the safety layers are the stage prompt and the gate.
+// `tokens {input, output, cache {read, write}}`. Read-only stages use `--agent plan`, whose
+// edit permission is deny-all, and return the artifact as the final message.
 
 import type { StageEvent } from "../../executor";
-import type { AgentPreset } from "../types";
+import { type AgentPreset, stagePolicy } from "../types";
 import { isUsageResultCandidate } from "../usage";
 
 interface OpenCodeLine {
@@ -47,11 +47,14 @@ export const opencodePreset: AgentPreset = {
   verified: false,
   version: "1.18.32",
   envKeys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "DEEPSEEK_API_KEY"],
-  readOnlyBy: "nothing: `run` has no read-only mode, so only the stage prompt and the gate hold",
+  readOnlyBy: "`--agent plan`",
+  returnsArtifact: true,
   skillsDir: ".opencode/skills",
   contextFile: "AGENTS.md",
+  promptVia: "stdin",
+  evidence: "docs/agent-research/opencode/docs.md:5",
   command: (opts, agent, prompt) => ({
-    argv: ["opencode", "run", "--format", "json", "--auto", "--dir", opts.cwd, ...(agent.model ? ["-m", agent.model] : [])],
+    argv: ["opencode", "run", "--format", "json", "--auto", "--dir", opts.cwd, ...(stagePolicy(opts.stage).write ? [] : ["--agent", "plan"]), ...(agent.model ? ["-m", agent.model] : [])],
     stdin: prompt,
   }),
   parseLine: parseOpenCodeLine,

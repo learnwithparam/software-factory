@@ -69,6 +69,8 @@ export const mastracodePreset: AgentPreset = {
   readOnlyBy: "`--mode plan`",
   skillsDir: ".mastracode/skills",
   contextFile: "AGENTS.md",
+  promptVia: "stdin",
+  evidence: "docs/agent-research/mastracode/docs.md:5",
   returnsArtifact: true,
   command: (opts, agent, prompt) => ({
     argv: [
