@@ -166,12 +166,13 @@ export async function planReset(deps: ResetDeps, ctx: ResetContext): Promise<Res
     actions.push({ kind: "close-issue", detail: `#${issue.number} ${issue.title}`, data: { number: issue.number } });
   }
 
-  for (const seed of seeds) {
-    actions.push({ kind: "create-issue", detail: seed.title, data: { seed } });
-  }
-
+  // Labels first: a fresh repo has none, and creating a labelled issue fails without them.
   for (const label of LABELS) {
     actions.push({ kind: "ensure-label", detail: label.name, data: { label } });
+  }
+
+  for (const seed of seeds) {
+    actions.push({ kind: "create-issue", detail: seed.title, data: { seed } });
   }
 
   actions.push({ kind: "wipe-worktrees", detail: ctx.workspacesDir });

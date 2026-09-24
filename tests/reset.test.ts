@@ -139,6 +139,7 @@ describe("factory reset --dry-run", () => {
     expect(actions.filter((a) => a.kind === "close-issue").map((a) => a.data!.number)).toEqual([10, 11]);
     expect(kinds.filter((k) => k === "create-issue")).toHaveLength(2);
     expect(kinds.filter((k) => k === "ensure-label")).toHaveLength(LABELS.length);
+    expect(kinds.lastIndexOf("ensure-label")).toBeLessThan(kinds.indexOf("create-issue")); // a fresh repo has no labels yet
     expect(kinds).toContain("wipe-worktrees");
     expect(kinds).toContain("wipe-state");
 
