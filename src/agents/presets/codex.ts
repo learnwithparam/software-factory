@@ -41,6 +41,10 @@ export const codexPreset: AgentPreset = {
   name: "codex",
   binary: "codex",
   verified: false,
+  version: "0.156.1",
+  envKeys: ["OPENAI_API_KEY"],
+  skillsDir: ".codex/skills",
+  contextFile: "AGENTS.md",
   returnsArtifact: true,
   command: (opts, agent, prompt, ctx) => ({
     argv: [
