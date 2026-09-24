@@ -342,3 +342,15 @@ describe("hardening from the verifier report", () => {
     expect(Date.now() - t0).toBeLessThan(6000);
   });
 });
+
+describe("preset-less command agents", () => {
+  test("a bare codex exec command gets the codex preset and --json", () => {
+    const a = resolveAgent({ codex: { command: ["env", "X=1", "codex", "exec", "{{prompt}}"] } }, { default: "codex" }, "triage");
+    expect(a.preset).toBe(PRESETS.codex);
+    expect(a.config.command).toEqual(["env", "X=1", "codex", "exec", "--json", "{{prompt}}"]);
+  });
+  test("an unrecognised command is left alone", () => {
+    const a = resolveAgent({ aider: { command: ["aider", "--message", "{{prompt}}"] } }, { default: "aider" }, "triage");
+    expect(a.preset).toBeUndefined();
+  });
+});

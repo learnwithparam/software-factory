@@ -11,6 +11,7 @@ import { aggregateStageEvents, type Executor, type StageEvent, type StageRunOpti
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
+import { structuredCommand } from "./structured";
 import { replySchema } from "../schemas";
 import { writeReply } from "./reply";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
@@ -32,6 +33,9 @@ export function resolveAgent(agents: Record<string, AgentConfig>, stages: StageA
   if (!config) throw new Error(`stage ${stage} uses agent "${name}", which is not in config.agents`);
   const preset = config.preset ? PRESETS[config.preset] : undefined;
   if (config.preset && !preset) throw new Error(`agent "${name}": unknown preset "${config.preset}"`);
+  // A bare `codex exec` or `claude -p` command still gets its JSON flag and parser.
+  const found = !preset && config.command ? structuredCommand(name, config.command) : undefined;
+  if (found) return { name, config: { ...config, command: found.command }, preset: PRESETS[found.preset] };
   return { name, config, preset };
 }
 

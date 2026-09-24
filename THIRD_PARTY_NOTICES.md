@@ -19,6 +19,7 @@ Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain L
 - `src/agents/executor.ts` from `internal/runner/runner.go` (process group kill from `process_unix.go`) [tested by `tests/ported/machinist/runner.test.ts`]
 - `src/agents/env.ts` from `internal/runner/runner.go` [tested by `tests/ported/machinist/runner.test.ts`]
 - `src/event-budget.ts` from `internal/runner/events.go` [tested by `tests/ported/machinist/events.test.ts`]
+- `src/agents/structured.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/structured.test.ts`]
 - `src/agents/final-message.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/final-message.test.ts`]
 - `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/agents/usage.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
