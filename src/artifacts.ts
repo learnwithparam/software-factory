@@ -214,6 +214,11 @@ export async function writeGateEvidence(cwd: string, issue: number, evidence: Ga
   await Bun.write(`${cwd}/${runDir(issue)}/gate.json`, `${JSON.stringify(evidence)}\n`);
 }
 
+export async function readGateEvidence(cwd: string, issue: number): Promise<GateEvidence | undefined> {
+  const v = await readJson<Partial<GateEvidence>>(`${cwd}/${runDir(issue)}/gate.json`);
+  return typeof v?.tree === "string" && typeof v.line === "string" && typeof v.status === "string" ? { line: v.line, status: v.status, tree: v.tree } : undefined;
+}
+
 async function readText(path: string): Promise<string | undefined> {
   const file = Bun.file(path);
   if (!(await file.exists())) return undefined;

@@ -365,6 +365,19 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("14d. verify re-runs the gates when gate.json describes a different tree", async () => {
+    const same = setup(["factory:ready"]);
+    happy(same);
+    await same.step();
+    expect(same.gateRunner.runs).toBe(1);
+
+    const moved = setup(["factory:ready"]);
+    moved.git.trees = ["built", "amended"];
+    happy(moved);
+    await moved.step();
+    expect(moved.gateRunner.runs).toBe(2);
+  });
+
   test("14c. outcome failed fails the run; an outcome complete does not hide a non-zero exit", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ outcome: "failed", summary: "cannot reproduce" }));

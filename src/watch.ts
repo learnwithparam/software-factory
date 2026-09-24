@@ -20,6 +20,7 @@ import {
   stepStop,
   validateStepJson,
   validateVerdict,
+  readGateEvidence,
   writeGateEvidence,
   readStageArtifacts,
   runDir,
@@ -403,6 +404,15 @@ async function runFromStage(
     }
 
     if (stage === "verify") {
+      // A verdict is only as good as its evidence: gate.json must describe
+      // the tree being verified, so a resumed or amended run re-measures it.
+      const tree = await deps.git.treeHash(worktree);
+      const seen = await readGateEvidence(worktree, issueNumber);
+      if (seen?.tree !== tree) {
+        const fresh = await runGates(deps.gateRunner, worktree);
+        deps.state.updateRun(config.repo, issueNumber, { gate_line: fresh.raw });
+        await writeGateEvidence(worktree, issueNumber, { line: fresh.raw, status: fresh.status, tree });
+      }
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
       const checked = art.json === undefined ? undefined : validateVerdict(art.json);
