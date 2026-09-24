@@ -1,3 +1,4 @@
+// Ported from owainlewis/machinist@3943516 internal/protocol/workflow.go:11-37 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the step envelope (outcome, summary) is optional on our stage artifacts and an absent outcome means complete; every stage rejects unknown fields against its own key list; the runner reads the file, so the 16 KiB and one-object rules live in readJson.
 // The contract between a stage skill (running inside `claude`, sandboxed by
 // guard-paths.sh + settings.json) and the runner. Section 9 of the plan says
 // "the agent cannot push, merge or call gh; only the runner talks to GitHub" —
@@ -12,7 +13,13 @@ export type Risk = "low" | "medium" | "high";
 export type VerdictResult = "pass" | "reject" | "uncertain";
 export type BuildStatus = "green" | "red" | "needs-info";
 
+// How a step ended, from machinist's StepResult. Absent means complete.
+export type StepOutcome = "complete" | "blocked" | "failed";
+const STEP_OUTCOMES: readonly string[] = ["complete", "blocked", "failed"];
+
 export interface TriageArtifact {
+  readonly outcome?: StepOutcome;
+  readonly summary?: string;
   readonly disposition: Disposition;
   readonly type: "bug" | "feature" | "docs" | "security" | "dependency";
   readonly risk: Risk;
@@ -23,6 +30,8 @@ export interface TriageArtifact {
 }
 
 export interface PlanArtifact {
+  readonly outcome?: StepOutcome;
+  readonly summary?: string;
   readonly status?: "needs-info";
   readonly risk: Risk;
   readonly revision: number;
@@ -32,6 +41,8 @@ export interface PlanArtifact {
 }
 
 export interface BuildArtifact {
+  readonly outcome?: StepOutcome;
+  readonly summary?: string;
   readonly status: BuildStatus;
   readonly gate_line: string;
   readonly rounds: number;
@@ -55,6 +66,8 @@ export interface Criterion {
 }
 
 export interface VerdictArtifact {
+  readonly outcome?: StepOutcome;
+  readonly summary?: string;
   readonly result: VerdictResult;
   readonly rounds: number;
   readonly findings: (string | Finding)[];
@@ -63,7 +76,7 @@ export interface VerdictArtifact {
 
 // A step result is one JSON object of at most 16 KiB (machinist workflow.go).
 export const MAX_STEP_JSON_BYTES = 16 * 1024;
-const VERDICT_KEYS = new Set(["result", "rounds", "findings", "criteria"]);
+const VERDICT_KEYS = new Set(["result", "rounds", "findings", "criteria", "outcome", "summary"]);
 const FINDING_KEYS = new Set(["severity", "confidence", "what", "where", "why", "fix"]);
 const CRITERION_KEYS = new Set(["id", "status", "gap"]);
 // A finding this sure and this serious contradicts a pass.
@@ -71,6 +84,38 @@ export const BLOCKING_CONFIDENCE = 3;
 
 function unknownKey(obj: object, allowed: Set<string>): string | undefined {
   return Object.keys(obj).find((k) => !allowed.has(k));
+}
+
+function stepEnvelopeProblem(o: Record<string, unknown>): string | undefined {
+  if (o.outcome !== undefined && !STEP_OUTCOMES.includes(o.outcome as string)) return "step outcome must be complete, blocked, or failed";
+  if (o.summary !== undefined && (typeof o.summary !== "string" || !o.summary.trim())) return "step summary must be a non-empty string";
+  return undefined;
+}
+
+// Every stage artifact rejects a field it does not define, so a typo cannot
+// pass as a silent no-op. The verdict has its own, deeper validator above.
+const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
+  triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence", "outcome", "summary"],
+  plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "outcome", "summary"],
+  build: ["status", "gate_line", "rounds", "outcome", "summary"],
+  pr: ["outcome", "summary"],
+};
+
+export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: unknown): { ok: true } | { ok: false; reason: string } {
+  const name = JSON_FILENAMES[stage];
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, reason: `${name} is not a JSON object` };
+  const o = raw as Record<string, unknown>;
+  const extra = unknownKey(o, new Set(STEP_KEYS[stage]));
+  if (extra) return { ok: false, reason: `${name} has unknown field "${extra}"` };
+  const problem = stepEnvelopeProblem(o);
+  return problem ? { ok: false, reason: `${name}: ${problem}` } : { ok: true };
+}
+
+// Where a step that reported "blocked" or "failed" stops. Undefined means carry on.
+export function stepStop(json: { outcome?: StepOutcome; summary?: string } | undefined): { status: "needs-human" | "failed"; reason: string } | undefined {
+  if (json?.outcome === "blocked") return { status: "needs-human", reason: json.summary ?? "the agent reported it was blocked" };
+  if (json?.outcome === "failed") return { status: "failed", reason: json.summary ?? "the agent reported failure" };
+  return undefined;
 }
 
 // Rejects a verdict that is malformed or contradicts itself. The runner never
@@ -81,6 +126,8 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
   const v = raw as Record<string, unknown>;
   const extra = unknownKey(v, VERDICT_KEYS);
   if (extra) return bad(`verdict.json has unknown field "${extra}"`);
+  const envelope = stepEnvelopeProblem(v);
+  if (envelope) return bad(envelope);
   if (v.result !== "pass" && v.result !== "reject" && v.result !== "uncertain") return bad('verdict.json "result" must be pass, reject or uncertain');
   if (!Number.isInteger(v.rounds) || (v.rounds as number) < 0) return bad('verdict.json "rounds" must be a non-negative integer');
   if (!Array.isArray(v.findings)) return bad('verdict.json "findings" must be an array');

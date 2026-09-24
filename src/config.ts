@@ -1,3 +1,4 @@
+// Ported from owainlewis/assembler@7cac671 src/index.ts:64-90 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: validateConfig's harness rules (executable not a {prompt} placeholder, a command must be non-empty) live in agentProblems; the codex/claude providers are presets; errors are collected, not thrown one at a time; the key table, boot refusal and defaults are the factory's own.
 // Shape of the target repo's `.factory/config.json`. Built by the repo-specific
 // side (splitbill) or by whoever installs this template elsewhere; the runner
 // only reads it, and `factory doctor` checks it exists. Missing fields fall

@@ -7,7 +7,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = join(import.meta.dir, "..");
-const HEADER = /Ported from owainlewis\/([a-z.-]+)@([0-9a-f]{7}) (\S+) \(MIT, Copyright \(c\) 2026 Owain Lewis\)\. Deviations: \S/;
+const HEADER =
+  /Ported from (?:owainlewis|mastra-ai)\/([a-z.-]+)@([0-9a-f]{7}) (\S+) \((?:MIT, Copyright \(c\) 2026 Owain Lewis|Apache-2\.0, [^)]+)\)\. Deviations: \S/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -19,15 +20,28 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const headers = walk(root).flatMap((file) => {
-  const first = readFileSync(file, "utf8").split("\n").slice(0, 2).join("\n");
+// Skills are ported too; their header is an HTML comment in the first lines.
+function walkTemplate(dir: string, out: string[] = []): string[] {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) walkTemplate(path, out);
+    else if (name.endsWith(".md")) out.push(path);
+  }
+  return out;
+}
+
+const sources = [...walk(root), ...walkTemplate(join(root, "template"))];
+const headers = sources.flatMap((file) => {
+  const first = readFileSync(file, "utf8").split("\n").slice(0, file.endsWith(".md") ? 8 : 2).join("\n");
   const m = HEADER.exec(first);
   return first.includes("Ported from ") ? [{ file: relative(root, file), m }] : [];
 });
 
 const notices = readFileSync(join(root, "THIRD_PARTY_NOTICES.md"), "utf8");
 const entries = [...notices.matchAll(/^## owainlewis\/([a-z.-]+)@([0-9a-f]{7})$/gm)].map((m) => `${m[1]}@${m[2]}`);
-const listed = [...notices.matchAll(/^- `([^`]+)` from /gm)].map((m) => m[1]!);
+const rows = [...notices.matchAll(/^- `([^`]+)` from .*$/gm)].map((m) => ({ file: m[1]!, line: m[0] }));
+const listed = rows.map((r) => r.file);
 
 test("every Ported-from header is well formed", () => {
   expect(headers.length).toBeGreaterThan(0);
@@ -47,6 +61,19 @@ test("every file listed in the notices exists and carries a header", () => {
   for (const file of listed) {
     expect(existsSync(join(root, file)), `${file} is listed but missing`).toBe(true);
     expect(withHeader.has(file), `${file} is listed but has no Ported-from header`).toBe(true);
+  }
+});
+
+test("every listed port names its upstream test, or says it has none", () => {
+  for (const { file, line } of rows) {
+    const t = /\[tested by `([^`]+)`\]/.exec(line);
+    if (!t) {
+      expect(line, `${file}: needs [tested by \`tests/ported/...\`] or [no upstream test]`).toContain("[no upstream test]");
+      continue;
+    }
+    const path = join(root, t[1]!);
+    expect(existsSync(path), `${file}: ${t[1]} does not exist`).toBe(true);
+    expect(readFileSync(path, "utf8").split("\n").slice(0, 2).join("\n"), `${t[1]}: no Ported-from header`).toContain("Ported from ");
   }
 });
 

@@ -335,6 +335,42 @@ describe("failure paths", () => {
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("Write .factory/runs/issue-1/triage.json");
     done(c);
   });
+
+  test("14b. a step that reports outcome blocked parks as needs-human with its summary", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ outcome: "blocked", summary: "Need the payment provider's sandbox key" }));
+    expect(await c.step()).toBe("needs-human");
+    expect(labels(c.github, 1)).toEqual([LABEL.needsHuman]);
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("Need the payment provider's sandbox key");
+    done(c);
+  });
+
+  test("14c. outcome failed fails the run; an outcome complete does not hide a non-zero exit", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ outcome: "failed", summary: "cannot reproduce" }));
+    expect(await c.step()).toBe("failed");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("cannot reproduce");
+    const d = setup([LABEL.ready]);
+    d.push("triage", triage({ outcome: "complete", summary: "ok" }), { exitCode: 1 });
+    expect(await d.step()).toBe("failed");
+    done(c);
+    done(d);
+  });
+
+  test("14d. an unknown field in any stage JSON fails the stage and names the field", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ dispositon: "proceed" }));
+    expect(await c.step()).toBe("failed");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe('triage.json has unknown field "dispositon"');
+    const d = setup([LABEL.ready]);
+    d.state.setToggle("auto_approve_low_risk", true);
+    d.push("triage", triage());
+    d.push("plan", plan("low", { file: ["src/b.ts"] }));
+    expect(await d.step()).toBe("failed");
+    expect(d.state.getRun("acme/widgets", 1)!.reason).toBe('plan.json has unknown field "file"');
+    done(c);
+    done(d);
+  });
 });
 
 describe("in-review and claim paths", () => {
