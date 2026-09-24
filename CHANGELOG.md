@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.6.0
+
+One factory, any agent. Every preset except Claude ships `verified: false`; participants verify them with
+`factory verify-agent` (see `docs/verify-an-agent.md`). Every fixture except Claude's is synthetic, written
+from each CLI's docs.
+
+- New presets: `gemini`, `opencode`, `cursor`, `pi`, `mastracode`. Each declares its pinned `version`,
+  the API keys it may see (`envKeys`), its skills dir, its context file and how it holds read-only stages
+  (`readOnlyBy`). A stage's env now drops every other known provider key, so a Codex stage never sees the
+  Anthropic key. Agents with a custom `command` keep the old behaviour.
+- Gemini and Mastra Code parse through a per-run parser (`newParser`), because their events arrive as deltas.
+- `factory install --agents a,b,c` links `.claude/skills` into each agent's skills dir and writes an
+  `AGENTS.md` (or `GEMINI.md`) pointer only when absent. Ported from skills `internal/agents/agents.go`.
+- `factory doctor` warns when an agent binary's version differs from its pin.
+- The Dockerfile takes `--build-arg AGENTS="gemini pi"` and pins every agent's version; a build with two
+  agents was run. Cursor is host-only (`docker: false`): it has no pinnable download.
+- `docs/agents.md`: a matrix generated from the registry (a test fails if they drift), a safety table and an
+  aider walkthrough. One registry test walks every preset for its fixture, pins, install target and docs.
+- Agents page and `GET /api/agents`. New `factory-operator` skill (ported from machinist's skill).
+  `tests/docs-links.test.ts` checks every `*.md` for unbalanced fences and dead local links (blueprint).
+- `FixtureRecorder` replaces a synthetic fixture instead of appending to it.
+
+Not in v2.6:
+- Live runs of any agent except Claude. OpenCode and Cursor event shapes are from memory, not from a
+  capture. Mastra `--mode plan` as read-only, Pi print mode reading stdin and OpenCode reading stdin are
+  unconfirmed until a participant runs them.
+- omp and Amp are cut; either still runs as a custom `command`. Mistral Vibe is config-only.
+- `prompt.ts` keeps reading the canonical `.claude/skills`, because `install` always writes it and links the
+  other agents' dirs to it. There is no `renderPolicy` hook; each preset's `command` applies `stagePolicy`.
+- The Agents page shows configuration and pins, not the installed version or doctor rows.
+
 ## v2.5.2
 
 Makes v2.5 work on a real run. Every fix has a test that fails when the fix is reverted.
