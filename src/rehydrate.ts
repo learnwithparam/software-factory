@@ -23,6 +23,13 @@ function findComment(comments: readonly GhComment[], needle: string) {
   return undefined;
 }
 
+// The status comment carries either the build object itself (needs-info) or
+// `{ build, gate }` once the runner has graded it; only the object is build.json.
+function buildObject(json: unknown): unknown {
+  const o = json as { build?: unknown; gate?: unknown } | null;
+  return o && typeof o === "object" && "gate" in o ? (o.build ?? undefined) : json;
+}
+
 export async function rehydrate(worktree: string, issue: GhIssue): Promise<void> {
   const dir = `${worktree}/${runDir(issue.number)}`;
   await Bun.$`mkdir -p ${dir}`.quiet();
@@ -32,7 +39,8 @@ export async function rehydrate(worktree: string, issue: GhIssue): Promise<void>
   for (const stage of stages) {
     const marker = [...markers].reverse().find((m) => m.stage === stage);
     if (marker !== undefined) {
-      await Bun.write(`${dir}/${JSON_FILENAMES[stage]}`, JSON.stringify(marker.json, null, 2));
+      const json = stage === "build" ? buildObject(marker.json) : marker.json;
+      if (json !== undefined) await Bun.write(`${dir}/${JSON_FILENAMES[stage]}`, JSON.stringify(json, null, 2));
     }
     const needle = VISIBLE_MARKER[stage];
     if (!needle) continue;

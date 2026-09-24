@@ -58,6 +58,12 @@ export function formatDurationMillis(milliseconds) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainingSeconds}s`;
 }
 
+// The cockpit shows whole seconds ("42s"); the ported formatter above keeps machinist's milliseconds.
+export function formatElapsed(milliseconds) {
+  if (!Number.isSafeInteger(milliseconds) || milliseconds < 1000) return formatDurationMillis(milliseconds);
+  return formatDurationMillis(Math.round(milliseconds / 1000) * 1000);
+}
+
 export function formatTokenUsage(value) {
   return typeof value === "string" && /^(0|[1-9]\d*)$/.test(value) ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "Unavailable";
 }

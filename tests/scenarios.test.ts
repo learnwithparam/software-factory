@@ -378,6 +378,80 @@ describe("failure paths", () => {
     expect(moved.gateRunner.runs).toBe(2);
   });
 
+  test("14f. a red gate re-run before verify sends the issue back to build, and is capped", async () => {
+    const GREEN = "FACTORY_GATES: status=GREEN passed=2 failed=0 skipped=0 failed_gates=-";
+    const RED = "FACTORY_GATES: status=RED passed=1 failed=1 skipped=0 failed_gates=unit";
+    const back = setup(["factory:ready"]);
+    back.git.trees = ["built", "amended"];
+    back.gateRunner.next = [GREEN, RED];
+    happy(back);
+    back.push("build", build());
+    back.push("verify", verdict("pass"));
+    back.push("pr", pr());
+    expect(await back.step()).toBe("shipped");
+    expect(back.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan", "build", "build", "verify", "pr"]);
+
+    const capped = setup(["factory:ready"]);
+    capped.git.trees = ["a", "b", "c", "d", "e", "f"];
+    capped.gateRunner.next = [GREEN, RED, GREEN, RED, GREEN, RED];
+    capped.push("triage", triage());
+    capped.push("plan", plan("low"));
+    for (let i = 0; i < 3; i++) capped.push("build", build());
+    expect(await capped.step()).toBe("failed");
+    expect(capped.state.getRun("acme/widgets", 1)!.reason).toContain("before verify");
+    expect(capped.state.listStageRuns("acme/widgets", { issue: 1 }).some((r) => r.stage === "verify")).toBe(false);
+  });
+
+  test("14g. the runner counts build and verify rounds, whatever the agent wrote", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    c.push("verify", verdict("reject"));
+    c.push("build", build());
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    const markers = c.github.issues.get(1)!.comments.map((m) => m.body).join("\n");
+    expect(markers).toContain('"rounds":2,"findings"');
+    expect(markers).toContain('"rounds":1,"findings"');
+    done(c);
+  });
+
+  test("14h. a tool-free re-check drops unsupported findings, and a reject left with none goes to a human", async () => {
+    const finding = (what: string) => ({ severity: "must", confidence: 4, what });
+    const rejected = (findings: unknown[]) => ({ "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict", "verdict.json": JSON.stringify({ result: "reject", rounds: 1, findings }) });
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const asked: unknown[] = [];
+    (c.deps as { rechecker?: unknown }).rechecker = { supported: async (f: unknown[]) => (asked.push(f), [] as number[]) };
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    c.push("verify", rejected([finding("invented bug")]));
+    expect(await c.step()).toBe("needs-human");
+    expect(asked).toHaveLength(1);
+    const body = c.github.issues.get(1)!.comments.map((m) => m.body).join("\n");
+    expect(body).toContain("does not support 1 finding(s)");
+    expect(body).toContain("- invented bug");
+    // A supported finding stands: the reject still sends the issue back to build.
+    const d = setup([LABEL.ready]);
+    d.state.setToggle("auto_approve_low_risk", true);
+    (d.deps as { rechecker?: unknown }).rechecker = { supported: async () => [0] };
+    d.push("triage", triage());
+    d.push("plan", plan("low"));
+    d.push("build", build());
+    d.push("verify", rejected([finding("real bug")]));
+    d.push("build", build());
+    d.push("verify", verdict("pass"));
+    d.push("pr", pr());
+    expect(await d.step()).toBe("shipped");
+    expect(d.github.seenLabels.has(LABEL.building)).toBe(true);
+    done(c);
+    done(d);
+  });
+
   test("14e. triage refuses an issue another open PR already closes, and spends no tokens", async () => {
     const c = setup(["factory:ready"]);
     c.github.prs.push({ number: 9, url: "u", state: "open", headRefName: "someone/fix", isDraft: false, closingIssuesReferences: [{ number: c.n }] });

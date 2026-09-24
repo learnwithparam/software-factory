@@ -67,6 +67,11 @@ function plainRun<T extends { title: string }>(run: T): T {
   return { ...run, title: plain(run.title) };
 }
 
+// The agent name and kill reason come from config and from what an agent printed.
+function plainStage<T extends { agent: string; killed_reason: string | null }>(s: T): T {
+  return { ...s, agent: plain(s.agent), killed_reason: s.killed_reason === null ? null : plain(s.killed_reason) };
+}
+
 function plainIssue<T extends { title: string; body: string; comments: { body: string }[] }>(issue: T): T {
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
@@ -111,7 +116,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
     const out: ReturnType<FactoryState["listStageRuns"]> = [];
     for (let after = 0; ; ) {
       const page = state.listStageRuns(repo, { after, limit: 500 });
-      out.push(...page);
+      out.push(...page.map(plainStage));
       if (page.length < 500) return out;
       after = page[page.length - 1]!.id;
     }
@@ -209,7 +214,10 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         for (const [k, expires] of sessions) if (expires <= now) sessions.delete(k);
         if (sessions.size >= MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
         sessions.set(id, now + SESSION_TTL_MS);
-        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}` } });
+        // Behind a TLS-terminating proxy the request arrives as http, so X-Forwarded-Proto counts too.
+        const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
+        const secure = https ? "; Secure" : "";
+        return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}` } });
       },
     },
     { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }) },
@@ -261,7 +269,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       handler: (_req, _url, m) => {
         const run = state.listRuns(repo || undefined).find((r) => r.id === Number(m[1]));
         if (!run) return json({ error: "no such run" }, { status: 404 });
-        return json({ run: plainRun(run), stages: state.listStageRuns(run.repo, { issue: run.issue }) });
+        return json({ run: plainRun(run), stages: state.listStageRuns(run.repo, { issue: run.issue }).map(plainStage) });
       },
     },
     {

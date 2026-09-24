@@ -11,16 +11,13 @@ the runner posts the verdict and moves the issue's label.
 ## 1. Read the inputs
 
 - `.factory/runs/issue-<N>/issue.json`, `plan.json`, `plan-comment.md`,
-  `build.json` — the plan's AC-n and NG-n, and what build reports it did,
-  including build's own `rounds` count.
+  `build.json` — the plan's AC-n and NG-n, and what build reports it did.
 - `.factory/runs/issue-<N>/gate.json`: what the runner measured after build
   (`line`, `status`, `tree`). If its `tree` equals `git rev-parse HEAD^{tree}`,
   the gate result is current: use it and do not re-run the gates. If the tree
   differs, or the file is missing, the evidence is stale: report `uncertain`.
 - The worktree at its current state (build's commits, uncommitted or not).
-- `.factory/runs/issue-<N>/verdict.json`, if present from a prior round, to
-  read its `rounds` so you increment it, not reset it. The runner tracks
-  the reject count itself for routing; this field is your own record.
+- The runner counts verify rounds itself: write `"rounds": 1` and it replaces the value.
 
 ## 2. Run the subagents
 

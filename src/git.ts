@@ -6,10 +6,13 @@
 // fast-forward and both exits 0, which is the bug this replaces (audit
 // finding #3).
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { CommandResult, CommandRunner } from "./github";
 
-async function spawnGit(args: string[], cwd?: string): Promise<CommandResult> {
-  const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
+  const proc = Bun.spawn(["git", ...args], { cwd, env: env ? { ...process.env, ...env } : undefined, stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -24,13 +27,13 @@ async function spawnGit(args: string[], cwd?: string): Promise<CommandResult> {
 export const FALLBACK_IDENTITY = ["-c", "user.name=software-factory", "-c", "user.email=factory@users.noreply.github.com"];
 
 export class GitCommandRunner implements CommandRunner {
-  async run(args: string[], opts?: { cwd?: string }): Promise<CommandResult> {
+  async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
       const name = await spawnGit(["config", "user.name"], opts?.cwd);
       const email = await spawnGit(["config", "user.email"], opts?.cwd);
-      if (name.stdout.trim() === "" || email.stdout.trim() === "") return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd);
+      if (name.stdout.trim() === "" || email.stdout.trim() === "") return spawnGit([...FALLBACK_IDENTITY, ...args], opts?.cwd, opts?.env);
     }
-    return spawnGit(args, opts?.cwd);
+    return spawnGit(args, opts?.cwd, opts?.env);
   }
 }
 
@@ -106,15 +109,30 @@ export class Git {
     return this.runner.run(["push", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
 
-  // The tree of HEAD: the same hash for the same content, whatever the commit.
+  // The tree of the working directory, not of HEAD: uncommitted edits count,
+  // so gate evidence cannot pass for a tree the agent has since changed. A
+  // throwaway index keeps the real one untouched; `.factory/runs` is the
+  // handoff dir (gate.json lives there) and is left out.
   async treeHash(worktreeDir: string): Promise<string> {
-    const result = await this.runner.run(["rev-parse", "HEAD^{tree}"], { cwd: worktreeDir });
-    return result.stdout.trim();
+    const dir = mkdtempSync(join(tmpdir(), "factory-index-"));
+    try {
+      const env = { GIT_INDEX_FILE: join(dir, "index") };
+      await this.runner.run(["add", "-A", "--", ".", ":!.factory/runs"], { cwd: worktreeDir, env });
+      const result = await this.runner.run(["write-tree"], { cwd: worktreeDir, env });
+      return result.stdout.trim();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   }
 
   async hasCommits(worktreeDir: string, base: string): Promise<boolean> {
     const result = await this.runner.run(["rev-list", `origin/${base}..HEAD`, "--count"], { cwd: worktreeDir });
     return Number(result.stdout.trim() || "0") > 0;
+  }
+
+  // The patch of this branch against its base, for a reviewer that has no tools.
+  async diff(worktreeDir: string, base: string): Promise<string> {
+    return (await this.runner.run(["diff", `origin/${base}...HEAD`], { cwd: worktreeDir })).stdout;
   }
 
   // Files changed on this branch versus its base, regardless of how they

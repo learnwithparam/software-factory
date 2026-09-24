@@ -97,6 +97,7 @@ export function claudeArgs(opts: StageRunOptions): string[] {
 export const claudePreset: AgentPreset = {
   name: "claude",
   binary: "claude",
+  verified: true,
   ownsPrompt: true,
   command: (opts, agent) => ({ argv: ["claude", ...claudeArgs(opts), ...(agent.model ? ["--model", agent.model] : [])] }),
   parseLine: parseStreamJsonLine,

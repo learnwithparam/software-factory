@@ -9,6 +9,7 @@ const READ_ONLY_BASH = [
   "Bash(git diff *)",
   "Bash(git log *)",
   "Bash(git show *)",
+  "Bash(git rev-parse *)",
   "Bash(git worktree list)",
   "Bash(cat *)",
   "Bash(ls *)",

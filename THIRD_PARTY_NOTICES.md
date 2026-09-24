@@ -33,6 +33,7 @@ Source: https://github.com/owainlewis/assembler (MIT, Copyright (c) 2026 Owain L
 - `src/logs.ts` from `src/runs.ts` [tested by `tests/ported/assembler/logs.test.ts`]
 - `src/config.ts` from `src/index.ts` [tested by `tests/ported/assembler/config.test.ts`]
 - `src/agents/reply.ts` from `src/index.ts` [tested by `tests/ported/assembler/outputs.test.ts`]
+- `src/recheck.ts` from `examples/review-pr.ts` [no upstream test]
 
 ## License text (both projects)
 

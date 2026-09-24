@@ -159,3 +159,25 @@ describe("Git.changedFiles", () => {
     expect(await git.changedFiles(clones[0]!, "main")).toEqual([]);
   });
 });
+
+describe("Git.treeHash", () => {
+  test("counts uncommitted and untracked edits, ignores .factory/runs, and leaves the real index alone", async () => {
+    const root = tmpRoot();
+    await initSeededRepo(root);
+    const git = new Git(new GitCommandRunner());
+    const clean = await git.treeHash(root);
+    expect(clean).toBe((await run(["git", "rev-parse", "HEAD^{tree}"], root)).trim());
+
+    writeFileSync(join(root, "README.md"), "edited\n");
+    const edited = await git.treeHash(root);
+    expect(edited).not.toBe(clean);
+    writeFileSync(join(root, "new.txt"), "x\n");
+    expect(await git.treeHash(root)).not.toBe(edited);
+
+    mkdirSync(join(root, ".factory/runs/issue-1"), { recursive: true });
+    const before = await git.treeHash(root);
+    writeFileSync(join(root, ".factory/runs/issue-1/gate.json"), "{}\n");
+    expect(await git.treeHash(root)).toBe(before);
+    expect((await run(["git", "diff", "--cached", "--name-only"], root)).trim()).toBe("");
+  });
+});

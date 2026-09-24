@@ -7,6 +7,7 @@
 // runner is the only thing that turns those files into GitHub API calls.
 
 import { mkdir, unlink } from "node:fs/promises";
+import { schemaProblem } from "./schemas";
 
 export type Disposition = "proceed" | "needs-info" | "refused" | "duplicate";
 export type Risk = "low" | "medium" | "high";
@@ -108,7 +109,7 @@ export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: u
   const o = raw as Record<string, unknown>;
   const extra = unknownKey(o, new Set(STEP_KEYS[stage]));
   if (extra) return { ok: false, reason: `${name} has unknown field "${extra}"` };
-  const problem = stepEnvelopeProblem(o);
+  const problem = stepEnvelopeProblem(o) ?? schemaProblem(stage, o);
   return problem ? { ok: false, reason: `${name}: ${problem}` } : { ok: true };
 }
 
@@ -129,6 +130,8 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
   if (extra) return bad(`verdict.json has unknown field "${extra}"`);
   const envelope = stepEnvelopeProblem(v);
   if (envelope) return bad(envelope);
+  // A blocked or failed verify owes no verdict; the runner routes it by outcome.
+  if (v.outcome === "blocked" || v.outcome === "failed") return { ok: true, verdict: v as unknown as VerdictArtifact };
   if (v.result !== "pass" && v.result !== "reject" && v.result !== "uncertain") return bad('verdict.json "result" must be pass, reject or uncertain');
   if (!Number.isInteger(v.rounds) || (v.rounds as number) < 0) return bad('verdict.json "rounds" must be a non-negative integer');
   if (!Array.isArray(v.findings)) return bad('verdict.json "findings" must be an array');

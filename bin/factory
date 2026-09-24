@@ -3,8 +3,8 @@
 // Thin dispatcher; all logic lives in src/ so it stays testable without a
 // child process.
 
-import { accessSync, constants } from "node:fs";
-import { resolve } from "node:path";
+import { accessSync, constants, readdirSync, readFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { GitHub } from "../src/github";
 import { GitCommandRunner, Git } from "../src/git";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
@@ -13,6 +13,7 @@ import { loadConfig, type FactoryConfig } from "../src/config";
 import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
+import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
 import { plain } from "../src/display";
@@ -24,6 +25,8 @@ import { workspacesDir as defaultWorkspacesDir } from "../src/paths";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
+import { FixtureRecorder } from "../src/agents/record";
+import { configFor, formatReport, reportFor } from "../src/verify-agent";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -66,13 +69,20 @@ async function resolveCloneDir(): Promise<string> {
 // Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
 // step, cron tick) resolve the exact same paths and construct the exact same
 // gate runner — one place, not three copies to drift (audit finding #1).
-function buildWatchDeps(cloneDir: string): WatchDeps {
+// The tool-free re-check calls `claude` directly, so it runs only when Claude does the verify stage.
+function verifierIsClaude(config: FactoryConfig): boolean {
+  const name = config.stages.verify ?? config.stages.default ?? "claude";
+  return config.agents[name]?.preset === "claude";
+}
+
+function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
   return {
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? DEFAULT_DB_PATH),
     executor: new CommandExecutor(config.agents, config.stages),
     gateRunner: new ShellGateRunner(),
+    rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
   };
@@ -143,7 +153,7 @@ async function cmdPark(): Promise<void> {
   if (!issueNumber) throw new UsageError("park: --issue <N> is required");
   const github = new GitHub();
   const issue = await github.getIssue(config.repo, issueNumber);
-  const runningLabels = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
+  const runningLabels: string[] = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
   const current = issue.labels.map((l) => l.name).find((n) => runningLabels.includes(n));
   if (current) await github.setStateLabel(config.repo, issueNumber, [current], LABEL.needsHuman);
   await github.commentIssue(config.repo, issueNumber, `Parked by \`factory park\`: ${reason}`);
@@ -236,6 +246,21 @@ async function cmdRebaseline(): Promise<void> {
   for (const c of moved) console.log(`  ${c}`);
 }
 
+// The skills this runner ships, keyed by their path in a target repo.
+function templateSkills(): Record<string, string> {
+  const root = resolve(import.meta.dir, "..", "template");
+  const out: Record<string, string> = {};
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else out[relative(root, full)] = readFileSync(full, "utf8");
+    }
+  };
+  walk(join(root, ".claude", "skills"));
+  return out;
+}
+
 async function cmdDoctor(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   let config;
@@ -263,11 +288,11 @@ async function cmdDoctor(): Promise<void> {
         }
       },
     },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages },
+    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages, templateSkills: templateSkills() },
   );
-  const allOk = checks.every((c) => c.ok);
+  const allOk = checks.every((c) => c.ok || c.warn);
   if (has("json")) console.log(successJson({ checks }, allOk));
-  else for (const c of checks) console.log(`  [${c.ok ? "ok" : "FAIL"}] ${c.name} — ${c.detail}`);
+  else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
   if (!allOk && has("fix")) {
     console.error("factory doctor --fix: creating missing labels");
     await fixDoctor(github, config.repo);
@@ -325,6 +350,27 @@ async function cmdUp(): Promise<void> {
   await new Promise(() => {}); // keep the process alive
 }
 
+// Runs the whole loop for one issue on one preset, with the raw output recorded as a fixture.
+async function cmdVerifyAgent(): Promise<void> {
+  const name = args[1];
+  if (!name || name.startsWith("--")) throw new UsageError("verify-agent: <name> is required");
+  const cloneDir = await resolveCloneDir();
+  const issueNumber = Number(flag("issue"));
+  if (!issueNumber) throw new UsageError("verify-agent: --issue <N> is required");
+  const loaded = await loadConfig(cloneDir);
+  const config: FactoryConfig = { ...loaded, ...configFor(name) };
+  const out = resolve(flag("out") ?? `tests/fixtures/agents/${name}`);
+  const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, new FixtureRecorder(out, name)) };
+  const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
+  if (outcome === "awaiting-approval") {
+    console.log(`Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`);
+  }
+  const report = reportFor(name, deps.state.listStageRuns(config.repo, { issue: issueNumber }), outcome);
+  console.log(formatReport(report));
+  console.log(`fixture: ${out}`);
+  if (!report.pass) process.exit(EXIT.runFailed);
+}
+
 async function cmdInstall(): Promise<void> {
   const target = args[1];
   if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci]");
@@ -367,6 +413,8 @@ async function main(): Promise<void> {
       return cmdDoctor();
     case "install":
       return cmdInstall();
+    case "verify-agent":
+      return cmdVerifyAgent();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

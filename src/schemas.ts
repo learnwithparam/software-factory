@@ -57,3 +57,39 @@ export function replySchema(stage: ArtifactStage): Record<string, unknown> {
     additionalProperties: false,
   };
 }
+
+// Checks a parsed artifact against its own schema: required fields, types and
+// enums. A step that reports blocked or failed owes only its outcome, so the
+// required list is skipped for it.
+export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>): string | undefined {
+  const schema = stageSchema(stage) as { properties: Record<string, Prop>; required: readonly string[] };
+  if (o.outcome !== "blocked" && o.outcome !== "failed") {
+    const missing = schema.required.find((k) => o[k] === undefined);
+    if (missing) return `"${missing}" is required`;
+  }
+  for (const [k, prop] of Object.entries(schema.properties)) {
+    if (o[k] !== undefined && !fits(prop, o[k])) return `"${k}" has the wrong type or value`;
+  }
+  return undefined;
+}
+
+function fits(prop: Prop, v: unknown): boolean {
+  if (Array.isArray(prop.anyOf)) return (prop.anyOf as Prop[]).some((p) => fits(p, v));
+  if (Array.isArray(prop.enum)) return prop.enum.includes(v);
+  switch (prop.type) {
+    case "string":
+      return typeof v === "string";
+    case "integer":
+      return Number.isInteger(v);
+    case "boolean":
+      return typeof v === "boolean";
+    case "number":
+      return typeof v === "number" && v >= ((prop.minimum as number | undefined) ?? -Infinity) && v <= ((prop.maximum as number | undefined) ?? Infinity);
+    case "array":
+      return Array.isArray(v) && v.every((x) => fits((prop.items as Prop | undefined) ?? {}, x));
+    case "object":
+      return typeof v === "object" && v !== null && !Array.isArray(v);
+    default:
+      return true;
+  }
+}

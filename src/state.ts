@@ -227,6 +227,16 @@ export class FactoryState {
     this.db
       .query(`UPDATE runs SET ${set}, updated_at = $updated_at WHERE repo = $repo AND issue = $issue`)
       .run(params as unknown as SQLQueryBindings);
+    // A run that stopped running gets its budget re-derived from the table if it resumes.
+    if (patch.status !== undefined && patch.status !== "running") {
+      const id = this.getRun(repo, issue)?.id;
+      if (id !== undefined) this.budgets.delete(id);
+    }
+  }
+
+  // How many runs hold an in-memory event budget; tests watch it for leaks.
+  get openBudgets(): number {
+    return this.budgets.size;
   }
 
   getRun(repo: string, issue: number): Run | undefined {

@@ -97,6 +97,11 @@ describe("route walk", () => {
     const setCookie = login.headers.get("set-cookie")!;
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain("Secure");
+    const secureLogin = (url: string, headers: Record<string, string> = {}) =>
+      dashboard.handle(new Request(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ token: TOKEN }) }), "203.0.113.7");
+    expect((await secureLogin("https://dash.example/api/session")).headers.get("set-cookie")).toContain("; Secure");
+    expect((await secureLogin("http://localhost:4100/api/session", { "x-forwarded-proto": "https" })).headers.get("set-cookie")).toContain("; Secure");
     expect((await at("/api/runs", { cookie: setCookie.split(";")[0]! })).status).toBe(200);
   });
 
@@ -245,5 +250,38 @@ describe("session cookie and terminal-safe text", () => {
     const get = async (path: string) => dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1");
     for (const path of ["/api/runs", "/api/issues/1/thread", "/api/issues/1/artifacts?file=plan.md", "/api/line"]) expect(await (await get(path)).text(), path).not.toContain("\u001b");
     expect(await (await get("/api/issues/1/artifacts?file=plan.md&download=1")).text()).toContain("\u001b");
+  });
+});
+
+describe("text is plain()-ed on every read route", () => {
+  const ESC = "\u001b[31m";
+  // JSON escapes ESC as \u001b, so look for both spellings.
+  const dirty = (s: string) => s.includes("\u001b") || s.includes("\\u001b");
+
+  test("no GET route returns an escape sequence that came from an issue, agent or artifact", async () => {
+    const issue: GhIssue = {
+      number: 1, title: `t${ESC}`, body: `b${ESC}`, labels: [{ name: LABEL.needsInfo }],
+      comments: [{ id: 1, author: "bot", authorAssociation: "NONE", body: `<!-- factory:plan v1 -->\nplan${ESC}`, createdAt: "2026-09-20T10:00:00Z" }],
+    };
+    const { dashboard, state } = await make("", [issue]);
+    const run = state.upsertRun({ issue: 1, repo: "acme/widgets", title: `run${ESC}`, stage: "build", status: "running" });
+    state.appendEvent(run.id, "build", "text", `event${ESC}`);
+    state.recordStageRun({
+      repo: "acme/widgets", issue: 1, stage: "build", agent: `agent${ESC}`, model: null, started_at: "2026-09-24T00:00:00Z",
+      finished_at: "2026-09-24T00:00:01Z", duration_ms: 1000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0,
+      exit_code: 1, killed_reason: `killed${ESC}`,
+    });
+    const dir = join(scratch, "issue-1", ".factory", "runs", "issue-1");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
+
+    const gets = (dashboard.routeLabels as string[]).filter((l) => l.startsWith("GET ") && !["GET /", "GET /assets", "GET /api/stream"].includes(l));
+    expect(gets.length).toBeGreaterThan(8);
+    for (const label of gets) {
+      const url = `http://localhost:4100${samplePath(label).replace(/\/artifacts$/, "/artifacts?file=plan.md")}`;
+      const res = await dashboard.handle(new Request(url.replace(/^(.*\/runs\/)1/, `$1${run.id}`)), "127.0.0.1");
+      expect(res.status, label).toBe(200);
+      expect(dirty(await res.text()), label).toBe(false);
+    }
   });
 });

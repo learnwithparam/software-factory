@@ -187,6 +187,11 @@ export class FakeGit extends Git {
     return this.trees.length > 1 ? this.trees.shift()! : this.trees[0]!;
   }
 
+  diffText = "diff --git a/x b/x";
+  override async diff(): Promise<string> {
+    return this.diffText;
+  }
+
   override async hasCommits(): Promise<boolean> {
     return true;
   }
@@ -198,9 +203,11 @@ export class FakeGit extends Git {
 export class FakeGateRunner implements GateRunner {
   line = "FACTORY_GATES: status=GREEN passed=10 failed=0 skipped=0 failed_gates=-";
   runs = 0;
+  // Lines to return before falling back to `line`, one per run.
+  next: string[] = [];
   async run(_worktreeDir: string) {
     this.runs++;
-    return { stdout: this.line, stderr: "", code: 0 };
+    return { stdout: this.next.shift() ?? this.line, stderr: "", code: 0 };
   }
 }
 

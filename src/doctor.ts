@@ -11,6 +11,8 @@ export interface DoctorCheck {
   readonly ok: boolean;
   readonly detail: string;
   readonly fixable: boolean;
+  // A warning is shown but never fails the run.
+  readonly warn?: boolean;
 }
 
 export interface DoctorDeps {
@@ -29,6 +31,8 @@ export interface DoctorContext {
   readonly factoryMode?: string; // FACTORY_MODE, "actions" when CI drives the loop
   readonly agents?: Record<string, AgentConfig>;
   readonly stages?: StageAgents;
+  // Shipped skill files (path relative to the repo root -> content), to spot an install that predates this runner.
+  readonly templateSkills?: Record<string, string>;
 }
 
 export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<DoctorCheck[]> {
@@ -56,6 +60,15 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: `agent "${name}" runs each stage it is assigned`,
       fixable: false,
     });
+    if (preset && !preset.verified) {
+      checks.push({
+        name: `agent "${name}" is verified`,
+        ok: false,
+        warn: true,
+        detail: `verified by participants: not yet (docs/verify-an-agent.md, \`factory verify-agent ${preset.name}\`)`,
+        fixable: false,
+      });
+    }
     if (agent && !preset) {
       checks.push({
         name: `agent "${name}" reports usage`,
@@ -107,6 +120,19 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       ok: text !== undefined && !text.includes("TODO"),
       detail: text === undefined ? "file is missing" : text.includes("TODO") ? "fill in every TODO" : "filled in",
       fixable: false,
+    });
+  }
+  if (ctx.templateSkills) {
+    const stale: string[] = [];
+    for (const [path, want] of Object.entries(ctx.templateSkills)) {
+      if ((await deps.readFile(`${ctx.cloneDir}/${path}`)) !== want) stale.push(path);
+    }
+    checks.push({
+      name: "installed skills match this runner",
+      ok: stale.length === 0,
+      detail: stale.length ? `${stale.length} differ or are missing (${stale[0]}); run \`factory install --update\`` : "up to date",
+      fixable: false,
+      warn: true,
     });
   }
   if (ctx.factoryMode === "actions") {

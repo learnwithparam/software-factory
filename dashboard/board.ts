@@ -8,6 +8,7 @@
 // /api/runs feed is what still shows recently-shipped rows locally.
 
 import type { GhIssue } from "../src/github";
+import { plain } from "../src/display";
 import { LABEL, isParkedLabel, isStateLabel } from "../src/labels";
 
 export type BoardColumn = "intake" | "triage" | "plan" | "build" | "verify" | "pr" | "attention";
@@ -52,7 +53,7 @@ export function buildBoard(issues: readonly GhIssue[]): BoardCard[] {
     const parkedLabel = names.find(isParkedLabel) ?? null;
     return {
       issue: issue.number,
-      title: issue.title,
+      title: plain(issue.title),
       column: columnFor(names),
       stateLabel,
       parkedLabel,

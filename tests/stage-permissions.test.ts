@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import type { StageName } from "../src/executor";
 import { stageSettings } from "../src/stage-permissions";
 
@@ -42,4 +43,28 @@ describe("repo-supplied agent commands", () => {
       expect(allow.includes("Bash(pytest *)")).toBe(stage === "verify");
     }
   });
+});
+
+// A command a skill tells the agent to run must be one its stage may run:
+// under dontAsk a denied command fails the stage mid-run, where no unit test looks.
+describe("skill commands are permitted by their stage", () => {
+  const allowed = (allow: string[], cmd: string) =>
+    allow.some((r) => {
+      const m = /^Bash\((.*)\)$/.exec(r);
+      if (!m) return false;
+      const pat = m[1]!;
+      return pat.endsWith("*") ? cmd.startsWith(pat.slice(0, -1)) : cmd === pat;
+    });
+
+  for (const stage of ["triage", "plan", "build", "verify", "pr"] as StageName[]) {
+    test(`${stage}: every git or gates command in factory-${stage} is allowed`, () => {
+      const text = readFileSync(`template/.claude/skills/factory-${stage}/SKILL.md`, "utf8");
+      const allow: string[] = JSON.parse(stageSettings(stage, 1)).permissions.allow;
+      const cmds = text
+        .split("\n")
+        .filter((l) => !/never|denies|the runner runs|gate_level/i.test(l))
+        .flatMap((l) => [...l.matchAll(/`((?:git|bash|\.factory\/gates\.sh)[^`]*)`/g)].map((m) => m[1]!));
+      for (const cmd of cmds) expect([cmd, allowed(allow, cmd)]).toEqual([cmd, true]);
+    });
+  }
 });

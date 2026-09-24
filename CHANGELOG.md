@@ -1,5 +1,51 @@
 # Changelog
 
+## v2.5.2
+
+Makes v2.5 work on a real run. Every fix has a test that fails when the fix is reverted.
+
+Correction to v2.5.1: its note "the provenance test now checks one ported test per row" was wrong. The test
+checks each ported file's header and notice, not the rows of `research/upstream.lock`, and that lock file
+sits outside this repo, so no test here can read it. `THIRD_PARTY_NOTICES.md` plus the provenance test are
+the in-repo record; the lock's `shipped:` line was corrected by hand.
+
+- Verify no longer runs on a red gate: a failing fresh gate goes back to build, or to failed at the round cap.
+- The gate tree now hashes the working tree, so uncommitted build edits no longer look like "same tree".
+- Read-only stages may run `git rev-parse`; a test checks every command a skill tells an agent to run
+  against its stage allow-list.
+- Step artifacts are validated for required fields and enums from `src/schemas.ts`. `outcome: blocked`
+  without a verdict routes to needs-human. Review rounds live in the runner, not the artifact.
+- Rehydrate writes the build object shape. The per-run event budget is evicted when the run ends.
+- `factory doctor` warns when installed skills differ from this runner, and when a preset is not verified.
+- The dashboard cookie gets `Secure` over https. Durations under a minute show whole seconds (`42s`).
+  Board titles and stage rows pass through `plain()`, with a test that walks every read route.
+- Finding re-check (P40): after verify, Claude re-checks each must/should finding against the diff in a
+  tool-free call and drops the unsupported ones. Fails open. Runs only when Claude is the verifier.
+- Ported assembler runtime cases: literal prompt args, stdin/stderr/exit preserved, hung-process timeout.
+- `bin/factory` is now type-checked (it has no `.ts` extension, so `tsc` skipped it). That found an
+  out-of-scope `config` in `buildWatchDeps` and a type error in `park`.
+- Participant verification path: presets carry `verified`; `factory verify-agent <name>` runs one issue on
+  that agent, records a scrubbed fixture and prints pass/fail, cost and tokens; `make agent-matrix` runs it
+  for every installed agent; `docs/verify-an-agent.md` is the runbook. Only Claude is verified by us.
+
+Live proof (Claude, splitbill issue #61, cent split): triage, plan, build, verify and pr all passed with
+no manual step except approving the plan. 5 stages, about 4.5 minutes, $1.68. Verify passed 5 of 5
+acceptance criteria and the PR changed only `src/money/cents.ts` and its test. `--json-schema` with no tools
+returns `structured_output`, which the P40 re-check reads. Recorded fixtures: `tests/fixtures/agents/claude/`
+(triage and plan) with a replay test; a preset can only say `verified: true` with a real fixture.
+
+Not in this release:
+
+- Claude fixtures for build, verify and pr: that run was not recorded. The next live Claude run adds them.
+- The P40 re-check has not fired in a live run (verify raised no findings); only its call was probed live.
+- R10: `cost_usd` stays `NOT NULL DEFAULT 0` in old databases. Incomplete usage is flagged by `usage_complete`.
+- Assembler `readCommandDecision` and `runSDK` (dead code for a CLI runner) and `test/delivery.test.ts`
+  (task-to-pr workflow, v2.8).
+- Machinist `runs-view.test.js` (needs React, jsdom and vite; our dashboard has no build step),
+  `artifacts_test.go` and the control-plane auth tests (a leased SQLite store and CSRF-protected HTTP
+  artifacts; we keep artifacts as files under `.factory/runs/`). Nothing to port to.
+- Live runs of any agent except Claude; participants verify those.
+
 ## v2.5.1
 
 Finishes v2.5: the pieces it promised and did not ship.
