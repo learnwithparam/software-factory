@@ -205,7 +205,8 @@ async function applyAction(deps: ResetDeps, ctx: ResetContext, action: ResetActi
       await Bun.$`rm -rf ${action.detail}`.quiet();
       return;
     case "wipe-state":
-      await Bun.$`rm -rf ${action.detail}`.quiet();
+      // SQLite runs in WAL mode; a leftover -wal or -shm next to a fresh file corrupts it.
+      await Bun.$`rm -rf ${action.detail} ${action.detail}-wal ${action.detail}-shm`.quiet();
       return;
   }
 }

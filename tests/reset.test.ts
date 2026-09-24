@@ -5,7 +5,7 @@
 // drives planReset directly against an injected fake gh/git.
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseIssueSeed, planReset, rebaseline, reset, type ResetDeps } from "../src/reset";
@@ -180,6 +180,19 @@ describe("factory reset --dry-run", () => {
     expect(git.calls.some((c) => c[0] === "push" && c.includes("--force") && c.some((a) => a.endsWith(":refs/heads/trunk")))).toBe(true);
 
     rmSync(issuesDir, { recursive: true, force: true });
+  });
+});
+
+describe("reset wipes the WAL files with the state database", () => {
+  test("factory.db-wal and -shm go too", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "factory-wal-"));
+    const db = join(dir, "factory.db");
+    for (const f of [db, `${db}-wal`, `${db}-shm`]) writeFileSync(f, "x");
+    const github = new FakeGitHub([], []);
+    const ctx = { repo: "acme/widgets", cloneDir: "/tmp/x", baselineTag: "baseline", base: "trunk", issuesDir: mkdtempSync(join(tmpdir(), "factory-i-")), workspacesDir: join(dir, "ws"), statePath: db };
+    await reset({ github, git: new FakeGitRunner() }, ctx, false);
+    expect(readdirSync(dir)).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 
