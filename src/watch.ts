@@ -192,8 +192,8 @@ async function runStage(
     repo: config.repo,
     issue: issueNumber,
     stage: stage as Stage,
-    agent: "claude", // the only executor until v2.5 makes the agent a config choice
-    model: null,
+    agent: result.agent ?? "claude", // ReplayExecutor reports none
+    model: result.model ?? null,
     started_at: startedAt.toISOString(),
     finished_at: finishedAt.toISOString(),
     duration_ms: finishedAt.getTime() - startedAt.getTime(),
