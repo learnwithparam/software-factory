@@ -3,6 +3,10 @@ import { describe, expect, test } from "bun:test";
 import { PROVIDER_KEYS, sanitizeEnv } from "../src/agents/env";
 import { PRESETS } from "../src/agents/presets";
 import type { StageName } from "../src/executor";
+import { CommandExecutor } from "../src/agents/executor";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const opts = (stage: StageName) => ({ stage, issue: 7, cwd: "/work", maxBudgetUsd: 5 });
 const argv = (name: string, stage: StageName, model?: string) => PRESETS[name]!.command(opts(stage), { preset: name, model }, "PROMPT").argv;
@@ -81,5 +85,26 @@ describe("per-provider env allow-list", () => {
   });
   test("every preset's envKeys are known provider keys", () => {
     for (const p of Object.values(PRESETS)) for (const k of p.envKeys) expect(PROVIDER_KEYS as readonly string[]).toContain(k);
+  });
+});
+
+describe("the executor applies the env allow-list", () => {
+  test("a stage on a preset sees only that preset's provider keys", async () => {
+    const cwd = realpathSync(mkdtempSync(join(tmpdir(), "factory-envkeys-")));
+    Bun.spawnSync(["git", "init", "-q"], { cwd });
+    mkdirSync(join(cwd, ".claude/skills/factory-plan"), { recursive: true });
+    writeFileSync(join(cwd, ".claude/skills/factory-plan/SKILL.md"), "---\nname: factory-plan\n---\nPlan it.\n");
+    PRESETS.envprobe = { ...PRESETS.codex!, name: "envprobe", envKeys: ["OPENAI_API_KEY"], command: () => ({ argv: ["sh", "-c", 'printf "%s|%s" "${OPENAI_API_KEY:-none}" "${ANTHROPIC_API_KEY:-none}" > "$FACTORY_ARTIFACT_DIR/keys.txt"'] }) };
+    const before = { o: process.env.OPENAI_API_KEY, a: process.env.ANTHROPIC_API_KEY };
+    process.env.OPENAI_API_KEY = "openai";
+    process.env.ANTHROPIC_API_KEY = "anthropic";
+    try {
+      await new CommandExecutor({ p: { preset: "envprobe" } }, { default: "p" }).runStage({ stage: "plan", issue: 7, cwd, maxBudgetUsd: 1 });
+    } finally {
+      delete PRESETS.envprobe;
+      for (const [k, v] of [["OPENAI_API_KEY", before.o], ["ANTHROPIC_API_KEY", before.a]] as const) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+    expect(readFileSync(join(cwd, ".factory/runs/issue-7/keys.txt"), "utf8")).toBe("openai|none");
+    rmSync(cwd, { recursive: true, force: true });
   });
 });
