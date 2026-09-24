@@ -24,6 +24,7 @@ Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain L
 - `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/agents/usage.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/artifacts.ts` from `internal/protocol/workflow.go` [tested by `tests/ported/machinist/workflow.test.ts`]
+- `template/.claude/skills/factory-operator/SKILL.md` from `skills/machinist/SKILL.md` [no upstream test]
 
 ## owainlewis/assembler@7cac671
 
@@ -40,6 +41,12 @@ Source: https://github.com/owainlewis/assembler (MIT, Copyright (c) 2026 Owain L
 Source: https://github.com/owainlewis/skills (MIT, Copyright (c) 2026 Owain Lewis)
 
 - `src/agent-dirs.ts` from `internal/agents/agents.go` [tested by `tests/ported/skills/agents.test.ts`]
+
+## owainlewis/blueprint@54c952b
+
+Source: https://github.com/owainlewis/blueprint (MIT, Copyright (c) 2026 Owain Lewis)
+
+- `src/docs-links.ts` from `scripts/check_repo.py` [tested by `tests/ported/blueprint/check_repo.test.ts`]
 
 ## License text (both projects)
 
