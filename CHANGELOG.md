@@ -19,6 +19,7 @@ Fixes:
 - `factory reset` and `watch` act on the clone's origin. A config whose `repo` disagrees with origin is
   refused, and a missing `repo` is read from origin. Before this, a copied config could close and reseed
   issues on the wrong repo.
+- `factory reset` creates labels before seeding issues, so it works on a fresh repo (found on the first sandbox reset).
 - `factory reset` checks the baseline tag before closing anything, and closes only issues labelled
   `factory:*` or seeded from `.factory/issues`. `--all-issues` keeps the old behaviour for a sandbox.
 - `tests/app-agnostic.test.ts`: runtime code never names the demo app outside comments, and a Python repo on
