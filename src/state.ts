@@ -80,8 +80,14 @@ export class FactoryState {
   constructor(path: string = DEFAULT_DB_PATH) {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
+    // The runner and the dashboard open a fresh database at the same moment after a reset;
+    // wait for the other's lock, and migrate inside one write transaction so neither sees half a schema.
+
+    // The runner and the dashboard open a fresh database at the same moment after a reset;
+    // wait for the other's lock, and migrate inside one write transaction so neither sees half a schema.
+    this.db.exec("PRAGMA busy_timeout = 5000;");
     this.db.exec("PRAGMA journal_mode = WAL;");
-    this.migrate();
+    this.db.transaction(() => this.migrate()).immediate();
   }
 
   private migrate(): void {
