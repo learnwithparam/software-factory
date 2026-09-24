@@ -176,7 +176,12 @@ function agentProblems(agents: unknown, stages: unknown): string[] {
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
       if (Array.isArray(a.command)) {
         if (a.command.length === 0) problems.push(`${where}command: must not be empty`);
+        else if (!String(a.command[0]).trim()) problems.push(`${where}command: the executable must not be empty`);
         else if (/\{\{/.test(String(a.command[0]))) problems.push(`${where}command: the executable cannot be a placeholder`);
+        // `sh -c "{{prompt}}"` would run issue text as shell code.
+        else if (/^(ba|z|da|k|c)?sh$/.test(String(a.command[0]).split("/").pop()!) && a.command.slice(1).some((x) => /\{\{prompt\}\}/.test(String(x)))) {
+          problems.push(`${where}command: {{prompt}} must not be an argument of a shell (use {{promptFile}} or stdin)`);
+        }
       }
     }
   } else if (agents !== undefined) problems.push("agents: expected an object");

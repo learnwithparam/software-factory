@@ -14,6 +14,7 @@ import { PRESETS } from "./presets";
 import type { AgentConfig, AgentPreset, StageAgents } from "./types";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
+const STDERR_KEEP_BYTES = 64 * 1024;
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
 
@@ -97,6 +98,7 @@ export class CommandExecutor implements Executor {
         FACTORY_SCRATCH_DIR: scratch,
       },
     });
+    let cancelRead: (() => void) | undefined;
     const killGroup = () => {
       // ESRCH means it already exited; that is the goal.
       try {
@@ -104,6 +106,9 @@ export class CommandExecutor implements Executor {
       } catch {
         proc.kill();
       }
+      // A descendant that left the group (setsid) can still hold the pipe open:
+      // give the reader a moment to drain, then stop waiting for it.
+      setTimeout(() => cancelRead?.(), 2000).unref();
     };
     const events: StageEvent[] = [];
     let toolCalls = 0;
@@ -112,7 +117,16 @@ export class CommandExecutor implements Executor {
     let recorded = 0;
     // Read alongside stdout, not after: an unread pipe can fill its OS buffer
     // and stall the child, and launch-time errors go to stderr only.
-    const stderrPromise = new Response(proc.stderr).text();
+    const errReader = proc.stderr.getReader();
+    const stderrPromise = (async () => {
+      const dec = new TextDecoder();
+      let text = "";
+      for (;;) {
+        const { done, value } = await errReader.read().catch(() => ({ done: true, value: undefined }));
+        if (done) return text + dec.decode();
+        text = (text + dec.decode(value, { stream: true })).slice(-STDERR_KEEP_BYTES);
+      }
+    })();
 
     const timeoutMinutes = opts.timeoutMinutes ?? DEFAULT_TIMEOUT_MINUTES;
     const timer = setTimeout(() => {
@@ -143,6 +157,10 @@ export class CommandExecutor implements Executor {
 
     try {
       const reader = proc.stdout.getReader();
+      cancelRead = () => {
+        void reader.cancel().catch(() => {});
+        void errReader.cancel().catch(() => {});
+      };
       const decoder = new TextDecoder();
       let buffer = "";
       for (;;) {

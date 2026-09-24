@@ -19,6 +19,7 @@ Any coding agent: the factory no longer knows Claude by name. An agent is config
   `pass|fail|unverified`. The runner sends a self-contradicting `pass` to a human. A step result must be one
   JSON object under 16 KiB. The runner writes `gate.json` (gate line and git tree hash) so a read-only
   verifier trusts current evidence instead of re-running the gates.
+- After a timeout the runner stops waiting on pipes held by a descendant that left the process group.
 - `factory doctor` checks the binary of each agent a stage uses and warns about one with no preset.
 
 Not in this release: Gemini, OpenCode, Pi, omp, Mastra Code and Amp presets (v2.6.0). The Codex preset is

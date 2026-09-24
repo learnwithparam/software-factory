@@ -43,7 +43,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   // One check per agent a stage actually uses, not one for every agent in config.
   const agents = ctx.agents ?? { claude: { preset: "claude" } };
   const stages = ctx.stages ?? { default: "claude" };
-  const used = new Set([stages.default ?? "claude", ...Object.values(stages)].filter((n): n is string => Boolean(n)));
+  // The default only counts if some stage falls back to it.
+  const STAGES = ["triage", "plan", "build", "verify", "pr"] as const;
+  const used = new Set(STAGES.map((st) => stages[st] ?? stages.default ?? "claude"));
   for (const name of [...used].sort()) {
     const agent = agents[name];
     const preset = agent?.preset ? PRESETS[agent.preset] : undefined;

@@ -247,11 +247,11 @@ The factory knows no agent by name. Each one is config, and `stages` says which 
 }
 ```
 
-Presets: `claude`, `codex`. A `command` agent gets the stage skill plus an artifact contract on stdin, or
+Presets: `claude`, `codex`. Setting both `preset` and `command` keeps the preset's event parser but runs your command. A `command` agent gets the stage skill plus an artifact contract on stdin, or
 where `{{prompt}}` / `{{promptFile}}` appears, and writes its results as files under
 `$FACTORY_ARTIFACT_DIR`. It runs with no event parser: tokens show as "not reported" and the tool-call cap
-cannot be enforced, so the timeout is the backstop and `factory doctor` says so. The guard hook and
-`--settings` rules are Claude-only. The runner's diff check, gates and commit apply to every agent.
+cannot be enforced, so the timeout is the backstop and `factory doctor` says so. A shell as the executable may not take `{{prompt}}` as an argument. The guard hook and
+`--settings` rules are Claude-only. A preset-less agent inherits your environment (minus `GH_TOKEN`, `GITHUB_TOKEN`, `FACTORY_*`, repo `GIT_*`), including model API keys and `~/.config/gh`: run it in a sandbox until v3.0. The runner's diff check, gates and commit apply to every agent.
 
 Then bring the target repo up to speed and start the loop:
 

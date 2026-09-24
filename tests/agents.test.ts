@@ -248,3 +248,39 @@ describe("verdict rules", () => {
     expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain("confidence 0-5");
   });
 });
+
+describe("hardening from the verifier report", () => {
+  test.each([
+    [{ agents: { x: { command: [""] } } }, /must not be empty/],
+    [{ agents: { x: { command: ["sh", "-c", "run {{prompt}}"] } } }, /must not be an argument of a shell/],
+    [{ agents: { x: { command: ["/bin/bash", "-c", "{{prompt}}"] } } }, /must not be an argument of a shell/],
+  ])("refuses %j", (cfg, want) => {
+    expect(configProblems({ repo: "a/b", ...cfg }).join("\n")).toMatch(want);
+  });
+
+  test("a shell that reads the prompt from a file is fine", () => {
+    expect(configProblems({ repo: "a/b", agents: { x: { command: ["sh", "run.sh", "{{promptFile}}"] } } })).toEqual([]);
+  });
+
+  test("doctor does not require claude when every stage names another agent", async () => {
+    const { runDoctor } = await import("../src/doctor");
+    const deps = { github: { authStatus: async () => ({ ok: true, detail: "" }), listLabels: async () => [] } as never, git: { run: async () => ({ stdout: "x", stderr: "", code: 0 }) }, which: async () => true, fileExists: async () => true, readFile: async () => "{}", isExecutable: async () => true };
+    const all = Object.fromEntries(STAGES.map((s) => [s, "codex"]));
+    const checks = await runDoctor(deps, { repo: "a/b", cloneDir: "/x", baselineTag: "b", agents: { claude: { preset: "claude" }, codex: { preset: "codex" } }, stages: { default: "claude", ...all } });
+    expect(checks.map((c) => c.name)).toContain("codex on PATH");
+    expect(checks.map((c) => c.name)).not.toContain("claude on PATH");
+  });
+
+  test("a grandchild that leaves the process group cannot hang the stage past the timeout", async () => {
+    const cwd = mkdtempSync(join(scratch, "setsid-"));
+    cpSync(join(import.meta.dir, "../template/.claude/skills"), join(cwd, ".claude/skills"), { recursive: true });
+    const script = join(cwd, "escape.sh");
+    writeFileSync(script, `#!/bin/sh\nperl -e 'use POSIX; POSIX::setsid(); exec "sleep","4719"' &\nsleep 30\n`, { mode: 0o755 });
+    const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" });
+    const t0 = Date.now();
+    const r = await ex.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1, timeoutMinutes: 0.02 });
+    Bun.spawnSync(["pkill", "-f", "sleep 4719"]);
+    expect(r.killedReason).toMatch(/stageTimeoutMinutes/);
+    expect(Date.now() - t0).toBeLessThan(6000);
+  });
+});
