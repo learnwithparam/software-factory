@@ -18,6 +18,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
 export const OPTIONS: [string, string][] = [
   ["--db <path>", "SQLite telemetry cache (default ~/.factory/state.db)"],
   ["--workspaces <dir>", "worktree root (default ~/.factory/workspaces)"],
+  ["--json", "run, tick, watch --once and doctor: print {ok,data} on stdout, and errors as {ok:false,error} on stderr"],
   ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
 ];
 

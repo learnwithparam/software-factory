@@ -1,6 +1,6 @@
 # Software Factory
 
-A GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR, monitor. You watch
+A GitHub-native SDLC loop for coding agents: triage, plan, build, verify, PR. You watch
 it happen in issues, comments, and a dashboard, instead of an agent's private terminal.
 
 Point it at any repo, label an issue `factory:ready`, and it runs the loop end to end: a PR
@@ -8,8 +8,8 @@ lands with a test that proves it, or a human gets asked exactly what's missing.
 
 ## The loop
 
-A human labels an issue `factory:ready`. The runner claims it, then drives six stages, each a
-Claude Code skill working in its own git worktree:
+A human labels an issue `factory:ready`. The runner claims it, then drives five stages, each a
+Claude Code skill working in its own git worktree, then the runner opens the PR:
 
 1. **triage** classifies risk and posts a triage comment.
 2. **plan** researches the code (via `factory-explorer`) and posts a plan comment with acceptance
@@ -77,14 +77,14 @@ The issue's label is the state. Everything else is derived from the thread.
 | Label | Meaning | Moves on when |
 |---|---|---|
 | `factory:ready` | a human queued it | the runner claims it |
-| `factory:triaging` / `planning` | the agent is working | the stage finishes |
+| `factory:triaging` / `factory:planning` | the agent is working | the stage finishes |
 | `factory:needs-info` | the agent asked a question (max two rounds, then `needs-human`) | a trusted comment answers it |
 | `factory:awaiting-approval` | plan posted, waiting | `/factory approve`, or auto for low risk |
-| `factory:building` / `verifying` | building, or proving the build | gates and verifier finish; a reject goes back to build twice, then `needs-human` |
+| `factory:building` / `factory:verifying` | building, or proving the build | gates and verifier finish; a reject goes back to build twice, then `needs-human` |
 | `factory:in-review` | PR ready for review | a human merges, or asks `/factory revise` |
 | `factory:failed` | a stage broke (timeout, red gates, boundary, denied tool) | `/factory retry` |
 | `factory:needs-human` | refused or out of rounds | `/factory retry` |
-| `factory:monitor` | merged, being watched | the monitor closes it |
+| `factory:monitor` | filed by `factory scan` from a production signal; a provenance label, not a stage | nothing, it stays on the issue |
 
 ## Where a human acts
 
@@ -108,6 +108,20 @@ Always through GitHub state, which the runner polls every `pollIntervalSeconds`.
 
 Every runner comment carries a hidden `<!-- factory:` marker, so the runner never mistakes its own
 comments for an answer.
+
+## Scripting the CLI
+
+`run`, `tick`, `watch --once` and `doctor` take `--json`: success is `{"ok":true,"data":...}` on
+stdout, failure is `{"ok":false,"error":{"kind":"config|usage|error","message":...}}` on stderr.
+Progress lines go to stderr, so stdout stays parseable.
+
+| Exit | Meaning |
+|---:|---|
+| 0 | success |
+| 1 | usage, invalid config, `gh` or `git` failure, or anything unexpected |
+| 2 | `run`: the issue ended in `factory:failed` |
+| 3 | `tick` or `watch --once`: paused by `maxOpenFactoryPrs`, no new pickups |
+| 4 | `doctor`: at least one check failed |
 
 ## Proving every scenario
 

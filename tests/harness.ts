@@ -129,6 +129,12 @@ export class FakeGitHub extends GitHub {
     if (pr) (pr as { state: string }).state = "closed";
   }
 
+  closed: number[] = [];
+
+  override async closeIssue(_repo: string, number: number): Promise<void> {
+    this.closed.push(number);
+  }
+
   override async listLabels(): Promise<string[]> {
     return [];
   }

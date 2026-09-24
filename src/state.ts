@@ -47,6 +47,28 @@ export interface RunEvent {
   text: string;
 }
 
+// One row per stage attempt. `runs` holds the latest state of an issue, so a
+// retry overwrote what the last attempt cost; this table keeps every attempt.
+export interface StageRun {
+  id: number;
+  repo: string;
+  issue: number;
+  stage: Stage;
+  agent: string;
+  model: string | null;
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  tool_calls: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+  exit_code: number;
+  killed_reason: string | null;
+}
+
+export type StageRunInput = Omit<StageRun, "id">;
+
 // Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
 // see paths.ts. A relative path here broke on any machine where the process
 // cwd wasn't the target repo (audit finding #1).
@@ -92,6 +114,24 @@ export class FactoryState {
         text TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS events_run_id_id ON events(run_id, id);
+      CREATE TABLE IF NOT EXISTS stage_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo TEXT NOT NULL,
+        issue INTEGER NOT NULL,
+        stage TEXT NOT NULL,
+        agent TEXT NOT NULL,
+        model TEXT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        tool_calls INTEGER NOT NULL DEFAULT 0,
+        tokens_in INTEGER NOT NULL DEFAULT 0,
+        tokens_out INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL NOT NULL DEFAULT 0,
+        exit_code INTEGER NOT NULL,
+        killed_reason TEXT
+      );
+      CREATE INDEX IF NOT EXISTS stage_runs_repo_issue_id ON stage_runs(repo, issue, id);
       CREATE TABLE IF NOT EXISTS toggles (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
@@ -186,6 +226,44 @@ export class FactoryState {
     return this.db
       .query("SELECT * FROM events WHERE run_id = $run_id AND id > $after ORDER BY id ASC LIMIT $limit")
       .all({ $run_id: runId, $after: after, $limit: limit }) as RunEvent[];
+  }
+
+  recordStageRun(input: StageRunInput): void {
+    this.db
+      .query(
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, cost_usd, exit_code, killed_reason)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $cost_usd, $exit_code, $killed_reason)`,
+      )
+      .run({
+        $repo: input.repo,
+        $issue: input.issue,
+        $stage: input.stage,
+        $agent: input.agent,
+        $model: input.model,
+        $started_at: input.started_at,
+        $finished_at: input.finished_at,
+        $duration_ms: input.duration_ms,
+        $tool_calls: input.tool_calls,
+        $tokens_in: input.tokens_in,
+        $tokens_out: input.tokens_out,
+        $cost_usd: input.cost_usd,
+        $exit_code: input.exit_code,
+        $killed_reason: input.killed_reason,
+      });
+  }
+
+  // Keyset pagination on id, like listEvents: pass the last id seen.
+  listStageRuns(repo: string, opts?: { issue?: number; after?: number; limit?: number }): StageRun[] {
+    const limit = opts?.limit ?? 200;
+    const after = opts?.after ?? 0;
+    if (opts?.issue !== undefined) {
+      return this.db
+        .query("SELECT * FROM stage_runs WHERE repo = $repo AND issue = $issue AND id > $after ORDER BY id ASC LIMIT $limit")
+        .all({ $repo: repo, $issue: opts.issue, $after: after, $limit: limit }) as StageRun[];
+    }
+    return this.db
+      .query("SELECT * FROM stage_runs WHERE repo = $repo AND id > $after ORDER BY id ASC LIMIT $limit")
+      .all({ $repo: repo, $after: after, $limit: limit }) as StageRun[];
   }
 
   getToggle(key: string, fallback: boolean): boolean {

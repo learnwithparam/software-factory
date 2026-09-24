@@ -35,9 +35,9 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v2.2.0 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REF: v2.3.0 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
-  CLAUDE_CODE_VERSION: "2.0.5" # pinned claude, same version the Dockerfile installs
+  CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
 
 # One workflow run in flight per issue at a time; a second labeled/comment
 # event on the same issue queues behind it instead of racing a second

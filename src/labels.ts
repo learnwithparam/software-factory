@@ -78,7 +78,7 @@ const STATE_DESCRIPTIONS: Record<StateLabel, string> = {
 const PARKED_DESCRIPTIONS: Record<ParkedLabel, string> = {
   "factory:needs-info": "Waiting on an answer to a question comment",
   "factory:needs-human": "Refused, or unresolved after two rounds; a human decides",
-  "factory:failed": "Gates stayed red twice; the run stopped",
+  "factory:failed": "A stage broke (timeout, red gates, boundary, denied tool); /factory retry resumes",
 };
 
 const PROVENANCE_DESCRIPTIONS: Record<ProvenanceLabel, string> = {
