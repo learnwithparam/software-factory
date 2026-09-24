@@ -71,7 +71,17 @@ describe("every preset is fully registered", () => {
     expect(renderAgentsDoc(agentsDoc)).toBe(agentsDoc);
   });
 
-  test("the version and secrets in the CI template are complete", () => {
-    for (const p of Object.values(PRESETS)) if (p.docker !== false) expect(ci).toContain(dockerVar(p.name));
+  test("the CI template pins, installs and passes the key of every preset", () => {
+    const pkg = (text: string, name: string) => new RegExp(`\\b${name}\\) pkg="([^"]+)"`).exec(text)?.[1]?.replace(/\$\{[A-Z_]+\}/, "");
+    const secrets = new Set(Object.values(PRESETS).flatMap((p) => p.envKeys));
+    for (const p of Object.values(PRESETS)) {
+      if (p.docker !== false) {
+        expect(ci).toContain(`${dockerVar(p.name)}: "${p.version}"`);
+        expect(pkg(ci, p.name), `${p.name}: install case`).toBeDefined();
+        expect(pkg(ci, p.name), `${p.name}: same package as the Dockerfile`).toBe(pkg(docker, p.name));
+      }
+    }
+    // Every job that runs an agent passes every key: 3 jobs (run-issue, tick, manual).
+    for (const key of secrets) expect(ci.split(`${key}: \${{ secrets.${key} }}`).length - 1, key).toBe(3);
   });
 });

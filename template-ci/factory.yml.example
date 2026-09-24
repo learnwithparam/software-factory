@@ -38,8 +38,9 @@ env:
   FACTORY_RUNNER_REF: v2.6.0 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
   CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
-  # Pins for the other agents. For each one your config uses, add `npm install -g <package>@<version>`
-  # beside the claude install step and its API key beside ANTHROPIC_API_KEY (docs/agents.md lists both).
+  # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
+  # FACTORY_AGENTS (space separated, default "claude"); add a repo secret for each one's key
+  # (docs/agents.md lists them). Cursor is host-only. A key you did not set stays empty.
   CODEX_VERSION: "0.156.1"
   GEMINI_VERSION: "0.61.0"
   OPENCODE_VERSION: "1.18.32"
@@ -82,7 +83,22 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: .factory-runner
 
-      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+      - name: Install agents
+        env:
+          AGENTS: ${{ vars.FACTORY_AGENTS || 'claude' }}
+        run: |
+          for agent in $AGENTS; do
+            case "$agent" in
+              claude) pkg="@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" ;;
+              codex) pkg="@openai/codex@${CODEX_VERSION}" ;;
+              gemini) pkg="@google/gemini-cli@${GEMINI_VERSION}" ;;
+              opencode) pkg="opencode-ai@${OPENCODE_VERSION}" ;;
+              pi) pkg="@mariozechner/pi-coding-agent@${PI_VERSION}" ;;
+              mastracode) pkg="mastracode@${MASTRACODE_VERSION}" ;;
+              *) echo "unknown agent $agent (cursor is host-only)" >&2; exit 1 ;;
+            esac
+            npm install -g "$pkg"
+          done
 
       - name: gh auth setup-git
         env:
@@ -94,6 +110,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: bun bin/factory run --repo-dir "${{ github.workspace }}" --issue ${{ github.event.issue.number }}
 
       - name: factory park (on failure)
@@ -121,7 +147,22 @@ jobs:
           bun-version: "1.3"
       - run: bun install --frozen-lockfile
         working-directory: .factory-runner
-      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+      - name: Install agents
+        env:
+          AGENTS: ${{ vars.FACTORY_AGENTS || 'claude' }}
+        run: |
+          for agent in $AGENTS; do
+            case "$agent" in
+              claude) pkg="@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" ;;
+              codex) pkg="@openai/codex@${CODEX_VERSION}" ;;
+              gemini) pkg="@google/gemini-cli@${GEMINI_VERSION}" ;;
+              opencode) pkg="opencode-ai@${OPENCODE_VERSION}" ;;
+              pi) pkg="@mariozechner/pi-coding-agent@${PI_VERSION}" ;;
+              mastracode) pkg="mastracode@${MASTRACODE_VERSION}" ;;
+              *) echo "unknown agent $agent (cursor is host-only)" >&2; exit 1 ;;
+            esac
+            npm install -g "$pkg"
+          done
       - env:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
         run: gh auth setup-git
@@ -130,6 +171,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: bun bin/factory tick --repo-dir "${{ github.workspace }}"
 
   scan:
@@ -173,7 +224,22 @@ jobs:
           bun-version: "1.3"
       - run: bun install --frozen-lockfile
         working-directory: .factory-runner
-      - run: npm install -g "@anthropic-ai/claude-code@${{ env.CLAUDE_CODE_VERSION }}"
+      - name: Install agents
+        env:
+          AGENTS: ${{ vars.FACTORY_AGENTS || 'claude' }}
+        run: |
+          for agent in $AGENTS; do
+            case "$agent" in
+              claude) pkg="@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" ;;
+              codex) pkg="@openai/codex@${CODEX_VERSION}" ;;
+              gemini) pkg="@google/gemini-cli@${GEMINI_VERSION}" ;;
+              opencode) pkg="opencode-ai@${OPENCODE_VERSION}" ;;
+              pi) pkg="@mariozechner/pi-coding-agent@${PI_VERSION}" ;;
+              mastracode) pkg="mastracode@${MASTRACODE_VERSION}" ;;
+              *) echo "unknown agent $agent (cursor is host-only)" >&2; exit 1 ;;
+            esac
+            npm install -g "$pkg"
+          done
       - env:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
         run: gh auth setup-git
@@ -182,6 +248,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.FACTORY_GH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
           if [ -n "${{ github.event.inputs.issue }}" ]; then
             bun bin/factory run --repo-dir "${{ github.workspace }}" --issue ${{ github.event.inputs.issue }}
