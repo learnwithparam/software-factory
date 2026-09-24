@@ -30,14 +30,14 @@ describe("teach/sessions.json", () => {
     }
   });
 
-  test("every seeded issue exists in splitbill and every checkpoint branch exists there", () => {
+  test("every seeded issue exists in splitbill and every checkpoint tag exists there", () => {
     if (!splitbill) return console.log("teach: no splitbill checkout, issues and branches not checked");
     const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
     for (const s of sessions) {
       expect({ id: s.id, issue: existsSync(join(splitbill, ".factory/issues", s.issue)) }).toEqual({ id: s.id, issue: true });
       if (!s.checkpoint) continue;
-      const ok = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${s.checkpoint}`], { cwd: splitbill }).status === 0;
-      expect({ id: s.id, branch: ok }).toEqual({ id: s.id, branch: true });
+      const ok = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/checkpoint/${s.checkpoint}`], { cwd: splitbill }).status === 0;
+      expect({ id: s.id, tag: ok }).toEqual({ id: s.id, tag: true });
     }
   });
 });
