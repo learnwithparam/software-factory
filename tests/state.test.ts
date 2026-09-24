@@ -58,9 +58,10 @@ test("two processes opening a fresh database at once both get the full schema", 
   for (let round = 0; round < 5; round++) {
     const target = `${path}${round}`;
     const src = script.replaceAll(JSON.stringify(path), JSON.stringify(target));
-    const procs = Array.from({ length: 4 }, () => Bun.spawn(["bun", "-e", src], { stderr: "pipe" }));
+    const procs = Array.from({ length: 16 }, () => Bun.spawn(["bun", "-e", src], { stderr: "pipe" }));
     const codes = await Promise.all(procs.map((p) => p.exited));
-    expect(codes).toEqual([0, 0, 0, 0]);
+    const errs = await Promise.all(procs.map((p) => new Response(p.stderr).text()));
+    expect({ codes, errs: errs.filter(Boolean) }).toEqual({ codes: Array(16).fill(0), errs: [] });
   }
   rmSync(dir, { recursive: true, force: true });
 });
