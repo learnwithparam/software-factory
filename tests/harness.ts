@@ -181,8 +181,10 @@ export class FakeGit extends Git {
     return { stdout: "", stderr: "", code: 0 };
   }
 
+  trees = ["faketree"];
+  // Each call returns the next tree, then repeats the last, so a test can move HEAD between build and verify.
   override async treeHash(): Promise<string> {
-    return "faketree";
+    return this.trees.length > 1 ? this.trees.shift()! : this.trees[0]!;
   }
 
   override async hasCommits(): Promise<boolean> {
@@ -195,7 +197,9 @@ export class FakeGit extends Git {
 // test can swap `line` for a red one to exercise the failure path.
 export class FakeGateRunner implements GateRunner {
   line = "FACTORY_GATES: status=GREEN passed=10 failed=0 skipped=0 failed_gates=-";
+  runs = 0;
   async run(_worktreeDir: string) {
+    this.runs++;
     return { stdout: this.line, stderr: "", code: 0 };
   }
 }

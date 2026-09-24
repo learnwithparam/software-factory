@@ -5,6 +5,7 @@
 // Deviations: the codes are the factory's own, and 1 keeps meaning "failed" so CI steps still fail.
 
 import { ConfigError } from "./config";
+import { plain } from "./display";
 
 export const EXIT = {
   ok: 0,
@@ -29,6 +30,6 @@ export function successJson(data: unknown, ok = true): string {
 }
 
 export function failureJson(err: unknown): string {
-  const message = err instanceof Error ? err.message : String(err);
+  const message = plain(err instanceof Error ? err.message : String(err));
   return JSON.stringify({ ok: false, error: { kind: errorKind(err), message } }, null, 2);
 }

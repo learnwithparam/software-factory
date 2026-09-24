@@ -15,6 +15,7 @@ export interface StageEvent {
   readonly text?: string;
   readonly tokensIn?: number;
   readonly tokensOut?: number;
+  readonly tokensCached?: number;
   // On "usage" events: `total` means these are the run's final totals (replace
   // what was summed); `invalid` means the terminal event was unreadable, so
   // tokens are "not reported".
@@ -44,7 +45,10 @@ export interface StageRunResult {
   readonly toolCalls: number;
   readonly tokensIn: number;
   readonly tokensOut: number;
+  readonly tokensCached?: number;
   readonly costUsd: number;
+  // True when the agent itself reported a cost; false means costFor decides.
+  readonly costReported?: boolean;
   readonly exitCode: number;
   // Set when the runner killed the process itself (timeout or tool-call cap)
   // rather than letting it exit on its own — audit finding #15.
@@ -74,34 +78,42 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
   let tokensIn = 0;
   let tokensOut = 0;
   let costUsd = 0;
+  let costReported = false;
+  let tokensCached = 0;
   const permissionDenials: string[] = [];
   let finalText: string | undefined;
-  let final: { in: number; out: number } | "invalid" | undefined;
+  let final: { in: number; out: number; cached: number } | "invalid" | undefined;
   for (const e of events) {
     if (e.finalText !== undefined) finalText = e.finalText;
     if (e.kind === "tool_use") toolCalls += 1;
     if (e.kind === "usage") {
       if (e.invalid) final = "invalid";
-      else if (e.total) final = { in: e.tokensIn ?? 0, out: e.tokensOut ?? 0 };
+      else if (e.total) final = { in: e.tokensIn ?? 0, out: e.tokensOut ?? 0, cached: e.tokensCached ?? 0 };
       else {
         tokensIn += e.tokensIn ?? 0;
         tokensOut += e.tokensOut ?? 0;
+        tokensCached += e.tokensCached ?? 0;
       }
     }
     if (e.kind === "result") {
-      costUsd = e.costUsd ?? costUsd;
+      if (e.costUsd !== undefined) {
+        costUsd = e.costUsd;
+        costReported = true;
+      }
       permissionDenials.push(...(e.denials ?? []));
     }
   }
   if (final === "invalid") {
     tokensIn = 0;
     tokensOut = 0;
+    tokensCached = 0;
   } else if (final) {
     tokensIn = final.in;
     tokensOut = final.out;
+    tokensCached = final.cached;
   }
   const finalMessage = finalText === undefined ? undefined : truncateFinalMessage(finalText);
-  const result = { events, toolCalls, tokensIn, tokensOut, costUsd, exitCode, permissionDenials, usageComplete: final !== "invalid", ...(finalMessage ? { finalMessage } : {}) };
+  const result = { events, toolCalls, tokensIn, tokensOut, tokensCached, costUsd, costReported, exitCode, permissionDenials, usageComplete: final !== "invalid", ...(finalMessage ? { finalMessage } : {}) };
   return exitCode !== 0 && stderrTail ? { ...result, stderrTail } : result;
 }
 

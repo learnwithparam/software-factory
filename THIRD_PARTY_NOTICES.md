@@ -8,26 +8,31 @@ in step. Only MIT-licensed code is copied.
 
 Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain Lewis)
 
-- `dashboard/public/styles.css` from `internal/controlplane/web/src/styles.css`
-- `dashboard/public/lib/run-metrics.js` from `internal/controlplane/web/src/run-metrics.js`
-- `dashboard/public/lib/runs-board.js` from `internal/controlplane/web/src/runs-board.js`
-- `dashboard/public/lib/status-loader.js` from `internal/controlplane/web/src/status-loader.js`
-- `dashboard/public/lib/analytics-state.js` from `internal/controlplane/web/src/analytics-state.js`
-- `dashboard/public/lib/task-presentation.js` from `internal/controlplane/web/src/task-presentation.js`
-- `dashboard/public/lib/routes.js` from `internal/controlplane/web/src/routes.js`
-- `src/revision.ts` from `internal/runner/revision.go` (shape from `internal/protocol/revision.go`)
-- `src/agents/executor.ts` from `internal/runner/runner.go` (process group kill from `process_unix.go`)
-- `src/agents/env.ts` from `internal/runner/runner.go`
-- `src/agents/final-message.ts` from `internal/runner/codex_usage.go`
-- `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go`
-- `src/agents/usage.ts` from `internal/runner/codex_usage.go`
+- `dashboard/public/styles.css` from `internal/controlplane/web/src/styles.css` [no upstream test]
+- `dashboard/public/lib/run-metrics.js` from `internal/controlplane/web/src/run-metrics.js` [tested by `tests/ported/machinist/run-metrics.test.ts`]
+- `dashboard/public/lib/runs-board.js` from `internal/controlplane/web/src/runs-board.js` [tested by `tests/ported/machinist/runs-board.test.ts`]
+- `dashboard/public/lib/status-loader.js` from `internal/controlplane/web/src/status-loader.js` [tested by `tests/ported/machinist/status-ui.test.ts`]
+- `dashboard/public/lib/analytics-state.js` from `internal/controlplane/web/src/analytics-state.js` [no upstream test]
+- `dashboard/public/lib/task-presentation.js` from `internal/controlplane/web/src/task-presentation.js` [tested by `tests/ported/machinist/task-presentation.test.ts`]
+- `dashboard/public/lib/routes.js` from `internal/controlplane/web/src/routes.js` [tested by `tests/ported/machinist/routes.test.ts`]
+- `src/revision.ts` from `internal/runner/revision.go` (shape from `internal/protocol/revision.go`) [tested by `tests/ported/machinist/revision.test.ts`]
+- `src/agents/executor.ts` from `internal/runner/runner.go` (process group kill from `process_unix.go`) [tested by `tests/ported/machinist/runner.test.ts`]
+- `src/agents/env.ts` from `internal/runner/runner.go` [tested by `tests/ported/machinist/runner.test.ts`]
+- `src/event-budget.ts` from `internal/runner/events.go` [tested by `tests/ported/machinist/events.test.ts`]
+- `src/agents/structured.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/structured.test.ts`]
+- `src/agents/final-message.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/final-message.test.ts`]
+- `src/agents/presets/codex.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
+- `src/agents/usage.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
+- `src/artifacts.ts` from `internal/protocol/workflow.go` [tested by `tests/ported/machinist/workflow.test.ts`]
 
 ## owainlewis/assembler@7cac671
 
 Source: https://github.com/owainlewis/assembler (MIT, Copyright (c) 2026 Owain Lewis)
 
-- `src/display.ts` from `src/display.ts`
-- `src/logs.ts` from `src/runs.ts`
+- `src/display.ts` from `src/display.ts` [tested by `tests/ported/assembler/display.test.ts`]
+- `src/logs.ts` from `src/runs.ts` [tested by `tests/ported/assembler/logs.test.ts`]
+- `src/config.ts` from `src/index.ts` [tested by `tests/ported/assembler/config.test.ts`]
+- `src/agents/reply.ts` from `src/index.ts` [tested by `tests/ported/assembler/outputs.test.ts`]
 
 ## License text (both projects)
 

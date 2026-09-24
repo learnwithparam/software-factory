@@ -1,10 +1,10 @@
 // Ported from owainlewis/machinist@3943516 internal/runner/codex_usage.go:508-560 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: input and output tokens are kept apart (machinist sums them); tool calls are counted from item.completed command, file and MCP items, which machinist does not need.
-// Codex CLI: `codex exec --json -s workspace-write -` with the prompt on stdin.
-// Read-only is not usable here because every stage writes its artifacts; the
-// runner's protected-path diff and gates are the backstop.
+// Codex CLI: `codex exec --json -s <sandbox> -` with the prompt on stdin.
+// Build and pr run workspace-write; triage, plan and verify run read-only and
+// return their artifacts as the final message, which the runner writes.
 
 import type { StageEvent } from "../../executor";
-import type { AgentPreset } from "../types";
+import { type AgentPreset, stagePolicy } from "../types";
 import { isUsageResultCandidate, readUsage } from "../usage";
 
 interface CodexLine {
@@ -32,7 +32,7 @@ export function parseCodexLine(line: string): StageEvent[] {
   }
   if (parsed.type === "turn.completed") {
     const usage = readUsage(parsed.usage, false);
-    return [usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, total: true } : { kind: "usage", invalid: true }];
+    return [usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, tokensCached: usage.tokensCached, total: true } : { kind: "usage", invalid: true }];
   }
   return [];
 }
@@ -40,8 +40,18 @@ export function parseCodexLine(line: string): StageEvent[] {
 export const codexPreset: AgentPreset = {
   name: "codex",
   binary: "codex",
-  command: (_opts, agent, prompt) => ({
-    argv: ["codex", "exec", "--json", "-s", "workspace-write", ...(agent.model ? ["-m", agent.model] : []), "-"],
+  returnsArtifact: true,
+  command: (opts, agent, prompt, ctx) => ({
+    argv: [
+      "codex",
+      "exec",
+      "--json",
+      "-s",
+      stagePolicy(opts.stage).write ? "workspace-write" : "read-only",
+      ...(ctx?.schemaFile ? ["--output-schema", ctx.schemaFile] : []),
+      ...(agent.model ? ["-m", agent.model] : []),
+      "-",
+    ],
     stdin: prompt,
   }),
   parseLine: parseCodexLine,

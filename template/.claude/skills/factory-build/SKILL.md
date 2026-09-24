@@ -35,9 +35,9 @@ Quote the exact gate line — the command and its pass/fail output — verbatim
 in the status comment. Do not paraphrase or summarize a failure as "some
 tests failed"; show the line that failed.
 
-If the gate fails and you can see why, fix it and re-run. Don't loop more
-than a few times guessing; if you can't get it green, say so in the status
-comment and stop — `factory-verify` will catch a red gate anyway, but a
+If the gate fails and you can see why, fix it and re-run. Stop after 3
+failed gate runs: write `"outcome": "blocked"` and say so in the status
+comment. If you can't get it green, say so in the status comment and stop — `factory-verify` will catch a red gate anyway, but a
 build that knows it's broken shouldn't pretend otherwise.
 
 ## 4. Escape hatch: back to needs-info mid-build
@@ -66,6 +66,9 @@ Write `.factory/runs/issue-<N>/status-comment.md` using the
   "rounds": 1
 }
 ```
+
+`outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
+look; put the reason in `summary`), or `failed`. No other fields are allowed.
 
 `status` is one of `green`, `red` (gate never went green after reasonable
 effort), or `needs-info` (see step 4). `rounds` is this issue's build

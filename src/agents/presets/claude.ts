@@ -58,11 +58,11 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
     // Cumulative usage incl. cache tokens (machinist codex_usage.go); a result with no usage keeps the per-message sums.
     if (parsed.usage !== undefined) {
       const usage = readUsage(parsed.usage, true);
-      events.push(usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, total: true } : { kind: "usage", invalid: true });
+      events.push(usage ? { kind: "usage", tokensIn: usage.tokensIn, tokensOut: usage.tokensOut, tokensCached: usage.tokensCached, total: true } : { kind: "usage", invalid: true });
     }
     events.push({
       kind: "result",
-      costUsd: parsed.total_cost_usd ?? parsed.cost_usd ?? 0,
+      ...(parsed.total_cost_usd ?? parsed.cost_usd) === undefined ? {} : { costUsd: parsed.total_cost_usd ?? parsed.cost_usd },
       text: parsed.subtype,
       ...(denials.length ? { denials } : {}),
       ...(parsed.result ? { finalText: parsed.result } : {}),

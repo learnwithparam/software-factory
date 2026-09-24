@@ -57,6 +57,7 @@ export interface GhPr {
   state: string;
   headRefName: string;
   isDraft: boolean;
+  closingIssuesReferences?: { number: number }[];
 }
 
 class GhError extends Error {
@@ -198,7 +199,7 @@ export class GitHub {
       "--state",
       opts?.state ?? "open",
       "--json",
-      "number,url,state,headRefName,isDraft",
+      "number,url,state,headRefName,isDraft,closingIssuesReferences",
       "--limit",
       "100",
     ]);

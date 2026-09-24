@@ -4,7 +4,7 @@
 // artifact contract reaches the prompt, and every preset can be diagnosed.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
@@ -50,10 +50,12 @@ describe("claude preset", () => {
 });
 
 describe("codex preset", () => {
-  test("prompt on stdin, JSON events, workspace-write", () => {
-    const inv = PRESETS.codex!.command({ stage: "plan", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex", model: "gpt-5.6-terra" }, "the prompt");
+  test("prompt on stdin, JSON events, sandbox by stage policy", () => {
+    const inv = PRESETS.codex!.command({ stage: "build", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex", model: "gpt-5.6-terra" }, "the prompt");
     expect(inv.argv).toEqual(["codex", "exec", "--json", "-s", "workspace-write", "-m", "gpt-5.6-terra", "-"]);
     expect(inv.stdin).toBe("the prompt");
+    for (const stage of ["triage", "plan", "verify"] as const) expect(PRESETS.codex!.command({ stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("read-only");
+    expect(PRESETS.codex!.command({ stage: "pr", issue: 1, cwd: "/w", maxBudgetUsd: 2 }, { preset: "codex" }, "").argv).toContain("workspace-write");
   });
 });
 
@@ -159,6 +161,62 @@ describe("an agent with no preset", () => {
   });
 });
 
+describe("codex with read-only stages", () => {
+  class SkillGit extends FakeGit {
+    override async ensureWorktree(cloneDir: string, worktreeDir: string, issue: number) {
+      await super.ensureWorktree(cloneDir, worktreeDir, issue);
+      cpSync(join(import.meta.dir, "../template/.claude/skills"), join(worktreeDir, ".claude/skills"), { recursive: true });
+    }
+  }
+  const bin = mkdtempSync(join(scratch, "bin-"));
+  symlinkSync(join(import.meta.dir, "fixtures/agents/fake-codex.ts"), join(bin, "codex"));
+
+  async function run(n: number, bad?: string, outputSchema?: boolean) {
+    const log = mkdtempSync(join(scratch, "log-"));
+    const saved = process.env.PATH;
+    process.env.PATH = `${bin}:${saved}`;
+    process.env.FAKE_AGENT_LOG = log;
+    if (bad !== undefined) process.env.FAKE_BAD_REPLY = bad;
+    const issue = baseIssue(n, [LABEL.ready]);
+    const github = new FakeGitHub([issue]);
+    const state = new FactoryState(":memory:");
+    state.setToggle("auto_approve_low_risk", true);
+    const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra", ...(outputSchema ? { outputSchema } : {}) } }, stages: { default: "codex" } });
+    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
+    try {
+      return { result: await processReadyIssue(issue, deps, config), github, state, log };
+    } finally {
+      process.env.PATH = saved;
+      delete process.env.FAKE_AGENT_LOG;
+      delete process.env.FAKE_BAD_REPLY;
+    }
+  }
+
+  test("triage, plan and verify run read-only and the runner writes their files; build writes its own", async () => {
+    const { result, github, state, log } = await run(5);
+    expect(result).toBe("shipped");
+    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only", "plan=read-only", "build=workspace-write", "verify=read-only", "pr=workspace-write"]);
+    expect(github.createdPrs[0]!.body).toContain("Closes #5");
+    // Cached tokens are stored, and gpt-5.6-terra has no price, so the cost is "not reported".
+    const [row] = state.listStageRuns("acme/widgets");
+    expect([row!.tokens_cached, row!.usage_complete]).toEqual([40, 0]);
+    state.close();
+  });
+
+  test("outputSchema hands the read-only stages a schema file, and only those", async () => {
+    const { result, log, state } = await run(7, undefined, true);
+    expect(result).toBe("shipped");
+    expect(readFileSync(join(log, "sandboxes"), "utf8").trim().split("\n").map((l) => l.trim())).toEqual(["triage=read-only schema", "plan=read-only schema", "build=workspace-write", "verify=read-only schema", "pr=workspace-write"]);
+    state.close();
+  });
+
+  test("a read-only reply that is not the envelope fails the stage instead of shipping", async () => {
+    const { result, state } = await run(6, "I looked at the code and it seems fine.");
+    expect(result).toBe("failed");
+    state.close();
+  });
+});
+
 describe("the runner refuses a self-contradicting verdict", () => {
   test("pass with a blocking finding goes to a human, and the verdict is never posted", async () => {
     const workspacesDir = mkdtempSync(join(scratch, "ws-"));
@@ -249,6 +307,21 @@ describe("verdict rules", () => {
   });
 });
 
+describe("skill text the runner depends on", () => {
+  const skill = (n: string) => readFileSync(join(import.meta.dir, `../template/.claude/skills/${n}/SKILL.md`), "utf8");
+  test("build stops at 3 gate runs, plan never renumbers, every step skill teaches outcome", () => {
+    expect(skill("factory-build")).toContain("Stop after 3");
+    expect(skill("factory-build")).not.toContain("a few times");
+    expect(skill("factory-plan")).toContain("never renumbered");
+    for (const n of ["triage", "plan", "build", "verify"]) expect(skill(`factory-${n}`), n).toContain("outcome");
+  });
+  test("the verdict template renders a per-criterion status", () => {
+    const t = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-comment/assets/verdict.md"), "utf8");
+    expect(t).toContain("{{pass|fail|unverified}}");
+    expect(t).not.toContain("pass_or_fail");
+  });
+});
+
 describe("hardening from the verifier report", () => {
   test.each([
     [{ agents: { x: { command: [""] } } }, /must not be empty/],
@@ -282,5 +355,17 @@ describe("hardening from the verifier report", () => {
     Bun.spawnSync(["pkill", "-f", "sleep 4719"]);
     expect(r.killedReason).toMatch(/stageTimeoutMinutes/);
     expect(Date.now() - t0).toBeLessThan(6000);
+  });
+});
+
+describe("preset-less command agents", () => {
+  test("a bare codex exec command gets the codex preset and --json", () => {
+    const a = resolveAgent({ codex: { command: ["env", "X=1", "codex", "exec", "{{prompt}}"] } }, { default: "codex" }, "triage");
+    expect(a.preset).toBe(PRESETS.codex);
+    expect(a.config.command).toEqual(["env", "X=1", "codex", "exec", "--json", "{{prompt}}"]);
+  });
+  test("an unrecognised command is left alone", () => {
+    const a = resolveAgent({ aider: { command: ["aider", "--message", "{{prompt}}"] } }, { default: "aider" }, "triage");
+    expect(a.preset).toBeUndefined();
   });
 });

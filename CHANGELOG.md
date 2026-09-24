@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.5.1
+
+Finishes v2.5: the pieces it promised and did not ship.
+
+- Cost meter: `src/pricing.ts` holds a dated per-model price table. An unknown model is "not reported",
+  never $0. `stage_runs` gains `tokens_cached` and `usage_complete` (guarded, idempotent `ALTER`), and the
+  dashboard shows "Not reported" for incomplete usage.
+- Stage policy: triage, plan and verify run Codex with `-s read-only` and return their artifact as the final
+  message; the runner validates it (`src/agents/reply.ts`) and writes the file. Build and pr keep
+  `workspace-write`. Opt in to `--output-schema` with `outputSchema: true` on an agent.
+- Stage artifacts get a JSON Schema built from the validators (`src/schemas.ts`), included in the artifact
+  contract. Every step artifact accepts `outcome: complete|blocked|failed` and rejects unknown fields;
+  `blocked` goes to needs-human with the reason.
+- Event log has a 32 MiB byte budget per run, with a `process.output_truncated` marker.
+- A `command` agent that is really `codex exec` or `claude -p`, even behind `env`, `mise` or `direnv`, gets
+  its JSON flag and preset parser.
+- Verify refuses stale evidence: if `gate.json` names a different tree than HEAD, the gates re-run first.
+  Triage refuses an issue another open PR already closes, before any tokens are spent.
+- Skills: `outcome` is taught, verdict comments render `pass|fail|unverified` per criterion, AC ids are never
+  renumbered, build stops after 3 failed gate runs.
+- Dashboard: the session cookie is a random id, not the token. Thread, run titles, artifact previews and CLI
+  errors pass through `plain()`. `InboxChannel` interface, inbox argument parsing and every ChatOps
+  command are tested.
+- Provenance: the test now checks one ported test per row and Markdown ports.
+
+Not in this release:
+
+- No live Codex run (#18). Claude gets no `--json-schema`; `outputSchema` is opt-in.
+- `gpt-5.6-terra` is unpriced, so its cost is not reported. Incomplete usage stores `cost_usd = 0` with
+  `usage_complete = 0`, not NULL.
+- A read-only reply's artifact is capped at 16 KiB.
+- The tool-free finding re-check call (P40) is still prompt text only.
+- Sub-minute durations keep the upstream `42.5s` format.
+- Upstream `runs-view.test.js`, `artifacts_test.go` and the auth tests are not ported.
+- Real Claude fixtures per stage are not recorded; they spend tokens.
+
 ## v2.5.0
 
 Any coding agent: the factory no longer knows Claude by name. An agent is config.

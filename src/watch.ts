@@ -12,10 +12,15 @@
 
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
+import { TRUNCATION_KIND } from "./event-budget";
+import { costFor } from "./pricing";
 import type { Executor, StageName, StageRunResult } from "./executor";
 import {
   clearStageArtifacts,
+  stepStop,
+  validateStepJson,
   validateVerdict,
+  readGateEvidence,
   writeGateEvidence,
   readStageArtifacts,
   runDir,
@@ -187,8 +192,17 @@ async function runStage(
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
   });
-  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind, e.text ?? e.toolName ?? "");
+  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
+  // The agent's own cost wins; otherwise price the tokens. No price means the
+  // cost is unknown, which is stored as 0 with usage_complete = 0, never as real.
+  const cached = result.tokensCached ?? 0;
+  const priced =
+    result.costReported === false
+      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
+      : result.costUsd;
+  const usageComplete = result.usageComplete !== false && priced !== undefined;
+  const costUsd = usageComplete ? (priced ?? 0) : 0;
   deps.state.recordStageRun({
     repo: config.repo,
     issue: issueNumber,
@@ -201,7 +215,9 @@ async function runStage(
     tool_calls: result.toolCalls,
     tokens_in: result.tokensIn,
     tokens_out: result.tokensOut,
-    cost_usd: result.costUsd,
+    tokens_cached: cached,
+    cost_usd: costUsd,
+    usage_complete: usageComplete ? 1 : 0,
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
   });
@@ -209,9 +225,24 @@ async function runStage(
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
     tokens_out: run.tokens_out + result.tokensOut,
-    cost_usd: run.cost_usd + result.costUsd,
+    cost_usd: run.cost_usd + costUsd,
   });
   return result;
+}
+
+// A stage's JSON, or why it cannot be used: an unknown field is refused, and
+// an `outcome` of blocked or failed stops the run where the agent said it did.
+type StepStage = "triage" | "plan" | "build";
+function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown): { json?: T; problem?: string } {
+  if (raw === undefined) return {};
+  const checked = validateStepJson(stage, raw);
+  return checked.ok ? { json: raw as T } : { problem: checked.reason };
+}
+
+async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, stop: { status: "needs-human" | "failed"; reason: string }): Promise<Outcome> {
+  await moveLabel(deps, config, issueNumber, from, stop.status === "failed" ? LABEL.failed : LABEL.needsHuman);
+  finish(deps, config, issueNumber, stop.status, stop.reason);
+  return stop.status;
 }
 
 interface RunCtx {
@@ -237,14 +268,26 @@ async function runFromStage(
 
   for (;;) {
     if (stage === "triage") {
+      // Someone else's open PR already closes this issue: don't spend tokens on a second fix.
+      const own = deps.git.branchName(issueNumber);
+      const taken = (await deps.github.listPrs(config.repo, { state: "open" })).find(
+        (p) => p.headRefName !== own && p.closingIssuesReferences?.some((r) => r.number === issueNumber),
+      );
+      if (taken) {
+        await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
+        finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);
+        return "needs-human";
+      }
       const result = await runStage(deps, config, issue, "triage", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "triage");
-      const json = art.json as TriageArtifact | undefined;
+      const { json, problem } = stageJson<TriageArtifact>("triage", art.json);
       if (result.exitCode !== 0 || !json) {
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", stageFailure(result, "triage produced no valid triage.json"));
+        finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "triage produced no valid triage.json"));
         return "failed";
       }
+      const triageStop = stepStop(json);
+      if (triageStop) return stopStep(deps, config, issueNumber, LABEL.triaging, triageStop);
       if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "triage", json });
       if (json.disposition === "refused" || json.disposition === "duplicate") {
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
@@ -271,15 +314,17 @@ async function runFromStage(
     if (stage === "plan") {
       const result = await runStage(deps, config, issue, "plan", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "plan");
-      const json = art.json as PlanArtifact | undefined;
+      const { json, problem } = stageJson<PlanArtifact>("plan", art.json);
       // A plan stage that crashes (or writes nothing) used to fall through
       // to "not eligible" and park as awaiting-approval with no plan comment
       // to approve against — stuck forever (audit finding #10).
       if (result.exitCode !== 0 || !json) {
         await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", stageFailure(result, "plan produced no valid plan.json"));
+        finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "plan produced no valid plan.json"));
         return "failed";
       }
+      const planStop = stepStop(json);
+      if (planStop) return stopStep(deps, config, issueNumber, LABEL.planning, planStop);
       if (json.status === "needs-info") {
         if (ctx.questionRound >= MAX_QUESTION_ROUNDS) {
           await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.needsHuman);
@@ -308,7 +353,9 @@ async function runFromStage(
     if (stage === "build") {
       const result = await runStage(deps, config, issue, "build", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "build");
-      const json = art.json as BuildArtifact | undefined;
+      const { json, problem } = stageJson<BuildArtifact>("build", art.json);
+      const buildStop = stepStop(json);
+      if (buildStop) return stopStep(deps, config, issueNumber, LABEL.building, buildStop);
 
       // The agent's own "needs-info" is a legitimate escape hatch (not a
       // crash), matched to the runner's exact spelling (audit finding #5:
@@ -336,7 +383,7 @@ async function runFromStage(
         await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.failed);
         deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
         const reason =
-          stageFailure(result) ??
+          problem ?? stageFailure(result) ??
           `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
         finish(deps, config, issueNumber, "failed", reason);
         return "failed";
@@ -367,6 +414,15 @@ async function runFromStage(
     }
 
     if (stage === "verify") {
+      // A verdict is only as good as its evidence: gate.json must describe
+      // the tree being verified, so a resumed or amended run re-measures it.
+      const tree = await deps.git.treeHash(worktree);
+      const seen = await readGateEvidence(worktree, issueNumber);
+      if (seen?.tree !== tree) {
+        const fresh = await runGates(deps.gateRunner, worktree);
+        deps.state.updateRun(config.repo, issueNumber, { gate_line: fresh.raw });
+        await writeGateEvidence(worktree, issueNumber, { line: fresh.raw, status: fresh.status, tree });
+      }
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
       const checked = art.json === undefined ? undefined : validateVerdict(art.json);
@@ -376,6 +432,8 @@ async function runFromStage(
         finish(deps, config, issueNumber, "needs-human", checked.reason);
         return "needs-human";
       }
+      const verifyStop = stepStop(json);
+      if (verifyStop) return stopStep(deps, config, issueNumber, LABEL.verifying, verifyStop);
       if (result.exitCode !== 0 || !json || json.result === "uncertain") {
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(

@@ -177,6 +177,26 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("4c. an unpriced or partial usage is stored as not reported, a priced one gets a cost", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const usage = { tokensIn: 1000, tokensOut: 100, tokensCached: 400, costUsd: 0, costReported: false };
+    c.push("triage", triage(), { ...usage, model: "gpt-not-priced" });
+    c.push("plan", plan("low"), { ...usage, model: "claude-haiku-4-5" });
+    c.push("build", build(), { ...usage, model: "claude-haiku-4-5", usageComplete: false });
+    c.push("verify", verdict("pass"), { ...usage, costUsd: 0.25, costReported: true, model: "gpt-not-priced" });
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    const rows = Object.fromEntries(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => [r.stage, r]));
+    expect([rows.triage!.usage_complete, rows.triage!.cost_usd]).toEqual([0, 0]);
+    expect(rows.plan!.usage_complete).toBe(1);
+    expect(rows.plan!.tokens_cached).toBe(400);
+    expect(rows.plan!.cost_usd).toBeCloseTo((600 * 1 + 400 * 0.1 + 100 * 5) / 1e6, 12);
+    expect(rows.build!.usage_complete).toBe(0);
+    expect([rows.verify!.usage_complete, rows.verify!.cost_usd]).toEqual([1, 0.25]);
+    done(c);
+  });
+
   test("18. an untrusted /factory approve is ignored", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage({ risk: "medium" }));
@@ -334,6 +354,63 @@ describe("failure paths", () => {
     expect(await c.step()).toBe("failed");
     expect(c.state.getRun("acme/widgets", 1)!.reason).toContain("Write .factory/runs/issue-1/triage.json");
     done(c);
+  });
+
+  test("14b. a step that reports outcome blocked parks as needs-human with its summary", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ outcome: "blocked", summary: "Need the payment provider's sandbox key" }));
+    expect(await c.step()).toBe("needs-human");
+    expect(labels(c.github, 1)).toEqual([LABEL.needsHuman]);
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("Need the payment provider's sandbox key");
+    done(c);
+  });
+
+  test("14d. verify re-runs the gates when gate.json describes a different tree", async () => {
+    const same = setup(["factory:ready"]);
+    happy(same);
+    await same.step();
+    expect(same.gateRunner.runs).toBe(1);
+
+    const moved = setup(["factory:ready"]);
+    moved.git.trees = ["built", "amended"];
+    happy(moved);
+    await moved.step();
+    expect(moved.gateRunner.runs).toBe(2);
+  });
+
+  test("14e. triage refuses an issue another open PR already closes, and spends no tokens", async () => {
+    const c = setup(["factory:ready"]);
+    c.github.prs.push({ number: 9, url: "u", state: "open", headRefName: "someone/fix", isDraft: false, closingIssuesReferences: [{ number: c.n }] });
+    happy(c);
+    expect(await c.step()).toBe("needs-human");
+    expect((c.state as unknown as { db: { query(q: string): { all(): unknown[] } } }).db.query("SELECT 1 FROM stage_runs").all()).toHaveLength(0);
+  });
+
+  test("14c. outcome failed fails the run; an outcome complete does not hide a non-zero exit", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ outcome: "failed", summary: "cannot reproduce" }));
+    expect(await c.step()).toBe("failed");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("cannot reproduce");
+    const d = setup([LABEL.ready]);
+    d.push("triage", triage({ outcome: "complete", summary: "ok" }), { exitCode: 1 });
+    expect(await d.step()).toBe("failed");
+    done(c);
+    done(d);
+  });
+
+  test("14d. an unknown field in any stage JSON fails the stage and names the field", async () => {
+    const c = setup([LABEL.ready]);
+    c.push("triage", triage({ dispositon: "proceed" }));
+    expect(await c.step()).toBe("failed");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe('triage.json has unknown field "dispositon"');
+    const d = setup([LABEL.ready]);
+    d.state.setToggle("auto_approve_low_risk", true);
+    d.push("triage", triage());
+    d.push("plan", plan("low", { file: ["src/b.ts"] }));
+    expect(await d.step()).toBe("failed");
+    expect(d.state.getRun("acme/widgets", 1)!.reason).toBe('plan.json has unknown field "file"');
+    done(c);
+    done(d);
   });
 });
 

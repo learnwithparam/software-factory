@@ -19,6 +19,9 @@ class FakeGitHub extends GitHub {
   override async listOpenIssues(): Promise<GhIssue[]> {
     return this.issues;
   }
+  override async getIssue(_repo: string, number: number): Promise<GhIssue> {
+    return this.issues.find((i) => i.number === number)!;
+  }
   override async commentIssue(_repo: string, issue: number, body: string): Promise<number | undefined> {
     this.posted.push({ issue, body });
     return 1;
@@ -211,5 +214,36 @@ describe("line and assets", () => {
     const font = await dashboard.handle(new Request("http://localhost:4100/fonts/manrope-latin.woff2"), "10.0.0.9");
     expect(font.headers.get("content-type")).toContain("font/woff2");
     expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(401);
+  });
+});
+
+describe("session cookie and terminal-safe text", () => {
+  const ESC = "\u001b[31m";
+
+  test("the cookie is a random id, not the token, and it is not accepted as a Bearer token", async () => {
+    const { dashboard } = await make(TOKEN);
+    const login = async () =>
+      dashboard.handle(new Request("http://localhost:4100/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: TOKEN }) }), "203.0.113.7");
+    const one = (await login()).headers.get("set-cookie")!;
+    const two = (await login()).headers.get("set-cookie")!;
+    expect(one).not.toContain(TOKEN);
+    expect(one.split(";")[0]).not.toBe(two.split(";")[0]);
+    const id = one.split(";")[0]!.split("=")[1]!;
+    const at = (headers: Record<string, string>) => dashboard.handle(new Request("http://localhost:4100/api/runs", { headers }), "203.0.113.7");
+    expect((await at({ authorization: `Bearer ${id}` })).status).toBe(401);
+    expect((await at({ cookie: `factory_session=${TOKEN}` })).status).toBe(401);
+    expect((await at({ cookie: `factory_session=${id}` })).status).toBe(200);
+  });
+
+  test("thread, run titles and artifact previews carry no terminal escapes; a download stays raw", async () => {
+    const issue: GhIssue = { number: 1, title: `T${ESC}`, body: `B${ESC}`, labels: [], comments: [{ id: 1, author: "a", authorAssociation: "NONE", body: `C${ESC}`, createdAt: "2026-09-20T10:00:00Z" }] };
+    const { dashboard, state } = await make("", [issue]);
+    state.upsertRun({ issue: 1, repo: "acme/widgets", title: `Run${ESC}`, stage: "build", status: "running" });
+    const dir = join(scratch, "issue-1", ".factory", "runs", "issue-1");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "plan.md"), `plan${ESC}`);
+    const get = async (path: string) => dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1");
+    for (const path of ["/api/runs", "/api/issues/1/thread", "/api/issues/1/artifacts?file=plan.md", "/api/line"]) expect(await (await get(path)).text(), path).not.toContain("\u001b");
+    expect(await (await get("/api/issues/1/artifacts?file=plan.md&download=1")).text()).toContain("\u001b");
   });
 });

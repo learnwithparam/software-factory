@@ -15,7 +15,8 @@ import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } f
 import { ShellGateRunner } from "../src/gates";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
-import { act, buildInbox, type InboxAction } from "../src/inbox";
+import { plain } from "../src/display";
+import { act, buildInbox, inboxPositionals, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
@@ -164,13 +165,7 @@ async function cmdInbox(): Promise<void> {
   if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
   const github = new GitHub();
   const items = buildInbox(await github.listOpenIssues(repo));
-  const positional: string[] = [];
-  for (let i = 1; i < args.length; i++) {
-    if (args[i] === "--json") continue;
-    if (args[i]!.startsWith("--")) i++; // a flag and its value
-    else positional.push(args[i]!);
-  }
-  const [issueArg, actionArg] = positional;
+  const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
     const item = items.find((i) => i.issue === Number(issueArg));
     if (!item) throw new UsageError(`inbox: #${issueArg} is not waiting for you`);
@@ -382,6 +377,6 @@ try {
   await main();
 } catch (err) {
   if (has("json")) console.error(failureJson(err));
-  else console.error(`factory: ${err instanceof Error ? err.message : err}`);
+  else console.error(`factory: ${plain(err instanceof Error ? err.message : String(err))}`);
   process.exit(EXIT.error);
 }

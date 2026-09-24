@@ -1,3 +1,4 @@
+// Ported from owainlewis/assembler@7cac671 src/index.ts:64-90 (MIT, Copyright (c) 2026 Owain Lewis). Deviations: validateConfig's harness rules (executable not a {prompt} placeholder, a command must be non-empty) live in agentProblems; the codex/claude providers are presets; errors are collected, not thrown one at a time; the key table, boot refusal and defaults are the factory's own.
 // Shape of the target repo's `.factory/config.json`. Built by the repo-specific
 // side (splitbill) or by whoever installs this template elsewhere; the runner
 // only reads it, and `factory doctor` checks it exists. Missing fields fall
@@ -171,7 +172,7 @@ function agentProblems(agents: unknown, stages: unknown): string[] {
         continue;
       }
       const a = raw as Record<string, unknown>;
-      checkKeys(a, { preset: "string", command: "strings", model: "string" }, where, problems);
+      checkKeys(a, { preset: "string", command: "strings", model: "string", outputSchema: "boolean" }, where, problems);
       if (typeof a.preset === "string" && !PRESETS[a.preset]) problems.push(`${where}preset: unknown "${a.preset}" (built in: ${Object.keys(PRESETS).join(", ")})`);
       if (a.preset === undefined && a.command === undefined) problems.push(`${where}needs a "preset" or a "command"`);
       if (Array.isArray(a.command)) {

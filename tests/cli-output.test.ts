@@ -69,3 +69,9 @@ test("every pause-aware --json command exits EXIT.paused, so tick and watch --on
   const src = readFileSync(bin, "utf8");
   expect(src.match(/if \(result\.paused\) process\.exit\(EXIT\.paused\)/g)?.length).toBe(2);
 });
+
+describe("failureJson", () => {
+  test("strips terminal escapes from an error message", () => {
+    expect(JSON.parse(failureJson(new Error("bad\u001b[31m thing"))).error.message).toBe("bad thing");
+  });
+});
