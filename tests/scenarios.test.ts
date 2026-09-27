@@ -78,6 +78,11 @@ afterAll(() => {
 });
 
 function done(c: Ctx) {
+  // policy: off (DEFAULT_CONFIG.merge.policy, and every scenario here except
+  // the "merge policy" describe block below) must never call mergePr, on any
+  // path this whole suite drives an issue through — not just the one test
+  // built to check it.
+  if (c.config.merge.policy === "off") expect(c.github.merged).toEqual([]);
   for (const l of [...c.github.seenLabels, ...(initialLabels.get(c.github) ?? [])]) seen.add(l);
   c.state.close();
 }
@@ -557,6 +562,90 @@ describe("in-review and claim paths", () => {
     expect(result.paused).toBe(true);
     expect(result.processed).toEqual([2]);
     expect(labels(c.github, 1)).toEqual([LABEL.ready]);
+    done(c);
+  });
+});
+
+// checkMergePolicy (watch.ts), wired into resumeInReview: a per-poll,
+// non-blocking check on an in-review PR. `off` is DEFAULT_CONFIG.merge.policy,
+// so most of the scenario suite above already proves it never touches
+// mergePr; these tests exercise the other two policies explicitly.
+describe("merge policy on an in-review PR", () => {
+  async function readyForMerge(c: Ctx) {
+    c.state.setToggle("auto_approve_low_risk", true);
+    happy(c);
+    await c.step();
+    const pr = c.github.prs[0]!;
+    c.github.queuePrStatus(pr.number, {
+      state: "open",
+      headRefOid: "sha1",
+      closingIssuesReferences: [{ number: 1 }],
+      statusCheckRollup: [{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" }],
+    });
+    c.github.queueMergeReadiness(pr.number, {
+      state: "open",
+      isDraft: false,
+      baseRefName: c.config.base,
+      headRefOid: "sha1",
+      mergeable: "MERGEABLE",
+      reviewDecision: "APPROVED",
+      hasUnresolvedReviewThreads: false,
+    });
+    return pr;
+  }
+
+  test("23. policy off never calls mergePr or checks readiness at all, even on a fully green, fully approved PR", async () => {
+    const c = setup([LABEL.ready]);
+    await readyForMerge(c);
+    expect(c.config.merge.policy).toBe("off");
+    const before = c.github.issues.get(1)!.comments.length;
+    expect(await c.step()).toBe("waiting");
+    expect(c.github.merged).toEqual([]);
+    // Not just "never merges": the guard skips the check entirely, so no
+    // audit comment (a "refuse: policy-not-auto") gets posted either.
+    expect(c.github.issues.get(1)!.comments.length).toBe(before);
+    done(c);
+  });
+
+  test("24. policy auto merges a fully eligible PR exactly once", async () => {
+    const c = setup([LABEL.ready], { merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 } });
+    const pr = await readyForMerge(c);
+    expect(await c.step()).toBe("waiting");
+    expect(c.github.merged).toEqual([{ repo: c.config.repo, prNumber: pr.number, headSha: "sha1" }]);
+    const comments = c.github.issues.get(1)!.comments;
+    expect(comments.some((cm) => cm.body.includes("<!-- factory:merge-policy:sha1 -->"))).toBe(true);
+    done(c);
+  });
+
+  test("25. policy dry-run posts the audit comment but never merges", async () => {
+    const c = setup([LABEL.ready], { merge: { policy: "dry-run", autoPaths: [], maxFiles: 10, maxLines: 200 } });
+    await readyForMerge(c);
+    expect(await c.step()).toBe("waiting");
+    expect(c.github.merged).toEqual([]);
+    const comments = c.github.issues.get(1)!.comments;
+    expect(comments.some((cm) => cm.body.includes("Merge policy: **dry-run**"))).toBe(true);
+    done(c);
+  });
+
+  test("26. a second poll on an unchanged head does not re-post the audit comment", async () => {
+    const c = setup([LABEL.ready], { merge: { policy: "dry-run", autoPaths: [], maxFiles: 10, maxLines: 200 } });
+    await readyForMerge(c);
+    await c.step();
+    const before = c.github.issues.get(1)!.comments.length;
+    await c.step();
+    expect(c.github.issues.get(1)!.comments.length).toBe(before);
+    done(c);
+  });
+
+  test("27. a file under protectedPaths never qualifies for auto-merge, whatever autoPaths says", async () => {
+    const c = setup([LABEL.ready], {
+      protectedPaths: ["src/secrets.ts"],
+      merge: { policy: "auto", autoPaths: ["src/**"], maxFiles: 10, maxLines: 200 },
+    });
+    c.git.diffStatOverride = [{ path: "src/secrets.ts", additions: 1, deletions: 0 }];
+    await readyForMerge(c);
+    expect(await c.step()).toBe("waiting");
+    expect(c.github.merged).toEqual([]);
     done(c);
   });
 });

@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
-import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr } from "../src/github";
+import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { Git } from "../src/git";
 import type { GateRunner } from "../src/gates";
 
@@ -143,6 +143,50 @@ export class FakeGitHub extends GitHub {
   override async currentLogin(): Promise<string> {
     return "factory-bot";
   }
+
+  // Queued CI/merge-readiness snapshots per PR number: each prStatus call
+  // shifts the next one, then repeats the last (the "trees" pattern in
+  // FakeGit below), so a test can move a PR from pending to green across
+  // successive polls without a real `gh` or a real clock.
+  private ciStatuses = new Map<number, PrStatus[]>();
+
+  queuePrStatus(prNumber: number, status: PrStatus): void {
+    const arr = this.ciStatuses.get(prNumber) ?? [];
+    arr.push(status);
+    this.ciStatuses.set(prNumber, arr);
+  }
+
+  override async prStatus(_repo: string, number: number): Promise<PrStatus> {
+    const arr = this.ciStatuses.get(number);
+    if (!arr || arr.length === 0) throw new Error(`no ci status queued for pr ${number}`);
+    return arr.length > 1 ? arr.shift()! : arr[0]!;
+  }
+
+  // Merge calls this fake ever made, so a test can prove merge-policy never
+  // calls it (policy: "off") or calls it exactly once, with what it passed.
+  merged: { repo: string; prNumber: number; headSha: string }[] = [];
+
+  override async mergePr(repo: string, prNumber: number, headSha: string): Promise<void> {
+    this.merged.push({ repo, prNumber, headSha });
+    const pr = this.prs.find((p) => p.number === prNumber);
+    if (pr) (pr as { state: string }).state = "merged";
+  }
+
+  // Queued merge-readiness snapshots per PR number, same shift-then-repeat
+  // pattern as ciStatuses/trees above.
+  private mergeReadinessQueue = new Map<number, MergeReadiness[]>();
+
+  queueMergeReadiness(prNumber: number, readiness: MergeReadiness): void {
+    const arr = this.mergeReadinessQueue.get(prNumber) ?? [];
+    arr.push(readiness);
+    this.mergeReadinessQueue.set(prNumber, arr);
+  }
+
+  override async mergeReadiness(_repo: string, number: number): Promise<MergeReadiness> {
+    const arr = this.mergeReadinessQueue.get(number);
+    if (!arr || arr.length === 0) throw new Error(`no merge readiness queued for pr ${number}`);
+    return arr.length > 1 ? arr.shift()! : arr[0]!;
+  }
 }
 
 export class FakeGit extends Git {
@@ -174,6 +218,14 @@ export class FakeGit extends Git {
 
   override async changedFiles(): Promise<string[]> {
     return this.changed;
+  }
+
+  // Defaults to one line added per changed file; a test that cares about
+  // exact counts sets this directly instead.
+  diffStatOverride: { path: string; additions: number; deletions: number }[] | undefined;
+
+  override async diffStat(): Promise<{ path: string; additions: number; deletions: number }[]> {
+    return this.diffStatOverride ?? this.changed.map((path) => ({ path, additions: 1, deletions: 0 }));
   }
 
   override async push(_worktreeDir: string, issue: number) {

@@ -86,12 +86,27 @@ export interface FactoryConfig {
   // price, no self-reported total) on one issue — a separate cap from the
   // dollar ones, since an unpriced run can't be summed into them.
   readonly spend: SpendConfig;
+  readonly merge: MergeConfig;
 }
 
 export interface SpendConfig {
   readonly perIssueUsd?: number;
   readonly dailyUsd?: number;
   readonly maxUnreportedRuns?: number;
+}
+
+// merge-policy.ts's inputs (plan v2.8.0 item 2). "off" (default) never looks
+// at merging; "dry-run" assesses eligibility and posts the audit comment but
+// never calls `gh pr merge`; "auto" merges once CI passes and every merge
+// gate holds. autoPaths/maxFiles/maxLines replace gate.py's hardcoded
+// docs/README-only, 10-file, 200-line allow-list with repo config, since "a
+// blog post is often longer than machinist's 200 lines" (plan). A file under
+// FactoryConfig.protectedPaths is never eligible, whatever autoPaths says.
+export interface MergeConfig {
+  readonly policy: "off" | "dry-run" | "auto";
+  readonly autoPaths: readonly string[];
+  readonly maxFiles: number;
+  readonly maxLines: number;
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -114,6 +129,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   stages: { default: "claude" },
   routes: {},
   spend: {},
+  merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -127,6 +143,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     stages: { ...DEFAULT_CONFIG.stages, ...partial.stages },
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
+    merge: { ...DEFAULT_CONFIG.merge, ...partial.merge },
   };
 }
 
@@ -155,6 +172,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   stages: "object",
   routes: "object",
   spend: "object",
+  merge: "object",
   riskCriteria: "object",
 };
 
@@ -191,6 +209,13 @@ export function configProblems(raw: unknown): string[] {
   nested("riskPolicy", { autoApproveLowRisk: "boolean" });
   nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive" });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
+  nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
+  if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
+    const policy = (cfg.merge as Record<string, unknown>).policy;
+    if (policy !== undefined && policy !== "off" && policy !== "dry-run" && policy !== "auto") {
+      problems.push(`merge.policy: expected "off", "dry-run" or "auto", got ${JSON.stringify(policy)}`);
+    }
+  }
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   if (cfg.gates !== undefined) {
     if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");

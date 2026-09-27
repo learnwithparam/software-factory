@@ -25,6 +25,8 @@ Source: https://github.com/owainlewis/machinist (MIT, Copyright (c) 2026 Owain L
 - `src/agents/usage.ts` from `internal/runner/codex_usage.go` [tested by `tests/ported/machinist/usage.test.ts`]
 - `src/artifacts.ts` from `internal/protocol/workflow.go` [tested by `tests/ported/machinist/workflow.test.ts`]
 - `template/.claude/skills/factory-operator/SKILL.md` from `skills/machinist/SKILL.md` [no upstream test]
+- `src/ci.ts` from `agent.py:439-459,487-592` [tested by `tests/ported/machinist/ci.test.ts`]
+- `src/merge-policy.ts` from `risk_delivery/gate.py` [tested by `tests/ported/machinist/merge-policy.test.ts`]
 
 ## owainlewis/assembler@7cac671
 
@@ -47,6 +49,12 @@ Source: https://github.com/owainlewis/skills (MIT, Copyright (c) 2026 Owain Lewi
 Source: https://github.com/owainlewis/blueprint (MIT, Copyright (c) 2026 Owain Lewis)
 
 - `src/docs-links.ts` from `scripts/check_repo.py` [tested by `tests/ported/blueprint/check_repo.test.ts`]
+
+## owainlewis/agent-skills@766699e
+
+Source: https://github.com/owainlewis/agent-skills (MIT, Copyright (c) 2026 Owain Lewis)
+
+Referenced, not copied: the herdr-issue-coordinator merge-gate checklist (`skills/herdr-issue-coordinator/SKILL.md:209-226`) informed `src/merge-policy.ts`'s ten named refusal reasons; see that file's own header for the deviation note.
 
 ## License text (both projects)
 

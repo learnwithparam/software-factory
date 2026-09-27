@@ -61,6 +61,35 @@ export interface GhPr {
   closingIssuesReferences?: { number: number }[];
 }
 
+export interface CiCheck {
+  readonly name?: string;
+  readonly context?: string;
+  readonly status?: string;
+  readonly state?: string;
+  readonly conclusion?: string;
+}
+
+export interface PrStatus {
+  readonly state: "open" | "closed" | "merged";
+  readonly headRefOid: string;
+  readonly closingIssuesReferences: readonly { number: number }[];
+  readonly statusCheckRollup: readonly CiCheck[];
+}
+
+// merge-policy.ts's readiness snapshot (src/merge-policy.ts). mergeable and
+// reviewDecision come straight off `gh pr view`; hasUnresolvedReviewThreads
+// needs a separate GraphQL call, since neither `gh pr view` nor `gh pr
+// checks` exposes thread resolution.
+export interface MergeReadiness {
+  readonly state: "open" | "closed" | "merged";
+  readonly isDraft: boolean;
+  readonly baseRefName: string;
+  readonly headRefOid: string;
+  readonly mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  readonly reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "";
+  readonly hasUnresolvedReviewThreads: boolean;
+}
+
 class GhError extends Error {
   constructor(
     args: string[],
@@ -244,6 +273,81 @@ export class GitHub {
 
   async closePr(repo: string, number: number): Promise<void> {
     await this.exec(["pr", "close", String(number), "--repo", repo]);
+  }
+
+  // One shared shape for validatePr and waitForCi (src/ci.ts): state,
+  // headRefOid, closingIssuesReferences and statusCheckRollup all come off
+  // the same `gh pr view`. state is lowercased to match GhPr.state's
+  // "open"/"closed" convention elsewhere in this codebase.
+  async prStatus(repo: string, number: number): Promise<PrStatus> {
+    const result = await this.exec([
+      "pr", "view", String(number), "--repo", repo,
+      "--json", "state,headRefOid,closingIssuesReferences,statusCheckRollup",
+    ]);
+    const data = JSON.parse(result.stdout) as {
+      state: string;
+      headRefOid: string;
+      closingIssuesReferences?: { number: number }[];
+      statusCheckRollup?: CiCheck[];
+    };
+    return {
+      state: data.state.toLowerCase() as PrStatus["state"],
+      headRefOid: data.headRefOid,
+      closingIssuesReferences: data.closingIssuesReferences ?? [],
+      statusCheckRollup: data.statusCheckRollup ?? [],
+    };
+  }
+
+  // The two `gh pr view` fields gate.py's Merge Readiness check needs
+  // (mergeable, reviewDecision) plus review-thread resolution, which only
+  // GraphQL exposes. state is lowercased for the same reason as prStatus.
+  async mergeReadiness(repo: string, number: number): Promise<MergeReadiness> {
+    const result = await this.exec([
+      "pr", "view", String(number), "--repo", repo,
+      "--json", "state,isDraft,baseRefName,headRefOid,mergeable,reviewDecision",
+    ]);
+    const data = JSON.parse(result.stdout) as {
+      state: string;
+      isDraft: boolean;
+      baseRefName: string;
+      headRefOid: string;
+      mergeable: string;
+      reviewDecision: string;
+    };
+    const [owner, name] = repo.split("/");
+    if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
+    const hasUnresolvedReviewThreads = await this.hasUnresolvedReviewThreads(owner, name, number);
+    return {
+      state: data.state.toLowerCase() as MergeReadiness["state"],
+      isDraft: data.isDraft,
+      baseRefName: data.baseRefName,
+      headRefOid: data.headRefOid,
+      mergeable: (data.mergeable || "UNKNOWN") as MergeReadiness["mergeable"],
+      reviewDecision: (data.reviewDecision ?? "") as MergeReadiness["reviewDecision"],
+      hasUnresolvedReviewThreads,
+    };
+  }
+
+  private async hasUnresolvedReviewThreads(owner: string, name: string, number: number): Promise<boolean> {
+    const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}`;
+    const result = await this.exec([
+      "api", "graphql",
+      "-f", `query=${query}`,
+      "-F", `owner=${owner}`,
+      "-F", `name=${name}`,
+      "-F", `number=${number}`,
+    ]);
+    const data = JSON.parse(result.stdout) as {
+      data: { repository: { pullRequest: { reviewThreads: { nodes: { isResolved: boolean }[] } } } };
+    };
+    return data.data.repository.pullRequest.reviewThreads.nodes.some((t) => !t.isResolved);
+  }
+
+  // --squash --match-head-commit refuses the merge if the PR's head moved
+  // since headSha was read, so a stale readiness snapshot never merges the
+  // wrong commit. Never --admin: a branch-protection block is respected.
+  async mergePr(repo: string, number: number, headSha: string): Promise<void> {
+    await this.exec(["pr", "merge", String(number), "--repo", repo, "--squash", "--match-head-commit", headSha]);
   }
 
   async listLabels(repo: string): Promise<string[]> {

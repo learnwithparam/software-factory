@@ -145,4 +145,19 @@ export class Git {
       .map((s) => s.trim())
       .filter(Boolean);
   }
+
+  // File-by-file added/deleted line counts, for merge-policy's autoEligible
+  // (src/merge-policy.ts). A binary file reports "-" for both counts in
+  // `--numstat`; those count as a changed file but add no lines.
+  async diffStat(worktreeDir: string, base: string): Promise<{ path: string; additions: number; deletions: number }[]> {
+    const result = await this.runner.run(["diff", "--numstat", `origin/${base}...HEAD`], { cwd: worktreeDir });
+    return result.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [add, del, ...rest] = line.split("\t");
+        return { path: rest.join("\t"), additions: Number(add) || 0, deletions: Number(del) || 0 };
+      });
+  }
 }

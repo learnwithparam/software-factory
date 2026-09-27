@@ -31,10 +31,12 @@ import {
 } from "./artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "./recheck";
 import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState } from "./derive";
 import { rehydrate } from "./rehydrate";
 import { runGates, type GateRunner } from "./gates";
 import { touchesProtectedPath } from "./boundary";
+import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue, GitHub } from "./github";
 import type { Git } from "./git";
@@ -733,6 +735,43 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
 
 // `/factory revise <text>` on an in-review issue (audit finding #19): sends
 // the change back to build with the feedback as `revise.md`.
+// Non-blocking, one snapshot per poll (never waitForCi's sleep loop, which
+// would hold a worker slot for up to 20 minutes and undo v2.7.0's continuous
+// dispatch). A routine miss — no PR yet, PR not a fit, a transient GitHub
+// error — is not this issue's problem to raise: it just leaves the PR for a
+// human, exactly like a repo with policy "off" always does. runPool has no
+// per-item error isolation, so nothing here may throw uncaught.
+async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<void> {
+  try {
+    const issueNumber = issue.number;
+    const head = deps.git.branchName(issueNumber);
+    const pr = await deps.github.findPrByHead(config.repo, head);
+    if (!pr) return;
+    await validatePr(deps.github, config.repo, issueNumber, pr.number);
+
+    const [ci, readiness] = await Promise.all([ciStatusNow(deps.github, config.repo, pr.number), deps.github.mergeReadiness(config.repo, pr.number)]);
+    const worktree = worktreeFor(deps, issueNumber);
+    const changedFiles = await deps.git.diffStat(worktree, config.base);
+    const plan = await readStageArtifacts(worktree, issueNumber, "plan");
+    const risk = (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk ?? "high";
+    const decision = decideMerge({
+      readiness,
+      ci,
+      risk,
+      changedFiles,
+      merge: config.merge,
+      protectedPaths: config.protectedPaths,
+      expectedBaseRefName: config.base,
+    });
+
+    const marker = mergePolicyMarker(decision.headSha);
+    if (!issue.comments.some((c) => c.body.includes(marker))) await postComment(deps, config, issueNumber, renderAuditComment(decision));
+    await attemptMerge(deps.github, config.repo, pr.number, decision);
+  } catch (err) {
+    console.error(`merge-policy check failed for #${issue.number}:`, err);
+  }
+}
+
 export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome | undefined> {
   // Feedback counts only if it is newer than the runner's last marker
   // comment: a handled revise is followed by the rebuild's own verdict, so it
@@ -744,18 +783,23 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
     .filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > since)
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .at(-1);
-  if (!latest) return undefined;
-  const command = parseChatOps(latest.body);
-  if (command.type === "cancel") return cancelRun(issue, deps, config);
-  if (command.type !== "revise") return undefined;
-
-  const worktree = worktreeFor(deps, issue.number);
-  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.inReview))) return "needs-human";
-  await writeRevision(worktree, issue, latest, command.text);
-  const head = deps.git.branchName(issue.number);
-  if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], LABEL.building);
-  return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
+  if (latest) {
+    const command = parseChatOps(latest.body);
+    if (command.type === "cancel") return cancelRun(issue, deps, config);
+    if (command.type === "revise") {
+      const worktree = worktreeFor(deps, issue.number);
+      if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.inReview))) return "needs-human";
+      await writeRevision(worktree, issue, latest, command.text);
+      const head = deps.git.branchName(issue.number);
+      if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
+      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], LABEL.building);
+      return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
+    }
+  }
+  // A human command always wins over auto-merge, so this only runs once
+  // there is nothing to revise or cancel.
+  if (config.merge.policy !== "off") await checkMergePolicy(deps, config, issue);
+  return undefined;
 }
 
 // The single entry point every mode drives through: the pool (watch), a
