@@ -38,6 +38,7 @@ import { touchesProtectedPath } from "./boundary";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue, GitHub } from "./github";
 import type { Git } from "./git";
+import { ensureSetup, ShellSetupRunner, type SetupRunner } from "./setup";
 import { FactoryState, type Stage } from "./state";
 import { LABEL } from "./labels";
 
@@ -74,6 +75,9 @@ export interface WatchDeps {
   readonly rechecker?: Rechecker;
   readonly cloneDir: string;
   readonly workspacesDir: string;
+  // Runs config.setup once per worktree; defaults to a real shell so tests
+  // can inject a fake instead of actually running `npm ci`.
+  readonly setupRunner?: SetupRunner;
 }
 
 export interface PollResult {
@@ -97,6 +101,26 @@ function labelsOf(issue: Pick<GhIssue, "labels">): string[] {
 // state (audit finding #21).
 async function moveLabel(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, to: string): Promise<void> {
   await deps.github.setStateLabel(config.repo, issueNumber, [from], to);
+}
+
+// The one place every resume path prepares a worktree: creates it if needed,
+// then primes it with config.setup (idempotent). A setup failure parks the
+// issue with the command output attached instead of handing a stage a
+// worktree with no dependencies installed (plan v2.6.2 item 4).
+async function ensureWorktreeReady(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  worktree: string,
+  fromLabel: string,
+): Promise<boolean> {
+  await deps.git.ensureWorktree(deps.cloneDir, worktree, issueNumber);
+  const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
+  if (result.ok) return true;
+  await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
+  await postComment(deps, config, issueNumber, `Setup failed in the worktree, so this parked instead of starting a stage:\n\n\`\`\`\n${result.log.slice(-4000)}\n\`\`\``);
+  finish(deps, config, issueNumber, "needs-human", "setup failed");
+  return false;
 }
 
 function withDataMarker(body: string, stage: string, json: unknown): string {
@@ -551,7 +575,7 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
     return "lost-claim";
   }
   const worktree = worktreeFor(deps, issue.number);
-  await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], LABEL.triaging);
   return runFromStage(deps, config, issue, "triage", worktree);
 }
@@ -598,7 +622,7 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
 
   const derived = deriveIssueState(issue);
   const worktree = worktreeFor(deps, issue.number);
-  await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
   await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
   await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], STAGE_LABEL[derived.resumeStage]);
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(issue));
@@ -616,19 +640,19 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   const worktree = worktreeFor(deps, issue.number);
 
   if (command.type === "approve") {
-    await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.building);
     return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
   }
   if (command.type === "revise") {
-    await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
     await writeRevision(worktree, issue, reply, command.text);
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
     return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
   }
   if (command.type === "cancel") return cancelRun(issue, deps, config);
   if (command.type === "retry") {
-    await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
     await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
     return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
   }
@@ -651,7 +675,7 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
 
   const derived = deriveIssueState(issue);
   const worktree = worktreeFor(deps, issue.number);
-  await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
   await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], STAGE_LABEL[derived.resumeStage]);
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
     rejectRound: derived.rejectRounds,
@@ -678,7 +702,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   if (command.type !== "revise") return undefined;
 
   const worktree = worktreeFor(deps, issue.number);
-  await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+  if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.inReview))) return "needs-human";
   await writeRevision(worktree, issue, latest, command.text);
   const head = deps.git.branchName(issue.number);
   if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
@@ -742,7 +766,7 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
   await runPool(issues, config.concurrency, async (issue) => {
     const derived = deriveIssueState(issue);
     const worktree = worktreeFor(deps, issue.number);
-    await deps.git.ensureWorktree(deps.cloneDir, worktree, issue.number);
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, STAGE_LABEL[derived.resumeStage]))) return "needs-human";
     return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
       rejectRound: derived.rejectRounds,
       questionRound: derived.questionRounds,

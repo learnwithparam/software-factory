@@ -34,6 +34,17 @@ export interface ResetContext {
   readonly statePath: string;
   // Close every open issue, not just the factory's and the seeded ones (a sandbox that holds nothing else).
   readonly allIssues?: boolean;
+  // config.resettable, opt-in per repo. A live repo (lwp-website) never sets
+  // this, so a stray `factory reset`/`rebaseline` cannot force-push it back
+  // to a baseline tag (plan v2.6.2 item 2). Defaults closed: omitting the
+  // field refuses, the same as an explicit `false`.
+  readonly resettable?: boolean;
+}
+
+export class NotResettableError extends Error {
+  constructor(repo: string) {
+    super(`${repo} is not resettable: set "resettable": true in .factory/config.json to allow \`factory reset\`/\`rebaseline\` on it`);
+  }
 }
 
 export interface ResetDeps {
@@ -122,6 +133,7 @@ async function checked(deps: ResetDeps, ctx: ResetContext, args: string[]): Prom
 
 // Move the baseline tag to origin/<base>: the "keep this merge" command.
 export async function rebaseline(deps: ResetDeps, ctx: ResetContext, dryRun: boolean): Promise<string[]> {
+  if (!ctx.resettable) throw new NotResettableError(ctx.repo);
   const moved = await commitsAheadOfTag(deps, ctx);
   if (!dryRun && moved.length) {
     await checked(deps, ctx, ["tag", "-f", ctx.baselineTag, `origin/${ctx.base}`]);
@@ -226,6 +238,7 @@ export interface ResetSummary {
 }
 
 export async function reset(deps: ResetDeps, ctx: ResetContext, dryRun: boolean): Promise<ResetSummary> {
+  if (!ctx.resettable) throw new NotResettableError(ctx.repo);
   const actions = await planReset(deps, ctx);
   if (!dryRun) {
     for (const action of actions) {

@@ -1,5 +1,44 @@
 # Changelog
 
+## v2.6.2
+
+Any repo, safely. No new features: this closes the gaps a second repo (splitbill-demo plus
+lwp-website) hit under one shared `FACTORY_HOME`.
+
+- **Per-repo state.** `factory.db` and `workspaces/issue-N` now live under
+  `FACTORY_HOME/<owner>/<repo>/`, not one shared `FACTORY_HOME`; two repos each carrying an issue #3
+  no longer collide on one worktree or one DB row set. `src/paths.ts` is the one resolver. `factory doctor`
+  warns (never auto-fixes) when the pre-v2.6.2 shared `factory.db` or `workspaces/` is still on disk;
+  moving that history is a deliberate, manual step, not something a doctor run does for you.
+- **`resettable: true` opt-in.** `factory reset` and `rebaseline` now refuse on a repo that hasn't opted
+  in; a live repo like lwp-website (which deploys on merge to `main`) can no longer have its issues and
+  branches wiped by a config that was only ever meant for a sandbox.
+- **The base branch defaults to `origin/HEAD`,** not a hard-coded `"main"`. A repo cloned with a
+  non-`main` default (`trunk`, `develop`) gets the branch it actually has, unless a config names `base`
+  explicitly. `factory-verify` and `factory-comment`'s skill text now say "the base branch" instead of
+  quoting `main`.
+- **A `setup` hook.** `.factory/config.json` can list `setup` commands (e.g. `npm ci`) that run once per
+  worktree, before any stage; a failure parks the issue with the log attached, instead of every stage
+  failing separately on a project that was never installed.
+- **Issue forms and a PR template.** `install` now ships `.github/ISSUE_TEMPLATE/{bug,feature,docs}.yml`
+  (each applies only its own type label, never `factory:ready`) and `.github/pull_request_template.md`
+  (summary, plan, gate evidence, verify verdict, risk and rollback: the same sections `factory-pr`'s
+  fallback body now uses when a target repo has no template of its own). `install.sh`'s next-step message
+  now says `factory doctor --fix`, which is what actually creates the `factory:*` and type labels; it used
+  to say plain `factory doctor`, which only reports them missing. This is what makes the
+  `src/labels.ts:48` claim ("set by the issue form") true.
+- **Carried over from v2.6.1:** the CI template gets a "set up your toolchain" placeholder step in
+  `run-issue`, `tick` and `manual` (not `scan`, which only runs `bun audit`); `factory scan` skips with a
+  clear message, never shelling out, on a repo with no `bun.lock`/`bun.lockb`; `teach/sessions.json` is
+  renumbered to this roadmap's versions. The Agents table's `overflow-x: auto` wrapper already covered the
+  375px-scroll item (verified, no change needed).
+
+Not in v2.6.2:
+- Model routing, machine concurrency, spend caps and `proof: check` for non-test work (v2.7).
+- The lwp-website pilot itself, and anything that merges (v2.8).
+- A live agent run: no stage's behavior changed here (only wording, config surface and file layout), so
+  the last live Claude run (v2.6.1) still stands as current evidence.
+
 ## v2.6.1
 
 Residue fixes for v2.6.0. No new features.

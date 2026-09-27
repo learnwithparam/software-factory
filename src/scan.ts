@@ -20,6 +20,7 @@
 // 48 issues — see tests/fixtures/bun-audit-splitbill.json, captured from a
 // real run, for the shape this parses.
 
+import { existsSync } from "node:fs";
 import type { GitHub } from "./github";
 import type { CommandRunner } from "./github";
 import { LABEL } from "./labels";
@@ -106,9 +107,16 @@ export interface ScanDeps {
 export interface ScanResult {
   readonly filed: string[]; // issue titles filed this run
   readonly skipped: string[]; // findings already open, deduped by marker
+  // Set instead of running, on a repo `bun audit` has nothing to say about
+  // (plan v2.6.2 item 6: a Python or npm-only repo must not fail scan, or
+  // silently parse `bun audit`'s error output as zero findings).
+  readonly skippedReason?: string;
 }
 
 export async function scan(deps: ScanDeps, repo: string, cloneDir: string): Promise<ScanResult> {
+  if (!existsSync(`${cloneDir}/bun.lock`) && !existsSync(`${cloneDir}/bun.lockb`)) {
+    return { filed: [], skipped: [], skippedReason: "no bun.lock (or bun.lockb) here; `factory scan` only audits Bun projects" };
+  }
   const audit = await deps.runner.run(["audit", "--json"], { cwd: cloneDir });
   const findings = parseAuditFindings(audit.stdout);
 

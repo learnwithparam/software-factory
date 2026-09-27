@@ -219,5 +219,5 @@ action="wrote"
 echo ""
 echo "install.sh: $action $wrote item(s), skipped $skipped existing item(s), $unchanged unchanged in $TARGET"
 if [[ ! -e "$TARGET/.factory/config.json" ]]; then
-  echo "install.sh: next: cp .factory/config.example.json .factory/config.json, fill in every TODO (config.json, charter.md), then \`factory doctor --repo-dir $TARGET\`."
+  echo "install.sh: next: cp .factory/config.example.json .factory/config.json, fill in every TODO (config.json, charter.md), then \`factory doctor --fix --repo-dir $TARGET\` (creates the factory:* and type labels this repo needs)."
 fi

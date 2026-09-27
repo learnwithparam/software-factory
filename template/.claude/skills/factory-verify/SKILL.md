@@ -54,7 +54,7 @@ finding you could not reproduce from the diff.
 Use `factory-comment`'s `verdict.md` template for
 `.factory/runs/issue-<N>/verdict-comment.md`: per-AC pass/fail with the
 evidence command and result, the test-that-bites (name, failing output on
-`main`, passing output here), reviewer findings verbatim, a summary of
+the base branch, passing output here), reviewer findings verbatim, a summary of
 non-goals respected, and — on reject — which round this is.
 
 Then write `.factory/runs/issue-<N>/verdict.json`:

@@ -99,6 +99,44 @@ describe("runDoctor", () => {
   });
 });
 
+// Plan v2.6.2 item 1: state moved from one shared FACTORY_HOME/factory.db to
+// FACTORY_HOME/<owner>/<repo>/factory.db, and the previous design decision
+// stands — never auto-migrate a shared DB into the new per-repo layout, only
+// warn. No `legacyStatePath`/`legacyWorkspacesDir` in `ctx` (as in every test
+// above) means the check is skipped entirely, not silently passing.
+describe("legacy shared state warning", () => {
+  test("silent when the caller passes no legacy paths to check", async () => {
+    const checks = await runDoctor(deps(), ctx);
+    expect(checks.some((c) => c.name.includes("legacy"))).toBe(false);
+  });
+
+  test("warns, but never fails the run, when the legacy factory.db still exists", async () => {
+    const checks = await runDoctor(deps(), { ...ctx, legacyStatePath: "/home/.factory/factory.db" });
+    const check = checks.find((c) => c.name.includes("factory.db"))!;
+    expect(check.ok).toBe(false);
+    expect(check.warn).toBe(true);
+    expect(check.fixable).toBe(false);
+    expect(check.detail).toContain("/home/.factory/factory.db");
+    expect(checks.every((c) => c.ok || c.warn)).toBe(true); // an all-warn run still counts as passing
+  });
+
+  test("warns when the legacy workspaces/ dir still exists", async () => {
+    const checks = await runDoctor(deps(), { ...ctx, legacyWorkspacesDir: "/home/.factory/workspaces" });
+    const check = checks.find((c) => c.name.includes("workspaces"))!;
+    expect(check.ok).toBe(false);
+    expect(check.warn).toBe(true);
+  });
+
+  test("passes clean when the legacy paths are given but nothing is there", async () => {
+    const checks = await runDoctor(
+      { ...deps(), fileExists: async () => false },
+      { ...ctx, legacyStatePath: "/home/.factory/factory.db", legacyWorkspacesDir: "/home/.factory/workspaces" },
+    );
+    expect(checks.find((c) => c.name.includes("factory.db"))!.ok).toBe(true);
+    expect(checks.find((c) => c.name.includes("workspaces"))!.ok).toBe(true);
+  });
+});
+
 describe("agents in doctor", () => {
   const agents = { claude: { preset: "claude" }, codex: { preset: "codex" }, aider: { command: ["aider", "--yes"] }, unused: { preset: "codex" } };
 
