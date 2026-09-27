@@ -21,8 +21,10 @@ import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
 import { versionOf, which } from "../src/probes";
 import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
-import { workspacesDir } from "../src/paths";
-import { runDir } from "../src/artifacts";
+import { discoverRepos, workspacesDir } from "../src/paths";
+import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
+import { ciStatusNow } from "../src/ci";
+import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -84,8 +86,8 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();
-  let boardCache: { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> } | null = null;
-  let boardInflight: Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>> | null = null;
+  const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> }>();
+  const issuesInflight = new Map<string, Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>>>();
 
   // The Agents page shows each configured agent's installed version and doctor rows.
   // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
@@ -116,22 +118,51 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
   // Single-flight + 10s cache in front of `gh issue list` (plan: "cached gh
   // listing, single-flight, 10s") so a browser polling every few seconds,
   // times any number of open tabs, doesn't turn into one `gh` call per poll.
-  async function cachedIssues() {
+  // Keyed per repo so the multi-repo inbox (v2.9.0 item 2) never lets one
+  // repo's cache serve another's issues.
+  async function cachedIssuesFor(r: string) {
     const now = Date.now();
-    if (boardCache && now - boardCache.at < BOARD_CACHE_MS) return boardCache.issues;
-    if (boardInflight) return boardInflight;
-    boardInflight = github
-      .listOpenIssues(repo)
+    const cached = issuesCache.get(r);
+    if (cached && now - cached.at < BOARD_CACHE_MS) return cached.issues;
+    const inflight = issuesInflight.get(r);
+    if (inflight) return inflight;
+    const promise = github
+      .listOpenIssues(r)
       .then((issues) => {
-        boardCache = { at: Date.now(), issues };
-        boardInflight = null;
+        issuesCache.set(r, { at: Date.now(), issues });
+        issuesInflight.delete(r);
         return issues;
       })
       .catch((err) => {
-        boardInflight = null;
+        issuesInflight.delete(r);
         throw err;
       });
-    return boardInflight;
+    issuesInflight.set(r, promise);
+    return promise;
+  }
+
+  function invalidateIssuesCache(r: string): void {
+    issuesCache.delete(r);
+  }
+
+  async function cachedIssues() {
+    return cachedIssuesFor(repo);
+  }
+
+  // Every repo the multi-repo inbox reads from (v2.9.0 item 2): an explicit
+  // FACTORY_REPOS list, else the single configured repo, else whatever repos
+  // have ever run under FACTORY_HOME.
+  function inboxRepos(): string[] {
+    const fromEnv = (process.env.FACTORY_REPOS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (fromEnv.length > 0) return fromEnv;
+    return repo ? [repo] : discoverRepos();
+  }
+
+  // The primary configured repo's workspaces dir is the injectable
+  // `workspaces` param (tests point it at a scratch dir); any other repo in a
+  // multi-repo inbox resolves its own workspaces dir under FACTORY_HOME.
+  function workspacesFor(r: string): string {
+    return r === repo ? workspaces : workspacesDir(process.env, r);
   }
 
   function json(data: unknown, init?: ResponseInit): Response {
@@ -154,8 +185,8 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
 
   const needRepo = (): Response | null => (repo ? null : json({ error: "FACTORY_REPO not set" }, { status: 500 }));
 
-  async function inboxItem(number: number) {
-    return buildInbox(await cachedIssues()).find((i) => i.issue === number);
+  async function inboxItem(r: string, number: number) {
+    return buildInbox(await cachedIssuesFor(r)).find((i) => i.issue === number);
   }
 
   // Files a stage left in .factory/runs/issue-N/ of the issue's worktree. The
@@ -267,7 +298,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         if (missing) return missing;
         if (!Number.isInteger(body.issue)) return json({ error: "issue must be an integer" }, { status: 400 });
         await github.addLabels(repo, body.issue!, [LABEL.ready]);
-        boardCache = null; // next /api/board reflects the label immediately
+        invalidateIssuesCache(repo); // next /api/board reflects the label immediately
         return json({ ok: true });
       },
     },
@@ -275,13 +306,63 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/thread$/,
       label: "GET /api/issues/:n/thread",
-      handler: async (_req, _url, m) => needRepo() ?? json({ issue: plainIssue(await github.getIssue(repo, Number(m[1]))) }),
+      handler: async (_req, url, m) => {
+        const r = url.searchParams.get("repo") || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        return json({ issue: plainIssue(await github.getIssue(r, Number(m[1]))) });
+      },
     },
     {
       method: "GET",
       pattern: /^\/api\/issues\/(\d+)\/artifacts$/,
       label: "GET /api/issues/:n/artifacts",
       handler: (_req, url, m) => artifacts(Number(m[1]), url),
+    },
+    {
+      // The PR review view (v2.9.0 item 1): diff, gate evidence, verify
+      // findings, CI status and per-stage cost/model, all in one call so the
+      // dashboard never has to go to GitHub itself.
+      method: "GET",
+      pattern: /^\/api\/issues\/(\d+)\/review$/,
+      label: "GET /api/issues/:n/review",
+      handler: async (_req, url, m) => {
+        const r = url.searchParams.get("repo") || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const issueNumber = Number(m[1]);
+        const pr = await github.prForIssue(r, issueNumber);
+        if (!pr) return json({ error: "no open PR closes that issue" }, { status: 404 });
+        const cwd = join(workspacesFor(r), `issue-${issueNumber}`);
+        const [diff, ci, gate, verify] = await Promise.all([
+          github.prDiff(r, pr.number),
+          ciStatusNow(github, r, pr.number),
+          readGateEvidence(cwd, issueNumber),
+          readStageArtifacts(cwd, issueNumber, "verify"),
+        ]);
+        const stages = state.listStageRuns(r, { issue: issueNumber }).map(plainStage);
+        return json({ repo: r, issue: issueNumber, pr: { number: pr.number, url: pr.url }, diff: plain(diff), ci, gate, verify: verify.json ?? null, stages });
+      },
+    },
+    {
+      // The dashboard's "Approve and merge" action: the same readiness gate
+      // and merge primitive as the automated policy, invoked as the operator
+      // (decideOperatorMerge, src/merge-policy.ts).
+      method: "POST",
+      pattern: /^\/api\/issues\/(\d+)\/merge$/,
+      label: "POST /api/issues/:n/merge",
+      handler: async (req, _url, m) => {
+        const body = (await req.json().catch(() => ({}))) as { repo?: string };
+        const r = body.repo || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const issueNumber = Number(m[1]);
+        const pr = await github.prForIssue(r, issueNumber);
+        if (!pr) return json({ error: "no open PR closes that issue" }, { status: 404 });
+        const [readiness, ci] = await Promise.all([github.mergeReadiness(r, pr.number), ciStatusNow(github, r, pr.number)]);
+        const decision = decideOperatorMerge(readiness, ci);
+        const merged = await attemptMerge(github, r, pr.number, decision);
+        await github.commentIssue(r, issueNumber, renderOperatorAuditComment(decision));
+        if (merged) invalidateIssuesCache(r);
+        return json({ ok: merged, decision });
+      },
     },
     {
       method: "GET",
@@ -337,21 +418,31 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
       method: "GET",
       pattern: /^\/api\/inbox$/,
       label: "GET /api/inbox",
-      handler: async () => needRepo() ?? json({ repo, items: buildInbox(await cachedIssues()) }),
+      // Aggregated across every repo under FACTORY_HOME (v2.9.0 item 2), or
+      // narrowed to one with ?repo=. Each item carries its own repo so the
+      // frontend can render and act on a mixed list.
+      handler: async (_req, url) => {
+        const filter = url.searchParams.get("repo");
+        const repos = filter ? [filter] : inboxRepos();
+        if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
+        const perRepo = await Promise.all(repos.map(async (r) => buildInbox(await cachedIssuesFor(r)).map((i) => ({ ...i, repo: r }))));
+        const items = perRepo.flat().sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
+        return json({ repos: inboxRepos(), repo, items });
+      },
     },
     {
       method: "POST",
       pattern: /^\/api\/inbox\/(\d+)\/act$/,
       label: "POST /api/inbox/:n/act",
       handler: async (req, _url, m) => {
-        const missing = needRepo();
-        if (missing) return missing;
-        const body = (await req.json()) as { action?: InboxAction; text?: string };
-        const item = await inboxItem(Number(m[1]));
+        const body = (await req.json()) as { action?: InboxAction; text?: string; repo?: string };
+        const r = body.repo || repo;
+        if (!r) return json({ error: "no repo configured or specified" }, { status: 400 });
+        const item = await inboxItem(r, Number(m[1]));
         if (!item) return json({ error: "nothing is waiting on that issue" }, { status: 404 });
         try {
-          const posted = await act(github, repo, item, body.action as InboxAction, body.text ?? "");
-          boardCache = null;
+          const posted = await act(github, r, item, body.action as InboxAction, body.text ?? "");
+          invalidateIssuesCache(r);
           return json({ ok: true, posted });
         } catch (err) {
           if (err instanceof InboxError) return json({ error: err.message }, { status: 400 });

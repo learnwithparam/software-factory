@@ -7,12 +7,13 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitHub, type GhIssue } from "../src/github";
+import { GitHub, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { LABEL } from "../src/labels";
 import { FactoryState, type StageRunInput } from "../src/state";
 
 class FakeGitHub extends GitHub {
   posted: { issue: number; body: string }[] = [];
+  merged: { repo: string; prNumber: number; headSha: string }[] = [];
   constructor(private readonly issues: GhIssue[] = []) {
     super();
   }
@@ -25,6 +26,25 @@ class FakeGitHub extends GitHub {
   override async commentIssue(_repo: string, issue: number, body: string): Promise<number | undefined> {
     this.posted.push({ issue, body });
     return 1;
+  }
+  // The review/merge routes (v2.9.0) look up the PR that closes an issue, its
+  // diff and CI status, and its merge readiness. One fake PR per known issue
+  // is enough for the route-walk and inbox tests, which never depend on its shape.
+  override async prForIssue(_repo: string, issueNumber: number): Promise<GhPr | undefined> {
+    if (!this.issues.some((i) => i.number === issueNumber)) return undefined;
+    return { number: 100 + issueNumber, url: `https://github.com/acme/widgets/pull/${100 + issueNumber}`, state: "open", headRefName: `issue-${issueNumber}`, isDraft: false, closingIssuesReferences: [{ number: issueNumber }] };
+  }
+  override async prDiff(): Promise<string> {
+    return "diff --git a/file b/file\n+added\n";
+  }
+  override async prStatus(): Promise<PrStatus> {
+    return { state: "open", headRefOid: "sha1", closingIssuesReferences: [{ number: 1 }], statusCheckRollup: [{ name: "build", status: "COMPLETED", conclusion: "SUCCESS" }] };
+  }
+  override async mergeReadiness(): Promise<MergeReadiness> {
+    return { state: "open", isDraft: false, baseRefName: "main", headRefOid: "sha1", mergeable: "MERGEABLE", reviewDecision: "APPROVED", hasUnresolvedReviewThreads: false, changesRequestedStale: false };
+  }
+  override async mergePr(repo: string, prNumber: number, headSha: string): Promise<void> {
+    this.merged.push({ repo, prNumber, headSha });
   }
 }
 
@@ -126,6 +146,101 @@ describe("inbox routes", () => {
     expect((await act(3, { action: "revise", text: " " })).status).toBe(400);
     expect((await act(4, { action: "cancel" })).status).toBe(404);
     expect(github.posted).toHaveLength(1);
+  });
+});
+
+describe("review and merge routes", () => {
+  test("the review route returns the diff, CI status and merge readiness for the PR that closes the issue", async () => {
+    const { dashboard } = await make("", [waiting(5, LABEL.inReview)]);
+    const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/5/review"), "127.0.0.1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pr: { number: number }; diff: string; ci: { status: string }; gate: unknown; verify: unknown; stages: unknown[] };
+    expect(body.pr.number).toBe(105);
+    expect(body.diff).toContain("diff --git");
+    expect(body.ci.status).toBe("passed");
+    expect(body.gate).toBeUndefined();
+    expect(body.verify).toBeNull();
+    expect(body.stages).toEqual([]);
+  });
+
+  test("the review route 404s when no open PR closes the issue", async () => {
+    const { dashboard } = await make("", []);
+    const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/9/review"), "127.0.0.1");
+    expect(res.status).toBe(404);
+  });
+
+  test("approve-and-merge calls the same mergePr the automated policy uses, and posts the operator audit comment", async () => {
+    const { dashboard, github } = await make("", [waiting(6, LABEL.inReview)]);
+    const res = await dashboard.handle(
+      new Request("http://localhost:4100/api/issues/6/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      "127.0.0.1",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; decision: { outcome: string } };
+    expect(body.ok).toBe(true);
+    expect(body.decision.outcome).toBe("merge");
+    expect(github.merged).toEqual([{ repo: "acme/widgets", prNumber: 106, headSha: "sha1" }]);
+    expect(github.posted[0]!.body).toContain("operator");
+  });
+
+  test("approve-and-merge refuses (and never calls mergePr) when readiness fails, still posting the audit comment", async () => {
+    const { dashboard, github } = await make("", [waiting(7, LABEL.inReview)]);
+    const original = github.mergeReadiness.bind(github);
+    github.mergeReadiness = async () => ({ ...(await original()), isDraft: true });
+    const res = await dashboard.handle(
+      new Request("http://localhost:4100/api/issues/7/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+      "127.0.0.1",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; decision: { outcome: string; refusals?: { reason: string }[] } };
+    expect(body.ok).toBe(false);
+    expect(body.decision.outcome).toBe("refuse");
+    expect(body.decision.refusals?.map((r) => r.reason)).toContain("draft");
+    expect(github.merged).toEqual([]);
+    expect(github.posted[0]!.body).toContain("blocked");
+  });
+
+  test("the merge route 404s when no open PR closes the issue", async () => {
+    const { dashboard } = await make("", []);
+    const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/9/merge", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), "127.0.0.1");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("multi-repo inbox", () => {
+  test("aggregates across every repo under FACTORY_HOME, sorted by wait time, and ?repo= narrows it to one", async () => {
+    const before = process.env.FACTORY_REPOS;
+    process.env.FACTORY_REPOS = "acme/widgets,acme/gadgets";
+    try {
+      const { dashboard } = await make("", [waiting(3, LABEL.awaitingApproval)]);
+      const all = (await (await dashboard.handle(new Request("http://localhost:4100/api/inbox"), "127.0.0.1")).json()) as {
+        repos: string[]; items: { issue: number; repo: string }[];
+      };
+      expect(all.repos).toEqual(["acme/widgets", "acme/gadgets"]);
+      // FakeGitHub answers the same issue list for every repo, so the same
+      // issue #3 shows up once per repo, each tagged with its own repo.
+      expect(all.items.map((i) => [i.repo, i.issue]).sort()).toEqual([
+        ["acme/gadgets", 3],
+        ["acme/widgets", 3],
+      ]);
+      const filtered = await dashboard.handle(new Request("http://localhost:4100/api/inbox?repo=acme/widgets"), "127.0.0.1");
+      expect(filtered.status).toBe(200);
+      const body = (await filtered.json()) as { items: { issue: number; repo: string }[] };
+      expect(body.items).toEqual([{ ...body.items[0]!, issue: 3, repo: "acme/widgets" }]);
+    } finally {
+      if (before === undefined) delete process.env.FACTORY_REPOS;
+      else process.env.FACTORY_REPOS = before;
+    }
+  });
+
+  test("inbox/:n/act resolves the repo from the request body, defaulting to the configured repo", async () => {
+    const { dashboard, github } = await make("", [waiting(3, LABEL.awaitingApproval)]);
+    const res = await dashboard.handle(
+      new Request("http://localhost:4100/api/inbox/3/act", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "approve", repo: "acme/widgets" }) }),
+      "127.0.0.1",
+    );
+    expect(res.status).toBe(200);
+    expect(github.posted).toEqual([{ issue: 3, body: "/factory approve" }]);
   });
 });
 

@@ -590,6 +590,7 @@ describe("merge policy on an in-review PR", () => {
       mergeable: "MERGEABLE",
       reviewDecision: "APPROVED",
       hasUnresolvedReviewThreads: false,
+      changesRequestedStale: false,
     });
     return pr;
   }

@@ -366,9 +366,7 @@ async function runFromStage(
     if (stage === "triage") {
       // Someone else's open PR already closes this issue: don't spend tokens on a second fix.
       const own = deps.git.branchName(issueNumber);
-      const taken = (await deps.github.listPrs(config.repo, { state: "open" })).find(
-        (p) => p.headRefName !== own && p.closingIssuesReferences?.some((r) => r.number === issueNumber),
-      );
+      const taken = await deps.github.prForIssue(config.repo, issueNumber, { excludeHead: own });
       if (taken) {
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);

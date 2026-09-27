@@ -1,5 +1,52 @@
 # Changelog
 
+## v2.9.0
+
+The review inbox stops sending you to GitHub. A PR waiting on you now shows its diff, gate
+evidence, verify verdict, CI status and per-stage cost right in the dashboard, across every repo
+the factory watches, with a merge button for the operator's own authority.
+
+- **`src/merge-policy.ts`: an operator merge path.** `decideOperatorMerge(readiness, ci)` reuses
+  `checkReadiness` with the PR's own base branch, skipping `autoEligible`'s risk/path/size gates
+  entirely, since a human click is a different authority source than the `auto` policy. It shares
+  one merge primitive, `attemptMerge`, with the automated policy (a spy test proves the same
+  function serves both). `renderOperatorAuditComment` posts its own `**operator**` wording, kept
+  distinct from `**auto**`/`**dry-run**` so the audit trail always shows who approved.
+- **`src/github.ts`.** `prDiff` (`gh pr diff`) and `prForIssue`, the one open PR that closes an
+  issue, shared by the triage check and the new review route. `mergeReadiness`'s
+  `changesRequestedStale` flag: a CHANGES_REQUESTED review against a commit the head has since
+  moved past no longer blocks the item, idea only, from assembler's unmerged fix branch, no code
+  copied.
+- **`src/paths.ts`: `discoverRepos(FACTORY_HOME)`.** Every `<owner>/<repo>/factory.db` under the
+  factory's home directory becomes one inbox source, so a machine watching several repos gets one
+  inbox with a repo filter, not one dashboard per repo.
+- **`dashboard/server.ts`.** `GET /api/inbox` aggregates across every discovered repo (or filters
+  to one with `?repo=`); `GET /api/issues/:n/review` returns the diff, CI, gate evidence, verify
+  verdict and per-stage cost for the PR that closes an issue; `POST /api/issues/:n/merge` runs
+  `decideOperatorMerge` and, on `outcome: "merge"`, calls the same `attemptMerge` the policy uses.
+- **`dashboard/public/app.js`.** A repo filter on the inbox list; a review panel for `review-pr`
+  and `merge-dry-run` items (diff, CI status, gate line, verify findings, a per-stage cost table);
+  an "Approve and merge" button wired to the new merge route, separate from the generic
+  approve/revise/cancel actions, since neither of those inbox kinds carries a server-side
+  "approve" action.
+
+Structural tests: every factory state or parked label yields one inbox item with at least one
+action, or none for in-flight labels (`tests/inbox.test.ts`); one merge function serves both the
+dashboard button and the automated policy (`tests/merge-policy-operator.test.ts`, a spy across
+both call sites). Verified live against a real in-review PR
+(`learnwithparam/splitbill-demo` issue #10 / PR #16): the review route returned the actual diff,
+CI status, gate evidence and verify verdict from GitHub, unchanged from the fixture shape.
+Playwright screenshots at 1440, 768 and 375 px in light and dark themes cover the inbox list, the
+review panel and the repo filter, with no console or page errors at any size.
+
+Not in v2.9.0:
+- "Request changes" as its own review action: the existing `revise` action (with your note) fills
+  this role; a separate action would duplicate it.
+- A CHANGES_REQUESTED-superseded check on the operator merge path beyond what `mergeReadiness`
+  already reports: `changesRequestedStale` is read, not re-derived, by `decideOperatorMerge`.
+- Any change to the automated `merge.policy` behavior from v2.8.0: this release only adds a
+  second, human-triggered caller of the same merge primitive.
+
 ## v2.8.0
 
 The merge-policy half of the lwp-website pilot: the factory can now tell whether an in-review PR

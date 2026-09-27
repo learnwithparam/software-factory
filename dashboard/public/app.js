@@ -9,6 +9,8 @@ const STAGES = ["triage", "plan", "build", "verify", "pr"];
 const WAITING = new Set(["needs-info", "awaiting-approval", "needs-human", "failed"]);
 const ACTIVE = new Set(["running", "verifying"]);
 const ACTION_LABEL = { approve: "Approve plan", revise: "Request changes", answer: "Send answer", retry: "Retry", cancel: "Cancel run" };
+const REVIEW_KINDS = new Set(["review-pr", "merge-dry-run"]);
+const KIND_LABEL = { "approve-plan": "Plan to approve", "answer-question": "Question for you", "review-pr": "Pull request to review", "merge-dry-run": "Ready to merge", parked: "Needs a human", failed: "Failed", budget: "Over budget" };
 const ICONS = {
   inbox: "M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5",
   line: "M4 6h10M4 12h16M4 18h7",
@@ -19,7 +21,7 @@ const ICONS = {
 };
 const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["analytics", "Analytics"], ["agents", "Agents"]];
 
-const state = { route: routeFromHash(location.hash), inbox: [], repo: "", selected: null, thread: null, filter: "all", data: {}, error: {} };
+const state = { route: routeFromHash(location.hash), inbox: [], repo: "", repos: [], repoFilter: "", selected: null, thread: null, review: null, filter: "all", data: {}, error: {} };
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -68,7 +70,7 @@ const post = (path, body) => api(path, { method: "POST", headers: { "content-typ
 /* ---- states shared by every view ---- */
 const quiet = (title, hint, ...extra) =>
   h("div", { class: "quiet-state" }, h("div", { class: "quiet-state-mark", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("strong", null, title), h("span", null, hint), ...extra);
-const heading = (title, lede) => h("div", { class: "page-heading" }, h("div", null, h("h1", null, title), lede && h("p", { class: "lede" }, lede)));
+const heading = (title, lede, ...extra) => h("div", { class: "page-heading" }, h("div", null, h("h1", null, title), lede && h("p", { class: "lede" }, lede)), ...extra);
 const stateOr = (name, ready) => {
   if (state.error[name]) return quiet("Could not load this view", state.error[name]);
   if (!state.data[name]) return quiet("Loading", "Reading the factory's state.");
@@ -107,22 +109,63 @@ function lineView() {
 }
 
 /* ---- Inbox ---- */
-async function selectItem(issue) {
-  state.selected = issue;
+function isSelected(i) { return state.selected != null && state.selected.repo === i.repo && state.selected.issue === i.issue; }
+
+async function selectItem(item) {
+  state.selected = { repo: item.repo, issue: item.issue };
   state.thread = null;
+  state.review = null;
   render();
-  try { state.thread = (await api(`/api/issues/${issue}/thread`)).issue; } catch (e) { state.thread = { error: e.message }; }
+  const q = `?repo=${encodeURIComponent(item.repo)}`;
+  const wantsReview = REVIEW_KINDS.has(item.kind);
+  const [thread, review] = await Promise.allSettled([api(`/api/issues/${item.issue}/thread${q}`), wantsReview ? api(`/api/issues/${item.issue}/review${q}`) : Promise.resolve(null)]);
+  state.thread = thread.status === "fulfilled" ? thread.value.issue : { error: thread.reason.message };
+  if (wantsReview) state.review = review.status === "fulfilled" ? review.value : { error: review.reason.message };
   render();
 }
 
 async function actOn(item, action, text) {
   if (action === "cancel" && !confirm(`Cancel the run for #${item.issue}? This closes the issue.`)) return;
   try {
-    await post(`/api/inbox/${item.issue}/act`, { action, text });
+    await post(`/api/inbox/${item.issue}/act`, { action, text, repo: item.repo });
     state.selected = null;
+    state.review = null;
     await Promise.all([loadInbox(), loadView()]);
   } catch (e) { alert(e.message); }
   render();
+}
+
+async function mergeApprove(item) {
+  try {
+    const r = await post(`/api/issues/${item.issue}/merge`, { repo: item.repo });
+    if (r.decision.outcome !== "merge") { alert(`Not merged:\n${r.decision.refusals.map((x) => `- ${x.detail}`).join("\n")}`); return; }
+    state.selected = null;
+    state.review = null;
+    await Promise.all([loadInbox(), loadView()]);
+  } catch (e) { alert(e.message); }
+  render();
+}
+
+function actionLabel(item, a) { return REVIEW_KINDS.has(item.kind) && a === "cancel" ? "Close" : ACTION_LABEL[a]; }
+
+function reviewPanel() {
+  const r = state.review;
+  if (!r) return quiet("Loading", "Reading the pull request.");
+  if (r.error) return quiet("Could not load the review", r.error);
+  const ciTone = r.ci.status === "passed" ? "ok" : r.ci.status === "failed" ? "bad" : "warn";
+  return h("div", { class: "review" },
+    h("dl", { class: "kv" },
+      h("dt", null, "Pull request"), h("dd", null, h("a", { href: r.pr.url, target: "_blank", rel: "noreferrer" }, `#${r.pr.number}`)),
+      h("dt", null, "CI"), h("dd", null, h("span", { class: "status", "data-tone": ciTone }, statusText(r.ci.status))),
+      r.gate ? [h("dt", null, "Gate"), h("dd", null, `${r.gate.status} · ${r.gate.line}`)] : null,
+      r.verify?.result ? [h("dt", null, "Verify"), h("dd", null, r.verify.result)] : null),
+    r.verify?.findings?.length ? h("div", null, h("h3", null, "Verify findings"),
+      h("ul", { class: "plain-list" }, r.verify.findings.map((f) => h("li", null, typeof f === "string" ? f : `${f.severity}: ${f.what}`)))) : null,
+    r.stages.length ? h("div", { class: "table-wrap" }, h("table", null,
+      h("thead", null, h("tr", null, ["Stage", "Agent", "Model", "Cost"].map((c, i) => h("th", { class: i === 3 ? "num" : "" }, c)))),
+      h("tbody", null, r.stages.map((s) => h("tr", null, h("td", null, s.stage), h("td", null, s.agent), h("td", null, s.model || "default"), h("td", { class: "num" }, s.usage_complete === 0 ? "Not reported" : money(s.cost_usd))))))) : null,
+    h("h3", { style: "margin-top:1rem" }, "Diff"),
+    h("pre", { class: "log" }, r.diff || "No diff available."));
 }
 
 function conversation(item) {
@@ -134,25 +177,38 @@ function conversation(item) {
         .map((m) => h("div", { class: `msg${m.bot ? " bot" : ""}` }, h("header", null, m.bot ? "factory" : m.author), cleanBody(m.body))));
   const needsText = item.actions.filter((a) => a === "revise" || a === "answer");
   const box = needsText.length ? h("textarea", { class: "field-control", id: "composer", rows: "3", placeholder: item.kind === "answer-question" ? "Your answer" : "What should change?", "aria-label": "Your reply" }) : null;
+  const isReview = REVIEW_KINDS.has(item.kind);
   return h("div", { class: "panel" },
-    h("div", { class: "panel-pad" }, h("h2", null, `#${item.issue} ${item.title}`), h("span", { class: "muted" }, `${item.label.replace("factory:", "").replace(/-/g, " ")} · waiting ${age(item.waitingSince)}`)),
+    h("div", { class: "panel-pad" }, h("h2", null, `#${item.issue} ${item.title}`), h("span", { class: "muted" }, `${item.repo} · ${item.label.replace("factory:", "").replace(/-/g, " ")} · waiting ${age(item.waitingSince)}`)),
+    isReview ? h("div", { class: "panel-pad" }, reviewPanel()) : null,
     body,
-    h("div", { class: "composer" }, box, h("div", { class: "actions" }, item.actions.map((a) =>
-      h("button", { class: `btn${a === "approve" || a === "answer" ? " btn-primary" : a === "cancel" ? " btn-danger" : ""}`, type: "button",
-        onclick: () => { const text = box ? box.value : ""; if ((a === "revise" || a === "answer") && !text.trim()) { box.focus(); return; } actOn(item, a, text); } }, ACTION_LABEL[a])))));
+    h("div", { class: "composer" }, box, h("div", { class: "actions" },
+      isReview ? h("button", { class: "btn btn-primary", type: "button", onclick: () => mergeApprove(item) }, "Approve and merge") : null,
+      item.actions.map((a) =>
+        h("button", { class: `btn${a === "approve" || a === "answer" ? " btn-primary" : a === "cancel" ? " btn-danger" : ""}`, type: "button",
+          onclick: () => { const text = box ? box.value : ""; if ((a === "revise" || a === "answer") && !text.trim()) { box.focus(); return; } actOn(item, a, text); } }, actionLabel(item, a))))));
+}
+
+function repoFilterControl() {
+  if (state.repos.length <= 1) return null;
+  return h("select", { class: "field-control repo-filter", "aria-label": "Filter by repo",
+    onchange: (e) => { state.repoFilter = e.target.value; loadInbox().then(render); } },
+    h("option", { value: "", selected: state.repoFilter === "" }, "All repos"),
+    ...state.repos.map((r) => h("option", { value: r, selected: state.repoFilter === r }, r)));
 }
 
 function inboxView() {
   const items = state.inbox;
-  const item = items.find((i) => i.issue === state.selected);
-  return h("section", null, heading("Inbox", "Everything the factory is waiting on you for."),
+  const multiRepo = state.repos.length > 1;
+  const item = items.find(isSelected);
+  return h("section", null, heading("Inbox", "Everything the factory is waiting on you for.", repoFilterControl()),
     !items.length ? quiet("Nothing is waiting on you", "The factory will list plans to approve and questions to answer here.")
     : h("div", { class: "split", "data-open": String(Boolean(item)) },
       h("div", { class: "list-col" }, h("div", { class: "list" }, items.map((i) =>
-        h("button", { class: "list-item", type: "button", "aria-current": String(i.issue === state.selected), onclick: () => selectItem(i.issue) },
-          h("span", { class: "kind" }, { "approve-plan": "Plan to approve", "answer-question": "Question for you", "review-pr": "Pull request to review", parked: "Needs a human", failed: "Failed" }[i.kind]),
+        h("button", { class: "list-item", type: "button", "aria-current": String(isSelected(i)), onclick: () => selectItem(i) },
+          h("span", { class: "kind" }, KIND_LABEL[i.kind], multiRepo ? h("span", { class: "muted repo-tag" }, ` · ${i.repo}`) : null),
           h("strong", null, `#${i.issue} ${i.title}`), h("span", { class: "muted" }, `waiting ${age(i.waitingSince)}`), h("span", { class: "muted" }, i.ask.slice(0, 110)))))),
-      h("div", { class: "detail-col" }, item ? [h("button", { class: "btn back", type: "button", onclick: () => { state.selected = null; render(); } }, "Back to inbox"), conversation(item)] : quiet("Pick an item", "Its conversation and actions show up here."))));
+      h("div", { class: "detail-col" }, item ? [h("button", { class: "btn back", type: "button", onclick: () => { state.selected = null; state.review = null; render(); } }, "Back to inbox"), conversation(item)] : quiet("Pick an item", "Its conversation and actions show up here."))));
 }
 
 /* ---- Runs ---- */
@@ -285,11 +341,14 @@ function toggleTheme() {
   try { localStorage.setItem("factory-theme", next); } catch {}
 }
 
-function go(view, issue) {
-  state.selected = issue ?? null;
+function go(view, issue, repo = state.repo) {
+  state.selected = issue ? { repo, issue } : null;
   if (location.hash !== `#/${view}`) location.hash = `#/${view}`;
   else render();
-  if (issue) selectItem(issue);
+  if (issue) {
+    const item = state.inbox.find((i) => i.issue === issue && i.repo === repo);
+    if (item) selectItem(item);
+  }
 }
 
 function showLogin() {
@@ -300,8 +359,15 @@ function showLogin() {
 }
 
 async function loadInbox() {
-  try { const r = await api("/api/inbox"); state.inbox = r.items; state.repo = r.repo; state.error.inbox = null; } catch (e) { state.error.inbox = e.message; }
-  document.getElementById("repo-label").textContent = state.repo || "";
+  try {
+    const q = state.repoFilter ? `?repo=${encodeURIComponent(state.repoFilter)}` : "";
+    const r = await api(`/api/inbox${q}`);
+    state.inbox = r.items;
+    state.repo = r.repo;
+    state.repos = r.repos || [];
+    state.error.inbox = null;
+  } catch (e) { state.error.inbox = e.message; }
+  document.getElementById("repo-label").textContent = state.repo || (state.repos.length > 1 ? `${state.repos.length} repos` : "");
   renderNav();
 }
 
