@@ -345,6 +345,19 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("12b. a normal build still cannot touch .claude/**, even with the default empty protectedPaths", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.git.changed = [".claude/skills/factory-build/SKILL.md"];
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    expect(await c.step()).toBe("needs-human");
+    expect(c.git.pushed).toEqual([]);
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toContain(".claude/skills/factory-build/SKILL.md");
+    done(c);
+  });
+
   test("13. a killed stage fails with the kill reason", async () => {
     const c = setup([LABEL.ready]);
     c.push("triage", triage(), { exitCode: 1, killedReason: "timed out after 15 minutes" });

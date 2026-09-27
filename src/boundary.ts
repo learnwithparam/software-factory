@@ -4,6 +4,14 @@
 // independently diffs the branch against its base and refuses to ship if a
 // protected path was touched by any means.
 
+// Hardcoded regardless of repo config, mirroring guard-paths.sh's own
+// unconditional additions (template/.claude/hooks/guard-paths.sh): a normal
+// build must never touch the factory's own state or skills, even with the
+// default empty protectedPaths. `factory learn`'s branch never calls this
+// check (it uses outsideAllowedPaths instead), so its exemption never
+// weakens this for a normal build.
+export const ALWAYS_PROTECTED_PATHS = [".claude/**", ".factory/**"] as const;
+
 export function touchesProtectedPath(changedFiles: readonly string[], protectedPaths: readonly string[]): string[] {
   const hits: string[] = [];
   for (const file of changedFiles) {

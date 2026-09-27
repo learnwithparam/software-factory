@@ -5,7 +5,7 @@
 // changed.
 
 import { describe, expect, test } from "bun:test";
-import { touchesProtectedPath } from "../src/boundary";
+import { ALWAYS_PROTECTED_PATHS, touchesProtectedPath } from "../src/boundary";
 
 describe("touchesProtectedPath", () => {
   test("flags an exact-path match", () => {
@@ -32,5 +32,16 @@ describe("touchesProtectedPath", () => {
 
   test("matches a dotfile pattern like a secrets file", () => {
     expect(touchesProtectedPath([".env.production"], [".env*"])).toEqual([".env.production"]);
+  });
+
+  // A normal build merges ALWAYS_PROTECTED_PATHS into its call (src/watch.ts),
+  // so .claude/** and .factory/** are refused even with the default empty
+  // protectedPaths config, matching what guard-paths.sh already hardcodes.
+  test("ALWAYS_PROTECTED_PATHS flags .claude/** and .factory/** with no repo config at all", () => {
+    const changed = [".claude/skills/factory-build/SKILL.md", ".factory/memory/lessons.md", "src/ui/button.tsx"];
+    expect(touchesProtectedPath(changed, [...ALWAYS_PROTECTED_PATHS])).toEqual([
+      ".claude/skills/factory-build/SKILL.md",
+      ".factory/memory/lessons.md",
+    ]);
   });
 });
