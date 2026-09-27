@@ -5,14 +5,21 @@
 // `Record<package, Advisory[]>` with neither field, which would have parsed
 // to zero findings against the live repo (audit finding #6).
 
-import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseAuditFindings, scan, type ScanDeps } from "../src/scan";
 import { GitHub, type CommandResult, type CommandRunner, type GhIssue } from "../src/github";
 import { LABEL } from "../src/labels";
 
 const FIXTURE = readFileSync(join(import.meta.dir, "fixtures", "bun-audit-splitbill.json"), "utf8");
+
+// A Bun project, as far as scan() checks: it never shells out to `bun audit`
+// without this marker (plan v2.6.2 item 6).
+const bunProjectDir = mkdtempSync(join(tmpdir(), "factory-scan-"));
+writeFileSync(join(bunProjectDir, "bun.lock"), "{}");
+afterAll(() => rmSync(bunProjectDir, { recursive: true, force: true }));
 
 describe("parseAuditFindings", () => {
   test("groups the real splitbill capture into one finding per package, not per advisory", () => {
@@ -87,7 +94,7 @@ describe("scan()", () => {
     // live scan should only file nanoid.
     const github = new FakeGitHub([issue(6, "some body\n<!-- factory:scan id=audit:hono -->\nmore text")]);
     const deps: ScanDeps = { github, runner: new FakeBunRunner(FIXTURE) };
-    const result = await scan(deps, "acme/widgets", "/tmp/does-not-matter");
+    const result = await scan(deps, "acme/widgets", bunProjectDir);
 
     expect(result.skipped).toHaveLength(1);
     expect(result.filed).toHaveLength(1);
@@ -99,7 +106,7 @@ describe("scan()", () => {
   test("files both findings when nothing is open yet", async () => {
     const github = new FakeGitHub([]);
     const deps: ScanDeps = { github, runner: new FakeBunRunner(FIXTURE) };
-    const result = await scan(deps, "acme/widgets", "/tmp/does-not-matter");
+    const result = await scan(deps, "acme/widgets", bunProjectDir);
     expect(result.filed).toHaveLength(2);
     expect(result.skipped).toHaveLength(0);
   });
@@ -113,7 +120,24 @@ describe("scan()", () => {
       }
     }
     const github = new FakeGitHub([]);
-    await scan({ github, runner: new RecordingRunner() }, "acme/widgets", "/tmp/x");
+    await scan({ github, runner: new RecordingRunner() }, "acme/widgets", bunProjectDir);
     expect(calls).toEqual([["audit", "--json"]]);
+  });
+
+  test("skips with a clear message on a repo with no bun.lock, never shelling out", async () => {
+    const calls: string[][] = [];
+    class RecordingRunner implements CommandRunner {
+      async run(args: string[]): Promise<CommandResult> {
+        calls.push(args);
+        return { stdout: "{}", stderr: "", code: 0 };
+      }
+    }
+    const noBunDir = mkdtempSync(join(tmpdir(), "factory-scan-py-"));
+    const github = new FakeGitHub([]);
+    const result = await scan({ github, runner: new RecordingRunner() }, "acme/pyapp", noBunDir);
+    expect(result).toEqual({ filed: [], skipped: [], skippedReason: expect.stringContaining("bun.lock") });
+    expect(calls).toEqual([]);
+    expect(github.created).toEqual([]);
+    rmSync(noBunDir, { recursive: true, force: true });
   });
 });

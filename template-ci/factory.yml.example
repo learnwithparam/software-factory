@@ -35,7 +35,7 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v2.6.1 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REF: v2.6.2 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
   CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
@@ -68,6 +68,15 @@ jobs:
     steps:
       - name: Checkout target repo
         uses: actions/checkout@v4
+
+      # A placeholder, not a no-op you can skip: `bun ci`/`npm ci` alone is not
+      # enough on a fresh Actions runner for a stack other than Bun/Node (a
+      # Python repo needs actions/setup-python first, etc). Add whatever this
+      # repo's stack needs here, before `factory run` builds and gates on it.
+      # `config.setup` in .factory/config.json (e.g. `npm ci`) still runs
+      # after this, once per worktree — this step is for the runtime itself.
+      - name: Set up your toolchain
+        run: echo "no language runtime needed beyond what ubuntu-latest ships, or add a setup step here"
 
       - name: Checkout software-factory (pinned)
         uses: actions/checkout@v4
@@ -137,6 +146,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # See run-issue's "Set up your toolchain" step: `factory tick` can also
+      # build and gate an issue, so it needs this repo's runtime too.
+      - name: Set up your toolchain
+        run: echo "no language runtime needed beyond what ubuntu-latest ships, or add a setup step here"
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.FACTORY_RUNNER_REPO }}
@@ -214,6 +227,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # See run-issue's "Set up your toolchain" step.
+      - name: Set up your toolchain
+        run: echo "no language runtime needed beyond what ubuntu-latest ships, or add a setup step here"
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.FACTORY_RUNNER_REPO }}

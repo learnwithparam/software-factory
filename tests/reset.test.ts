@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseIssueSeed, planReset, rebaseline, reset, type ResetDeps } from "../src/reset";
+import { NotResettableError, parseIssueSeed, planReset, rebaseline, reset, type ResetDeps } from "../src/reset";
 import { GitHub, type CommandResult, type CommandRunner, type GhIssue, type GhPr } from "../src/github";
 import { LABELS } from "../src/labels";
 
@@ -120,6 +120,7 @@ describe("factory reset --dry-run", () => {
       issuesDir,
       workspacesDir: "/tmp/factory-ws-does-not-exist",
       statePath: "/tmp/factory-state-does-not-exist",
+      resettable: true,
     };
 
     const actions = await planReset(deps, ctx);
@@ -169,6 +170,7 @@ describe("factory reset --dry-run", () => {
       issuesDir,
       workspacesDir: mkdtempSync(join(tmpdir(), "factory-ws-")),
       statePath: mkdtempSync(join(tmpdir(), "factory-state-")),
+      resettable: true,
     };
     mkdirSync(ctx.workspacesDir, { recursive: true });
 
@@ -191,7 +193,7 @@ describe("reset wipes the WAL files with the state database", () => {
     const db = join(dir, "factory.db");
     for (const f of [db, `${db}-wal`, `${db}-shm`]) writeFileSync(f, "x");
     const github = new FakeGitHub([], []);
-    const ctx = { repo: "acme/widgets", cloneDir: "/tmp/x", baselineTag: "baseline", base: "trunk", issuesDir: mkdtempSync(join(tmpdir(), "factory-i-")), workspacesDir: join(dir, "ws"), statePath: db };
+    const ctx = { repo: "acme/widgets", cloneDir: "/tmp/x", baselineTag: "baseline", base: "trunk", issuesDir: mkdtempSync(join(tmpdir(), "factory-i-")), workspacesDir: join(dir, "ws"), statePath: db, resettable: true };
     await reset({ github, git: new FakeGitRunner() }, ctx, false);
     expect(readdirSync(dir)).toEqual([]);
     rmSync(dir, { recursive: true, force: true });
@@ -207,6 +209,7 @@ describe("reset keeps merged setup safe", () => {
     issuesDir,
     workspacesDir: "/tmp/factory-ws-none",
     statePath: "/tmp/factory-state-none",
+    resettable: true,
   });
 
   test("plan lists the commits the force push would drop", async () => {
@@ -268,5 +271,28 @@ describe("reset stays inside what the factory owns", () => {
     const git = new FakeGitRunner();
     git.revParseSha = "";
     await expect(planReset({ github: new FakeGitHub([issue(1, "x", ["factory:ready"])], []), git }, ctx)).rejects.toThrow(/baseline tag baseline not found/);
+  });
+});
+
+describe("reset refuses on a repo that never opted in", () => {
+  const ctx = { repo: "acme/widgets", cloneDir: "/tmp/x", baselineTag: "baseline", base: "main", issuesDir: "/tmp/none", workspacesDir: "/tmp/ws-none", statePath: "/tmp/st-none" };
+
+  test("reset() without resettable throws before touching gh or git", async () => {
+    const github = new FakeGitHub([issue(1, "Old bug", ["factory:failed"])], [pr(5, "factory/issue-3")]);
+    const git = new FakeGitRunner();
+    await expect(reset({ github, git }, ctx, false)).rejects.toThrow(NotResettableError);
+    expect(github.closedPrs).toEqual([]);
+    expect(github.closedIssues).toEqual([]);
+    expect(git.calls).toEqual([]);
+  });
+
+  test("reset() with resettable: false throws the same as omitting it", async () => {
+    await expect(reset({ github: new FakeGitHub([], []), git: new FakeGitRunner() }, { ...ctx, resettable: false }, true)).rejects.toThrow(NotResettableError);
+  });
+
+  test("rebaseline() without resettable throws before moving the tag", async () => {
+    const git = new FakeGitRunner();
+    await expect(rebaseline({ github: new FakeGitHub([], []), git }, ctx, false)).rejects.toThrow(NotResettableError);
+    expect(git.calls).toEqual([]);
   });
 });

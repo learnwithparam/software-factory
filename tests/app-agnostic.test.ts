@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { loadConfig, repoFromRemoteUrl } from "../src/config";
 import { parseGateLine } from "../src/gates";
+import { defaultStatePath, workspacesDir, worktreePath } from "../src/paths";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -94,5 +95,38 @@ describe("a Python repo on a trunk branch", () => {
     expect(runGatesSh(dir)).toBe("GREEN");
     writeFileSync(join(dir, "tests/test_math.py"), "import unittest\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(1 + 1, 3)\n");
     expect(runGatesSh(dir)).toBe("RED");
+  });
+});
+
+// The other half of "any repo, safely" (plan v2.6.2 item 1): a second repo
+// sharing one FACTORY_HOME must never share a worktree or a state DB with
+// the first, even when both hold the same issue number.
+describe("two repos sharing one FACTORY_HOME never collide", () => {
+  const env = { HOME: "/tmp/does-not-matter", FACTORY_HOME: "/tmp/factory-home-shared" } as NodeJS.ProcessEnv;
+
+  test("workspaces and state DBs are namespaced by owner/name", () => {
+    const a = { workspaces: workspacesDir(env, "acme/pyapp"), db: defaultStatePath(env, "acme/pyapp") };
+    const b = { workspaces: workspacesDir(env, "acme/other"), db: defaultStatePath(env, "acme/other") };
+    expect(a.workspaces).not.toBe(b.workspaces);
+    expect(a.db).not.toBe(b.db);
+    expect(a.workspaces.startsWith("/tmp/factory-home-shared/acme/pyapp")).toBe(true);
+    expect(b.workspaces.startsWith("/tmp/factory-home-shared/acme/other")).toBe(true);
+  });
+
+  test("the same issue number in two repos never resolves to the same worktree", () => {
+    const a = worktreePath(3, env, "acme/pyapp");
+    const b = worktreePath(3, env, "acme/other");
+    expect(a).not.toBe(b);
+    expect(a.endsWith("/issue-3")).toBe(true);
+    expect(b.endsWith("/issue-3")).toBe(true);
+  });
+
+  test("omitting repo keeps the pre-v2.6.2 shared path, so an unmigrated single-repo install is unaffected", () => {
+    expect(workspacesDir(env)).toBe(`${env.FACTORY_HOME}/workspaces`);
+    expect(defaultStatePath(env)).toBe(`${env.FACTORY_HOME}/factory.db`);
+  });
+
+  test("a repo slug with no slash refuses instead of silently sharing a path", () => {
+    expect(() => workspacesDir(env, "not-a-slug")).toThrow(/repo must be "owner\/name"/);
   });
 });

@@ -13,6 +13,7 @@ import { loadConfig, type FactoryConfig } from "../src/config";
 import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
+import { ShellSetupRunner } from "../src/setup";
 import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
@@ -22,7 +23,7 @@ import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { createDashboard } from "../dashboard/server";
 import { versionOf, which } from "../src/probes";
-import { workspacesDir as defaultWorkspacesDir } from "../src/paths";
+import { workspacesDir as defaultWorkspacesDir, defaultStatePath } from "../src/paths";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
@@ -75,12 +76,13 @@ function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
   return {
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
-    state: new FactoryState(flag("db") ?? DEFAULT_DB_PATH),
+    state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
     executor: new CommandExecutor(config.agents, config.stages),
     gateRunner: new ShellGateRunner(),
     rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
     cloneDir,
-    workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
+    workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
+    setupRunner: new ShellSetupRunner(),
   };
 }
 
@@ -159,11 +161,16 @@ async function cmdPark(): Promise<void> {
 async function cmdLogs(): Promise<void> {
   const issue = Number(args[1]);
   if (!Number.isInteger(issue) || issue < 1) throw new UsageError("logs: an issue number is required, e.g. `factory logs 12 --follow`");
-  const state = new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH);
-  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? state.listRuns().find((r) => r.issue === issue)?.repo ?? "";
+  const repoDir = flag("repo-dir");
+  // With no --repo/--repo-dir/FACTORY_REPO hint, this stays on the legacy
+  // shared DB (pre-v2.6.2 installs); with one, it opens that repo's own DB
+  // (per-repo since v2.6.2) instead of guessing at the shared one.
+  const repo = flag("repo") ?? process.env.FACTORY_REPO ?? (repoDir ? (await loadConfig(resolve(repoDir))).repo : undefined);
+  const state = new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH));
+  const resolvedRepo = repo ?? state.listRuns().find((r) => r.issue === issue)?.repo ?? "";
   const controller = new AbortController();
   process.on("SIGINT", () => controller.abort());
-  await streamLogs(state, repo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
+  await streamLogs(state, resolvedRepo, issue, { follow: has("follow"), stage: flag("stage"), json: has("json"), signal: controller.signal });
 }
 
 async function cmdInbox(): Promise<void> {
@@ -201,6 +208,10 @@ async function cmdScan(): Promise<void> {
     },
   };
   const result = await scan({ github: new GitHub(), runner: bunRunner }, config.repo, cloneDir);
+  if (result.skippedReason) {
+    console.log(`factory scan: skipped — ${result.skippedReason}`);
+    return;
+  }
   console.log(`factory scan: filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
   for (const t of result.filed) console.log(`  + ${t}`);
 }
@@ -215,8 +226,9 @@ async function cmdReset(): Promise<void> {
     baselineTag: config.baselineTag,
     base: config.base,
     issuesDir: `${cloneDir}/.factory/issues`,
-    workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(),
-    statePath: flag("db") ?? DEFAULT_DB_PATH,
+    workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
+    statePath: flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo),
+    resettable: config.resettable,
     allIssues: has("all-issues"),
   };
   const deps = { github: new GitHub(), git: new GitCommandRunner() };
@@ -237,6 +249,7 @@ async function cmdRebaseline(): Promise<void> {
     issuesDir: "",
     workspacesDir: "",
     statePath: "",
+    resettable: config.resettable,
   };
   const moved = await rebaseline({ github: new GitHub(), git: new GitCommandRunner() }, ctx, dryRun);
   console.log(`factory rebaseline${dryRun ? " --dry-run" : ""}: ${config.baselineTag} -> origin/${config.base} (${moved.length} commit(s))`);
@@ -286,7 +299,17 @@ async function cmdDoctor(): Promise<void> {
         }
       },
     },
-    { repo: config.repo, cloneDir, baselineTag: config.baselineTag, factoryMode: process.env.FACTORY_MODE, agents: config.agents, stages: config.stages, templateSkills: templateSkills() },
+    {
+      repo: config.repo,
+      cloneDir,
+      baselineTag: config.baselineTag,
+      factoryMode: process.env.FACTORY_MODE,
+      agents: config.agents,
+      stages: config.stages,
+      templateSkills: templateSkills(),
+      legacyStatePath: defaultStatePath(process.env),
+      legacyWorkspacesDir: defaultWorkspacesDir(process.env),
+    },
   );
   const allOk = checks.every((c) => c.ok || c.warn);
   if (has("json")) console.log(successJson({ checks }, allOk));
@@ -319,10 +342,10 @@ function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoA
 }
 
 async function cmdDashboard(): Promise<void> {
-  const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? DEFAULT_DB_PATH;
   const repoDir = flag("repo-dir");
   const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
   const repo = flag("repo") ?? process.env.FACTORY_REPO ?? config?.repo ?? "";
+  const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
   const github = new GitHub();
   serveDashboard(state, github, repo, false, config);

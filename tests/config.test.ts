@@ -34,6 +34,46 @@ describe("loadConfig", () => {
   });
 });
 
+// A config generated for a repo whose default branch is not "main" must not
+// silently point PRs and reset at a branch that does not exist (plan v2.6.2
+// item 3). Local `--repo-dir` mode has no `ensureRepoClone` (VM/CI-only) to
+// resolve this, so loadConfig has to do it itself.
+describe("base branch defaults to origin/HEAD, not the hard-coded \"main\"", () => {
+  function git(cwd: string, ...args: string[]): void {
+    const r = Bun.spawnSync(["git", ...args], { cwd, stderr: "pipe" });
+    if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
+  }
+
+  function cloneOfTrunkRepo(): string {
+    const src = mkdtempSync(join(dir, "src-"));
+    git(src, "init", "-q", "-b", "trunk");
+    writeFileSync(join(src, "f.txt"), "x");
+    git(src, "add", ".");
+    git(src, "-c", "user.email=a@b.c", "-c", "user.name=a", "commit", "-q", "-m", "x");
+    const bare = `${mkdtempSync(join(dir, "bare-"))}.git`;
+    git(dir, "clone", "-q", "--bare", src, bare);
+    const wd = join(dir, `wd-${Math.random().toString(36).slice(2)}`);
+    git(dir, "clone", "-q", bare, wd);
+    return wd;
+  }
+
+  test("a config that omits base picks up origin/HEAD's branch", async () => {
+    const wd = cloneOfTrunkRepo();
+    mkdirSync(join(wd, ".factory"));
+    writeFileSync(join(wd, ".factory/config.json"), JSON.stringify({ repo: "acme/x", gates: [] }));
+    const c = await loadConfig(wd);
+    expect(c.base).toBe("trunk");
+  });
+
+  test("a config that names base explicitly, even \"main\", is never overridden", async () => {
+    const wd = cloneOfTrunkRepo();
+    mkdirSync(join(wd, ".factory"));
+    writeFileSync(join(wd, ".factory/config.json"), JSON.stringify({ repo: "acme/x", base: "main", gates: [] }));
+    const c = await loadConfig(wd);
+    expect(c.base).toBe("main");
+  });
+});
+
 describe("config validation at boot", () => {
   test("an unknown top-level key refuses to start and names the key", async () => {
     await expect(loadConfig(repoWith({ repo: "a/b", maxOpenFactoryPr: 3 }))).rejects.toThrow(/maxOpenFactoryPr: unknown key/);

@@ -22,20 +22,26 @@ it. Only reachable after `factory-verify` wrote `result: "pass"`.
 
 If a PR template exists, fill its sections from the plan and verdict; do
 not invent sections it doesn't have or drop ones it does. If no template
-exists, use this structure:
+exists, use this structure (the same shape as the one this template ships
+in `.github/pull_request_template.md`):
 
 ```markdown
 ## Summary
 {{one_line_goal}}
 
-## Acceptance criteria
-- AC-1: {{criterion}} — verified by {{evidence_command}}
-...
-
-## Non-goals respected
-{{ng_summary}}
-
 Closes #{{issue_number}}
+
+## Plan
+{{link_to_plan_comment}}: AC-1 {{criterion}}, verified by {{evidence_command}} ...
+
+## Gate evidence
+{{gate_line_verbatim}}
+
+## Verify verdict
+{{link_to_verdict_comment}}: {{test_that_bites_summary}}
+
+## Risk and rollback
+{{risk_level_from_plan}}: {{rollback_note}}
 ```
 
 Keep it factual and short: what changed, how each AC was checked, what was
@@ -44,7 +50,7 @@ comment; link to it instead of copying it.
 
 ## 3. Write the outputs
 
-Write `.factory/runs/issue-<N>/pr-body.md` with the filled body above —
+Write `.factory/runs/issue-<N>/pr-body.md` with the filled body above;
 this is the only file this stage reads back. The runner opens the PR as a
 draft, titled from the issue itself (`<issue title> (#<N>)`), with this
 file as the body, then sets the issue's label to `factory:in-review`.

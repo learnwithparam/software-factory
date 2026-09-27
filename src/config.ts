@@ -52,6 +52,13 @@ export interface FactoryConfig {
   readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
+  // Opt-in: `reset`/`rebaseline` refuse on any repo where this is false (the
+  // default), so a live repo (lwp-website) can never be force-pushed back to
+  // a baseline tag by a stray `factory reset` (plan v2.6.2 item 2).
+  readonly resettable: boolean;
+  // Commands run once per fresh worktree, before any stage (e.g. "npm ci").
+  // Idempotent via a marker file in the worktree; a failure parks the issue.
+  readonly setup: readonly string[];
   readonly agentCommands: AgentCommands;
   // Named agents, each a preset or a command; `stages` says which one runs a stage.
   readonly agents: Readonly<Record<string, AgentConfig>>;
@@ -71,6 +78,8 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   stageTimeoutMinutes: 15,
   maxToolCalls: 60,
   gates: [],
+  resettable: false,
+  setup: [],
   agentCommands: { read: [], build: [], verify: [] },
   agents: { claude: { preset: "claude" } },
   stages: { default: "claude" },
@@ -106,6 +115,8 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   stageTimeoutMinutes: "posInt",
   maxToolCalls: "posInt",
   gates: "object",
+  resettable: "boolean",
+  setup: "strings",
   agentCommands: "object",
   agents: "object",
   stages: "object",
@@ -212,6 +223,14 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   // GitHub calls follow config.repo but git pushes follow origin; a copied config must not aim one at the wrong repo.
   const origin = originRepo(targetRepoDir);
   if (config.repo === "" && origin) config = { ...config, repo: origin };
+  // "main" is only a fallback default (DEFAULT_CONFIG.base), never a guess:
+  // a config that omits "base" gets whatever origin/HEAD resolves to (a repo
+  // on "trunk" or "develop" must not be force-pushed at "main" by default).
+  // A config that names "base" explicitly, even "main", is never overridden.
+  if ((raw as Record<string, unknown>).base === undefined) {
+    const detected = defaultBranchOf(targetRepoDir);
+    if (detected) config = { ...config, base: detected };
+  }
   if (!/^[^/\s]+\/[^/\s]+$/.test(config.repo)) {
     throw new ConfigError(`${path}: "repo" must be "owner/name", got ${JSON.stringify(config.repo)}`);
   }
@@ -232,4 +251,17 @@ function originRepo(dir: string): string | undefined {
   if (!existsSync(`${dir}/.git`)) return undefined;
   const r = Bun.spawnSync(["git", "-C", dir, "remote", "get-url", "origin"], { stdout: "pipe", stderr: "ignore" });
   return r.exitCode === 0 ? repoFromRemoteUrl(r.stdout.toString()) : undefined;
+}
+
+// The branch name behind origin/HEAD, e.g. "trunk" for a repo cloned with a
+// non-"main" default. Mirrors ensureRepoClone's origin/HEAD resolution
+// (src/repo.ts) for local `--repo-dir` mode, which never runs that clone
+// path. Missing on a bare or freshly-inited repo (no remote fetch yet) --
+// callers fall back to DEFAULT_CONFIG.base ("main") in that case.
+function defaultBranchOf(dir: string): string | undefined {
+  if (!existsSync(`${dir}/.git`)) return undefined;
+  const r = Bun.spawnSync(["git", "-C", dir, "rev-parse", "--abbrev-ref", "origin/HEAD"], { stdout: "pipe", stderr: "ignore" });
+  if (r.exitCode !== 0) return undefined;
+  const ref = r.stdout.toString().trim();
+  return ref.startsWith("origin/") ? ref.slice("origin/".length) : undefined;
 }

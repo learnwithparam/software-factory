@@ -7,7 +7,7 @@
 {{/each}}
 
 ### The test that bites
-`{{test_name}}` fails on `main` ({{failing_output_snippet}}), passes here
+`{{test_name}}` fails on the base branch ({{failing_output_snippet}}), passes here
 (`{{command}}` → {{passing_output_snippet}}).
 
 ### Reviewer findings

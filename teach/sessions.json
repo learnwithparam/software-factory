@@ -6,8 +6,8 @@
     { "id": "lesson-2", "title": "Execution: any agent, checked and costed", "tag": "v2.5.2", "planned": false, "checkpoint": "02-execution", "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "Live sequence 3"] },
     { "id": "interim-b", "title": "One factory, any agent", "tag": "v2.6.1", "planned": false, "checkpoint": null, "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1"] },
     { "id": "lesson-3", "title": "Context routing", "tag": "v2.7.0", "planned": true, "checkpoint": "03-context", "issue": "04-search-sql-injection.md", "demo": ["Live sequence 3"] },
-    { "id": "lesson-5", "title": "Self-healing loop", "tag": "v2.8.0", "planned": true, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Live sequence 1"] },
-    { "id": "lesson-6", "title": "Risk-gated merge", "tag": "v2.9.0", "planned": true, "checkpoint": "06-delivery", "issue": "01-readme-missing-run-steps.md", "demo": ["Deliver and reset"] },
-    { "id": "interim-c", "title": "Enterprise hardening", "tag": "v3.0.0", "planned": true, "checkpoint": null, "issue": "05-delete-expense-idor.md", "demo": ["Live sequence 5"] }
+    { "id": "lesson-6", "title": "Risk-gated merge", "tag": "v2.8.0", "planned": true, "checkpoint": "06-delivery", "issue": "01-readme-missing-run-steps.md", "demo": ["Deliver and reset"] },
+    { "id": "lesson-5", "title": "Self-healing loop", "tag": "v3.0.0", "planned": true, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Live sequence 1"] },
+    { "id": "interim-c", "title": "Enterprise hardening", "tag": "v3.3.0", "planned": true, "checkpoint": null, "issue": "05-delete-expense-idor.md", "demo": ["Live sequence 5"] }
   ]
 }

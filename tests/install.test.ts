@@ -33,6 +33,37 @@ describe("install.sh (default)", () => {
     rmSync(target, { recursive: true, force: true });
   });
 
+  // The `src/labels.ts:48` claim ("set by the issue form") is only true once
+  // install actually ships a form (plan v2.6.2 item 5); this fails if the
+  // template stops shipping one or a form starts applying `factory:ready`.
+  test("ships issue forms (type label only) and a PR template", () => {
+    const target = scratchTarget();
+    run([target]);
+    for (const type of ["bug", "feature", "docs"]) {
+      const path = join(target, ".github", "ISSUE_TEMPLATE", `${type}.yml`);
+      expect(existsSync(path)).toBe(true);
+      const body = readFileSync(path, "utf8");
+      const labelsLine = body.split("\n").find((l) => l.startsWith("labels:"));
+      expect(labelsLine).toBe(`labels: ["${type}"]`); // the form applies only its type label
+    }
+    const pr = readFileSync(join(target, ".github", "pull_request_template.md"), "utf8");
+    for (const heading of ["## Summary", "## Plan", "## Gate evidence", "## Verify verdict", "## Risk and rollback"]) {
+      expect(pr).toContain(heading);
+    }
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  // `src/labels.ts:48` claims type labels are "set by the issue form" — true
+  // only once something actually creates those labels on the repo. The form
+  // itself can't (a GitHub issue form applies a label, it doesn't create
+  // one), so install's own next-step points at the command that does.
+  test("tells the user to run `factory doctor --fix`, which is what actually creates the labels", () => {
+    const target = scratchTarget();
+    const { stdout } = run([target]);
+    expect(stdout).toContain("factory doctor --fix");
+    rmSync(target, { recursive: true, force: true });
+  });
+
   test("never overwrites a file that already exists", () => {
     const target = scratchTarget();
     mkdirSync(join(target, ".claude"), { recursive: true });

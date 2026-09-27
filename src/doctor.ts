@@ -35,6 +35,13 @@ export interface DoctorContext {
   readonly stages?: StageAgents;
   // Shipped skill files (path relative to the repo root -> content), to spot an install that predates this runner.
   readonly templateSkills?: Record<string, string>;
+  // The pre-v2.6.2 shared paths (`defaultStatePath`/`workspacesDir` called
+  // with no `repo`), passed in so doctor can warn when they still exist.
+  // Never auto-migrated: that was an explicit design decision (a shared DB
+  // moved without asking could interleave two repos' history), so this
+  // check only names the path and leaves the move to the operator.
+  readonly legacyStatePath?: string;
+  readonly legacyWorkspacesDir?: string;
 }
 
 // Flags that let a CLI run headless without waiting on an approval prompt.
@@ -204,6 +211,31 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     detail: missing.length ? `missing: ${missing.map((l) => l.name).join(", ")}` : "all present",
     fixable: true,
   });
+
+  if (ctx.legacyStatePath) {
+    const exists = await deps.fileExists(ctx.legacyStatePath);
+    checks.push({
+      name: "no unmigrated pre-v2.6.2 shared factory.db",
+      ok: !exists,
+      detail: exists
+        ? `${ctx.legacyStatePath} still exists; each repo now gets its own DB under FACTORY_HOME/<owner>/<repo>/factory.db. This is never migrated automatically: move any run history you want to keep, then remove it.`
+        : "none found",
+      fixable: false,
+      warn: true,
+    });
+  }
+  if (ctx.legacyWorkspacesDir) {
+    const exists = await deps.fileExists(ctx.legacyWorkspacesDir);
+    checks.push({
+      name: "no unmigrated pre-v2.6.2 shared workspaces/",
+      ok: !exists,
+      detail: exists
+        ? `${ctx.legacyWorkspacesDir} still exists; each repo now gets its own workspaces/ under FACTORY_HOME/<owner>/<repo>/. This is never migrated automatically: move anything you need, then remove it.`
+        : "none found",
+      fixable: false,
+      warn: true,
+    });
+  }
 
   return checks;
 }
