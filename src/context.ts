@@ -11,6 +11,13 @@ import { stripFrontmatter } from "./agents/prompt";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 
+// v2.10.0 item 2: repo-local memory across runs. Capped well under the
+// context pack's own budget so a growing lessons file can never crowd out
+// AGENTS.md or the plan's own files; `factory learn` (v2.10.0 item 4) enforces
+// the same cap when it appends, so reading here should rarely need to trim.
+export const LESSONS_PATH = ".factory/memory/lessons.md";
+export const MAX_LESSONS_BYTES = 8 * 1024;
+
 interface Section {
   readonly label: string;
   readonly body: string;
@@ -23,6 +30,24 @@ async function readOptional(path: string): Promise<string | undefined> {
   return text.trim() ? text : undefined;
 }
 
+// Keeps the most recent lessons (the tail of the file, whole lines only) when
+// over the cap, since a newer lesson is more likely to still apply than an
+// older one it may have superseded.
+function capLessons(raw: string): string {
+  if (Buffer.byteLength(raw) <= MAX_LESSONS_BYTES) return raw;
+  const lines = raw.split("\n");
+  const kept: string[] = [];
+  let used = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i] ?? "";
+    const bytes = Buffer.byteLength(`${line}\n`);
+    if (used + bytes > MAX_LESSONS_BYTES) break;
+    kept.unshift(line);
+    used += bytes;
+  }
+  return `Older lessons dropped for the ${MAX_LESSONS_BYTES / 1024} KiB lessons-file cap.\n\n${kept.join("\n")}`;
+}
+
 async function planFiles(cwd: string, issue: number): Promise<readonly string[]> {
   const { json } = await readStageArtifacts(cwd, issue, "plan");
   const files = (json as Partial<PlanArtifact> | undefined)?.files;
@@ -33,6 +58,9 @@ async function sections(issue: number, cwd: string, skills: readonly string[]): 
   const out: Section[] = [];
   const agentsMd = await readOptional(`${cwd}/AGENTS.md`);
   if (agentsMd) out.push({ label: "AGENTS.md", body: agentsMd.trim() });
+
+  const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
+  if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
 
   for (const name of skills) {
     const body = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);

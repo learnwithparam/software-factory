@@ -150,6 +150,16 @@ describe("install.sh scaffold", () => {
     expect(readFileSync(join(target, ".factory", "gates.sh"), "utf8")).not.toBe("old");
     rmSync(target, { recursive: true, force: true });
   });
+
+  test("writes a starter lessons.md, and --update never overwrites accumulated lessons", () => {
+    const target = scratchTarget();
+    run([target]);
+    expect(existsSync(join(target, ".factory", "memory", "lessons.md"))).toBe(true);
+    writeFileSync(join(target, ".factory", "memory", "lessons.md"), "my accumulated lessons");
+    run([target, "--update"]);
+    expect(readFileSync(join(target, ".factory", "memory", "lessons.md"), "utf8")).toBe("my accumulated lessons");
+    rmSync(target, { recursive: true, force: true });
+  });
 });
 
 describe("install.sh --agents", () => {
