@@ -2,9 +2,11 @@
 // starts, checked once instead of failing three stages in.
 
 import type { CommandRunner, GitHub } from "./github";
-import { LABELS } from "./labels";
+import { labelsFor } from "./labels";
+import type { RouteConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
+import { suggestSlots } from "./machine";
 
 export interface DoctorCheck {
   readonly name: string;
@@ -33,6 +35,7 @@ export interface DoctorContext {
   readonly factoryMode?: string; // FACTORY_MODE, "actions" when CI drives the loop
   readonly agents?: Record<string, AgentConfig>;
   readonly stages?: StageAgents;
+  readonly routes?: Readonly<Record<string, RouteConfig>>;
   // Shipped skill files (path relative to the repo root -> content), to spot an install that predates this runner.
   readonly templateSkills?: Record<string, string>;
   // The pre-v2.6.2 shared paths (`defaultStatePath`/`workspacesDir` called
@@ -42,6 +45,10 @@ export interface DoctorContext {
   // check only names the path and leaves the move to the operator.
   readonly legacyStatePath?: string;
   readonly legacyWorkspacesDir?: string;
+  // The machine's own slot count (loadMachineConfig().slots), so doctor can
+  // compare it against suggestSlots()'s cores/memory heuristic. Advice only
+  // (plan v2.7.0 item 5): nothing here enforces the suggestion.
+  readonly configuredSlots?: number;
 }
 
 // Flags that let a CLI run headless without waiting on an approval prompt.
@@ -204,7 +211,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   } catch {
     existingLabels = new Set();
   }
-  const missing = LABELS.filter((l) => !existingLabels.has(l.name));
+  const missing = labelsFor(ctx.routes).filter((l) => !existingLabels.has(l.name));
   checks.push({
     name: "all factory labels exist",
     ok: missing.length === 0,
@@ -237,11 +244,22 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     });
   }
 
+  if (ctx.configuredSlots !== undefined) {
+    const suggested = suggestSlots();
+    checks.push({
+      name: "machine slots suit this machine",
+      ok: true,
+      warn: true,
+      detail: `configured ${ctx.configuredSlots}, this machine's cores/memory suggest ${suggested} (advice only; set FACTORY_SLOTS or FACTORY_HOME/machine.json to change it)`,
+      fixable: false,
+    });
+  }
+
   return checks;
 }
 
-export async function fixDoctor(github: GitHub, repo: string): Promise<void> {
-  for (const label of LABELS) {
+export async function fixDoctor(github: GitHub, repo: string, routes?: Readonly<Record<string, RouteConfig>>): Promise<void> {
+  for (const label of labelsFor(routes)) {
     await github.ensureLabel(repo, label.name, label.color, label.description);
   }
 }

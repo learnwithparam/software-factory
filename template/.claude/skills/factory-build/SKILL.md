@@ -18,13 +18,22 @@ files inside this worktree and write the artifact files below.
 - The repo skills named in the plan (`.claude/skills/<name>/SKILL.md`) —
   read and follow them; they encode repo-specific rules you don't know.
 
-## 2. Build test-first, smallest change
+## 2. Build to the plan's proof, smallest change
 
-For each AC, write its named test first, watch it fail for the right
-reason, then write the smallest change that makes it pass. Do not touch a
-file outside the plan's "files to touch" list without a real reason — if
-you find you need to, that's a signal to stop and ask (step 4), not to
-quietly expand scope. Never cross a non-goal (NG-n); those are binding.
+Read `plan.json`'s `proof` (absent means `test`).
+
+- **`test`**: for each AC, write its named test first, watch it fail for the
+  right reason, then write the smallest change that makes it pass.
+- **`check`**: no test file is expected. For each AC, run the plan's named
+  check command against your change and confirm it proves that AC (e.g. a
+  repo-specific audit script reports the fixed line, a prose lint reports
+  clean, a link check finds no dead link). Re-run every named check before
+  step 3, not just the one for the AC you just touched.
+
+Either way: do not touch a file outside the plan's "files to touch" list
+without a real reason — if you find you need to, that's a signal to stop and
+ask (step 4), not to quietly expand scope. Never cross a non-goal (NG-n);
+those are binding.
 
 Apply every repo skill named in the plan as you go, not as an afterthought.
 

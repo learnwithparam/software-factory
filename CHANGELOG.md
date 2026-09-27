@@ -1,5 +1,63 @@
 # Changelog
 
+## v2.7.0
+
+Routing, concurrency and cost. The factory now picks a model per issue type and stage, shares
+one machine's slots and daily budget across every repo it watches, and can prove non-test work
+(a blog post, a docs page) without ever writing a failing test.
+
+- **`routes` in `.factory/config.json`.** Each type label (`bug`, `feature`, `docs`, `security`,
+  `dependency`, or one a repo adds, e.g. `content`) can name its own agent per stage and its own
+  routed skills. `resolveRoute(agents, stages, routes, stage, type)` resolves
+  `routes[type].stages[stage]` → `stages[stage]` → `stages.default` → `"claude"`; triage always
+  uses `stages.triage`, since the type isn't known yet. `template/.factory/config.example.json`
+  ships the recommended default: triage on Haiku, plan on Opus, build and verify on Sonnet, PR
+  on Haiku, with `docs` builds on Haiku. With no config, the Claude CLI's own default model still
+  applies.
+- **`src/context.ts`: a context pack, built once per stage.** `buildContextPack(stage, issue, cwd,
+  skills)` assembles AGENTS.md, the route's skills, `ARCHITECTURE.md` if the repo has one, and the
+  files named in `plan.json`, capped at 64 KiB; whatever doesn't fit is named, never truncated
+  mid-file. Claude gets it appended after `STAGE_GUIDANCE` on the same `--append-system-prompt`;
+  every other agent gets it inlined ahead of the artifact contract in its rendered prompt.
+- **Pricing for the current models.** `claude-sonnet-5` and `claude-opus-5-5` price correctly
+  instead of costing NULL; `research/pricing/anthropic.md` captures the source table these prices
+  (and the already-priced `claude-haiku-4-5`) come from.
+- **Concurrency belongs to the machine, not the repo.** `src/machine.ts` reads slots from
+  `FACTORY_SLOTS`, or `FACTORY_HOME/machine.json` (`{ "slots": N, "dailyUsd": N }`), validated at
+  boot. A repo's own `concurrency` becomes a cap on top of that: the limit is whichever is
+  smaller. Slots are leases in `machine.db` (`BEGIN IMMEDIATE`), reclaimed when a holder's pid has
+  died, so two watchers on one machine (splitbill-demo and lwp-website) share one pool instead of
+  each assuming the whole machine. `factory doctor` prints a suggested slot count from cores and
+  free memory, as advice only.
+- **Continuous dispatch.** The watcher no longer waits for the whole pool to drain before polling
+  again; it keeps polling while jobs run and picks up new work the moment a slot frees, tracking
+  in-flight issues so nothing double-starts.
+- **Spend caps.** `spend.perIssueUsd` and `dailyUsd` (repo and machine) are checked before every
+  stage, against the running sum of `stage_runs.cost_usd`. Over a cap, the issue parks with a
+  "budget" inbox item and intake pauses while the daily cap is hit; a stage with unknown cost
+  counts against a separate token cap so an unpriced model can't spend past every limit for free.
+- **`proof: "test" | "check"` on the plan.** `test` (the default) keeps today's rule: build writes
+  a failing test first, verify checks it catches the bug. `check` names the commands that prove
+  each acceptance criterion instead: build runs them, verify re-runs them and judges the diff, and
+  never asks for a test. Both skills read `proof` off the plan artifact, never off the type name, so
+  a repo can declare work `proof: check` under any type, including one it added itself. The type
+  list is config-driven everywhere now; `TYPE_LABELS` is the default, not the only list.
+
+Structural tests: every `(type, stage)` pair in `routes` and `TYPE_LABELS` resolves to a defined
+agent; `loadConfig` refuses at boot when a routed skill has no `SKILL.md` on disk, instead of
+no-opping mid-run in the context pack; a `proof: check` plan (Markdown files, a prose-lint gate,
+no test file) ships exactly like a `proof: test` plan; the app-agnostic grep now covers every
+file under `template/.claude/skills` and `template/.claude/agents` for a named stack tool
+(`npm`, `bun`, `pytest`, `cargo`, `go test`), since those are the files an agent actually reads at
+runtime, unlike `gates.sh` or the CI workflow, which are allowed to be stack-specific; a property
+test holds running jobs to the machine's slots across two watcher processes and confirms a freed
+slot is picked up within one poll.
+
+Not in v2.7.0:
+- The lwp-website pilot itself, `merge.policy`, and anything that merges (v2.8).
+- A live agent run against splitbill-demo exercising the new routes and concurrency: pending your
+  reset OK.
+
 ## v2.6.2
 
 Any repo, safely. No new features: this closes the gaps a second repo (splitbill-demo plus

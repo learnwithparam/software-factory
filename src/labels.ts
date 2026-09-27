@@ -45,7 +45,10 @@ export const PARKED_LABELS = [LABEL.needsInfo, LABEL.needsHuman, LABEL.failed] a
 // Provenance: how the issue was filed.
 export const PROVENANCE_LABELS = [LABEL.monitor] as const;
 
-// Type: set by the issue form, read by triage/plan for risk policy.
+// Type: set by the issue form, read by triage/plan for risk policy. This is
+// the default list; a repo may add types via config.routes (e.g. lwp adds
+// "content"), so `typesFor` and `issueType` below are what actually decide
+// which label on an issue counts as its type, not this array alone.
 export const TYPE_LABELS = ["bug", "feature", "docs", "security", "dependency"] as const;
 
 export type StateLabel = (typeof STATE_LABELS)[number];
@@ -124,6 +127,17 @@ export function findLabel(name: string): FactoryLabel | undefined {
   return LABELS.find((l) => l.name === name);
 }
 
+const CUSTOM_TYPE_COLOR = "c5def5"; // light blue: a type this repo added itself, not one of the five defaults
+
+// LABELS plus one entry per repo-added type (a routes key not already in
+// TYPE_LABELS), so `factory doctor --fix` creates those labels too.
+export function labelsFor(routes: Readonly<Record<string, unknown>> | undefined): readonly FactoryLabel[] {
+  const extra = Object.keys(routes ?? {})
+    .filter((t) => !(TYPE_LABELS as readonly string[]).includes(t))
+    .map((name) => ({ name, color: CUSTOM_TYPE_COLOR, description: `Type added by this repo's config.routes`, category: "type" as const }));
+  return [...LABELS, ...extra];
+}
+
 // Labels that mark an issue as "in the loop, not yet parked and not done".
 // Used by watch.ts to compute the STOP_IF PR count and by the dashboard board columns.
 export function isStateLabel(name: string): name is StateLabel {
@@ -137,4 +151,18 @@ export function isParkedLabel(name: string): name is ParkedLabel {
 // Strip every factory:* state/parked label from a label list, keeping type and monitor.
 export function withoutLifecycleLabels(names: readonly string[]): string[] {
   return names.filter((n) => !isStateLabel(n) && !isParkedLabel(n));
+}
+
+// The full type list for a repo: the five defaults plus whatever it declares
+// through config.routes (plan v2.7.0 item 1: "the type list comes from config
+// everywhere; TYPE_LABELS becomes the default list, not the only one").
+export function typesFor(routes: Readonly<Record<string, unknown>> | undefined): string[] {
+  return [...new Set<string>([...TYPE_LABELS, ...Object.keys(routes ?? {})])];
+}
+
+// The one label on an issue that names its type, or undefined if none of its
+// labels is in the repo's type list (routes keys plus TYPE_LABELS).
+export function issueType(routes: Readonly<Record<string, unknown>> | undefined, labelNames: readonly string[]): string | undefined {
+  const types = new Set(typesFor(routes));
+  return labelNames.find((n) => types.has(n));
 }

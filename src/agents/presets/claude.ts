@@ -71,7 +71,11 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
   return events;
 }
 
-export function claudeArgs(opts: StageRunOptions): string[] {
+// `contextPack` (buildContextPack, plan v2.7.0 item 3) rides the same
+// --append-system-prompt as STAGE_GUIDANCE, appended after it. --help gives
+// no guarantee that repeating the flag concatenates rather than overriding,
+// so this sends one flag with one value rather than risk losing STAGE_GUIDANCE.
+export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
   return [
     "-p",
     `/factory-${opts.stage} ${opts.issue}`,
@@ -87,7 +91,7 @@ export function claudeArgs(opts: StageRunOptions): string[] {
     "--settings",
     stageSettings(opts.stage, opts.issue, opts.agentCommands),
     "--append-system-prompt",
-    STAGE_GUIDANCE,
+    contextPack ? `${STAGE_GUIDANCE}\n\n${contextPack}` : STAGE_GUIDANCE,
     "--no-session-persistence",
     "--max-budget-usd",
     String(opts.maxBudgetUsd),
@@ -104,7 +108,9 @@ export const claudePreset: AgentPreset = {
   skillsDir: ".claude/skills",
   contextFile: "CLAUDE.md",
   ownsPrompt: true,
-  command: (opts, agent) => ({ argv: ["claude", ...claudeArgs(opts), ...(agent.model ? ["--model", agent.model] : [])] }),
+  // `prompt` is the context pack for an ownsPrompt agent: Claude runs its own
+  // skill and ignores everything else spawnStage would otherwise put there.
+  command: (opts, agent, prompt) => ({ argv: ["claude", ...claudeArgs(opts, prompt), ...(agent.model ? ["--model", agent.model] : [])] }),
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };

@@ -7,12 +7,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runDir } from "../artifacts";
+import type { RouteConfig } from "../config";
+import { buildContextPack } from "../context";
 import { aggregateStageEvents, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
 import { replySchema } from "../schemas";
+import { typesFor } from "../labels";
 import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
@@ -30,8 +33,26 @@ export interface ResolvedAgent {
   readonly preset?: AgentPreset;
 }
 
+// `routes[type].stages[stage]`, then `stages[stage]`, then `stages.default`,
+// then "claude" (plan v2.7.0 item 1). Triage runs before the type is known,
+// so it always uses `stages.triage` regardless of what `type` is passed.
+export function resolveRoute(
+  agents: Record<string, AgentConfig>,
+  stages: StageAgents,
+  routes: Readonly<Record<string, RouteConfig>> | undefined,
+  stage: keyof StageAgents & string,
+  type: string | undefined,
+): ResolvedAgent {
+  const routed = stage !== "triage" && type ? routes?.[type]?.stages?.[stage] : undefined;
+  const name = routed ?? stages[stage] ?? stages.default ?? "claude";
+  return resolveAgentByName(agents, name, stage);
+}
+
 export function resolveAgent(agents: Record<string, AgentConfig>, stages: StageAgents, stage: keyof StageAgents & string): ResolvedAgent {
-  const name = stages[stage] ?? stages.default ?? "claude";
+  return resolveRoute(agents, stages, undefined, stage, undefined);
+}
+
+function resolveAgentByName(agents: Record<string, AgentConfig>, name: string, stage: string): ResolvedAgent {
   const config = agents[name];
   if (!config) throw new Error(`stage ${stage} uses agent "${name}", which is not in config.agents`);
   const preset = config.preset ? PRESETS[config.preset] : undefined;
@@ -58,11 +79,12 @@ export class CommandExecutor implements Executor {
   constructor(
     private readonly agents: Record<string, AgentConfig>,
     private readonly stages: StageAgents,
+    private readonly routes: Readonly<Record<string, RouteConfig>> = {},
     private readonly recorder?: FixtureRecorder,
   ) {}
 
   async runStage(opts: StageRunOptions): Promise<StageRunResult> {
-    const agent = resolveAgent(this.agents, this.stages, opts.stage);
+    const agent = resolveRoute(this.agents, this.stages, this.routes, opts.stage, opts.type);
     const scratch = mkdtempSync(join(tmpdir(), `factory-scratch-${opts.issue}-`));
     try {
       return await this.spawnStage(opts, agent, scratch);
@@ -79,10 +101,13 @@ export class CommandExecutor implements Executor {
     const readOnly = !stagePolicy(opts.stage).write && agent.preset?.returnsArtifact === true && !agent.config.command;
     let argv: readonly string[];
     let stdin: string | undefined;
+    const types = typesFor(this.routes);
+    const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
+    const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, skills);
     if (agent.preset?.ownsPrompt) {
-      ({ argv, stdin } = agent.preset.command(opts, agent.config, ""));
+      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack));
     } else {
-      const prompt = await renderPrompt(opts, readOnly);
+      const prompt = await renderPrompt(opts, readOnly, types, contextPack);
       if (agent.config.command) {
         const promptFile = join(scratch, "prompt.md");
         writeFileSync(promptFile, prompt);
@@ -93,7 +118,7 @@ export class CommandExecutor implements Executor {
         let schemaFile: string | undefined;
         if (readOnly && agent.config.outputSchema) {
           schemaFile = join(scratch, "reply.schema.json");
-          writeFileSync(schemaFile, JSON.stringify(replySchema(opts.stage)));
+          writeFileSync(schemaFile, JSON.stringify(replySchema(opts.stage, types)));
         }
         ({ argv, stdin } = agent.preset.command(opts, agent.config, prompt, { schemaFile }));
       } else {

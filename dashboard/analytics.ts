@@ -22,6 +22,7 @@ export interface Analytics {
   readonly spend30dUsd: number;
   readonly byStage: readonly Bucket[];
   readonly byAgent: readonly Bucket[];
+  readonly byModel: readonly Bucket[];
 }
 
 const FINISHED = new Set(["shipped", "failed", "rejected", "cancelled", "needs-human"]);
@@ -56,5 +57,9 @@ export function analytics(runs: readonly Run[], stageRuns: readonly StageRun[], 
     spend30dUsd: spendSince(30),
     byStage: bucketBy(stageRuns, (r) => r.stage),
     byAgent: bucketBy(stageRuns, (r) => r.agent),
+    // A run with no price on record (no agent-reported total, no pricing.ts
+    // entry) is still counted, under "unknown" — never dropped silently
+    // (plan v2.7.0 item 7: spend per model, visible even when incomplete).
+    byModel: bucketBy(stageRuns, (r) => r.model ?? "unknown"),
   };
 }

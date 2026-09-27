@@ -4,11 +4,12 @@
 // through chatops.ts and its trust rule instead of a second command path.
 
 import { parseChatOps } from "./chatops";
+import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
 import type { GhComment, GhIssue, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 
-export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "parked" | "failed";
+export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "parked" | "failed" | "budget";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -48,12 +49,23 @@ function latestRunnerComment(comments: readonly GhComment[]): GhComment | undefi
   return [...comments].reverse().find((c) => c.body.includes("<!-- factory:") && !c.body.includes("<!-- factory:status"));
 }
 
+// `needsHuman` covers every kind of park (a failed setup, a budget cap, a
+// step the agent itself stopped on); the label alone can't tell them apart,
+// so the marker on the parking comment — the last one posted — does (plan
+// v2.7.0 item 7: a budget park gets its own inbox kind, not a generic one).
+function isBudgetPark(label: string, issue: GhIssue): boolean {
+  if (label !== LABEL.needsHuman) return false;
+  const markers = parseDataMarkers(issue.comments);
+  return markers.at(-1)?.stage === "budget";
+}
+
 export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
   const items: InboxItem[] = [];
   for (const issue of issues) {
     const label = issue.labels.map((l) => l.name).find((n) => WAITING[n]);
     if (!label) continue;
-    const { kind, actions } = WAITING[label]!;
+    const { kind: labelKind, actions } = WAITING[label]!;
+    const kind = isBudgetPark(label, issue) ? "budget" : labelKind;
     const comment = latestRunnerComment(issue.comments);
     items.push({
       id: `issue-${issue.number}`,
