@@ -7,6 +7,7 @@
 // the repo dir), the agent ran outside a git checkout. FACTORY_HOME fixes
 // the ambiguity once, for local, Docker and CI alike (audit finding #1).
 
+import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 
 export function factoryHome(env: NodeJS.ProcessEnv = process.env): string {
@@ -35,6 +36,27 @@ export function defaultStatePath(env: NodeJS.ProcessEnv = process.env, repo?: st
 
 export function reposDir(env: NodeJS.ProcessEnv = process.env): string {
   return `${factoryHome(env)}/repos`;
+}
+
+// The legacy top-level dirs under FACTORY_HOME that are not an owner name.
+const RESERVED_TOP_LEVEL = new Set(["repos", "workspaces"]);
+
+// Every "owner/name" with a state DB under FACTORY_HOME, for the multi-repo
+// inbox (v2.9.0 item 2, pulled forward from v3.0's blueprint plan). A repo
+// only counts once it has run at least once (its factory.db exists), so a
+// stray empty directory never shows up as a phantom repo.
+export function discoverRepos(env: NodeJS.ProcessEnv = process.env): string[] {
+  const home = factoryHome(env);
+  if (!existsSync(home)) return [];
+  const repos: string[] = [];
+  for (const owner of readdirSync(home, { withFileTypes: true })) {
+    if (!owner.isDirectory() || RESERVED_TOP_LEVEL.has(owner.name)) continue;
+    const ownerDir = `${home}/${owner.name}`;
+    for (const name of readdirSync(ownerDir, { withFileTypes: true })) {
+      if (name.isDirectory() && existsSync(`${ownerDir}/${name.name}/factory.db`)) repos.push(`${owner.name}/${name.name}`);
+    }
+  }
+  return repos.sort();
 }
 
 // Where a given issue's worktree lives, always absolute regardless of what

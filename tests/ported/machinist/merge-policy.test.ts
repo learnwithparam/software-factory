@@ -26,6 +26,7 @@ function readiness(overrides: Partial<MergeReadiness> = {}): MergeReadiness {
     mergeable: "MERGEABLE",
     reviewDecision: "APPROVED",
     hasUnresolvedReviewThreads: false,
+    changesRequestedStale: false,
     ...overrides,
   };
 }

@@ -59,7 +59,13 @@ export function checkReadiness(readiness: MergeReadiness, ci: CiResult, expected
   } else if (ci.status !== "passed") {
     refusals.push({ reason: "ci-failed", detail: `CI status is "${ci.status}"` });
   }
-  if (readiness.reviewDecision === "CHANGES_REQUESTED" || readiness.reviewDecision === "REVIEW_REQUIRED") {
+  // A CHANGES_REQUESTED review whose commit the head has since moved past no
+  // longer blocks (v2.9.0 item 3): the reviewer asked for changes on a commit
+  // that isn't the one about to merge.
+  if (
+    readiness.reviewDecision === "REVIEW_REQUIRED" ||
+    (readiness.reviewDecision === "CHANGES_REQUESTED" && !readiness.changesRequestedStale)
+  ) {
     refusals.push({ reason: "reviews-required", detail: `review decision is "${readiness.reviewDecision}"` });
   }
   if (readiness.hasUnresolvedReviewThreads) {
@@ -145,6 +151,34 @@ export async function attemptMerge(github: Pick<GitHub, "mergePr">, repo: string
 
 export function mergePolicyMarker(headSha: string): string {
   return `<!-- factory:merge-policy:${headSha} -->`;
+}
+
+// The dashboard's "Approve and merge" button (v2.9.0 item 1): a human is the
+// authority here, not repo config, so this skips autoEligible's risk/path/size
+// gates entirely (herdr SKILL.md:18-23, "authority is explicit only": a
+// human click is a different authority source than the auto-policy). It
+// reuses checkReadiness with the PR's own baseRefName as the "expected" one,
+// since an operator merge has no earlier plan snapshot to compare against;
+// it is evaluated fresh, at click time. Readiness refusals (draft, CI,
+// unresolved threads, ...) still apply: a human can approve, but the PR
+// itself must still be mergeable.
+export function decideOperatorMerge(readiness: MergeReadiness, ci: CiResult): MergeDecision {
+  const headSha = readiness.headRefOid;
+  const refusals = checkReadiness(readiness, ci, readiness.baseRefName);
+  if (refusals.length > 0) return { outcome: "refuse", headSha, refusals };
+  return { outcome: "merge", headSha };
+}
+
+// A separate function from renderAuditComment, so the ported test's exact
+// "auto"/"dry-run" wording assertions never have to account for a third,
+// operator-triggered source.
+export function renderOperatorAuditComment(decision: MergeDecision): string {
+  const marker = mergePolicyMarker(decision.headSha);
+  if (decision.outcome === "merge") {
+    return `${marker}\nMerge policy: **operator**, approved and merged \`${decision.headSha.slice(0, 7)}\` from the dashboard.`;
+  }
+  const lines = decision.refusals.map((r) => `- **${r.reason}**: ${r.detail}`);
+  return [marker, "Merge policy: **operator**, blocked.", ...(lines.length ? ["", "Refusals:", ...lines] : [])].join("\n");
 }
 
 // The comment posted to the PR either way: what was decided, and why, so a

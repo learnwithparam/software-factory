@@ -88,6 +88,11 @@ export interface MergeReadiness {
   readonly mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   readonly reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "";
   readonly hasUnresolvedReviewThreads: boolean;
+  // Every CHANGES_REQUESTED review is against a commit the head has since
+  // moved past (v2.9.0 item 3, from assembler's unmerged fix branch, idea
+  // only, no code copied): a reviewer who asked for changes on an old commit
+  // no longer blocks a PR that has since been updated.
+  readonly changesRequestedStale: boolean;
 }
 
 class GhError extends Error {
@@ -316,7 +321,7 @@ export class GitHub {
     };
     const [owner, name] = repo.split("/");
     if (!owner || !name) throw new Error(`repo must be "owner/name", got ${JSON.stringify(repo)}`);
-    const hasUnresolvedReviewThreads = await this.hasUnresolvedReviewThreads(owner, name, number);
+    const { hasUnresolvedReviewThreads, changesRequestedStale } = await this.reviewState(owner, name, number, data.headRefOid);
     return {
       state: data.state.toLowerCase() as MergeReadiness["state"],
       isDraft: data.isDraft,
@@ -325,11 +330,20 @@ export class GitHub {
       mergeable: (data.mergeable || "UNKNOWN") as MergeReadiness["mergeable"],
       reviewDecision: (data.reviewDecision ?? "") as MergeReadiness["reviewDecision"],
       hasUnresolvedReviewThreads,
+      changesRequestedStale,
     };
   }
 
-  private async hasUnresolvedReviewThreads(owner: string, name: string, number: number): Promise<boolean> {
-    const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}`;
+  // One GraphQL call for both readiness facts that `gh pr view` can't expose:
+  // unresolved review threads, and whether every CHANGES_REQUESTED review is
+  // against a commit the head has since moved past.
+  private async reviewState(
+    owner: string,
+    name: string,
+    number: number,
+    headRefOid: string,
+  ): Promise<{ hasUnresolvedReviewThreads: boolean; changesRequestedStale: boolean }> {
+    const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}reviews(last:50){nodes{state commit{oid}}}}}}`;
     const result = await this.exec([
       "api", "graphql",
       "-f", `query=${query}`,
@@ -338,9 +352,37 @@ export class GitHub {
       "-F", `number=${number}`,
     ]);
     const data = JSON.parse(result.stdout) as {
-      data: { repository: { pullRequest: { reviewThreads: { nodes: { isResolved: boolean }[] } } } };
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: { nodes: { isResolved: boolean }[] };
+            reviews: { nodes: { state: string; commit: { oid: string } | null }[] };
+          };
+        };
+      };
     };
-    return data.data.repository.pullRequest.reviewThreads.nodes.some((t) => !t.isResolved);
+    const pr = data.data.repository.pullRequest;
+    const changesRequested = pr.reviews.nodes.filter((r) => r.state === "CHANGES_REQUESTED");
+    return {
+      hasUnresolvedReviewThreads: pr.reviewThreads.nodes.some((t) => !t.isResolved),
+      changesRequestedStale: changesRequested.length > 0 && changesRequested.every((r) => r.commit?.oid !== headRefOid),
+    };
+  }
+
+  // The literal diff a human would read on the PR's "Files changed" tab.
+  async prDiff(repo: string, prNumber: number): Promise<string> {
+    const result = await this.exec(["pr", "diff", String(prNumber), "--repo", repo]);
+    return result.stdout;
+  }
+
+  // The one open PR that closes this issue, if any, shared by watch.ts's
+  // "someone else already closes this issue" triage check and the dashboard's
+  // review view, so the lookup is defined in exactly one place.
+  async prForIssue(repo: string, issueNumber: number, opts?: { excludeHead?: string }): Promise<GhPr | undefined> {
+    const prs = await this.listPrs(repo, { state: "open" });
+    return prs.find(
+      (p) => (!opts?.excludeHead || p.headRefName !== opts.excludeHead) && p.closingIssuesReferences?.some((r) => r.number === issueNumber),
+    );
   }
 
   // --squash --match-head-commit refuses the merge if the PR's head moved
