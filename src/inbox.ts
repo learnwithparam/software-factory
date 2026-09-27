@@ -9,7 +9,7 @@ import { plain } from "./display";
 import type { GhComment, GhIssue, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 
-export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "parked" | "failed" | "budget";
+export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "merge-dry-run" | "parked" | "failed" | "budget";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -59,14 +59,24 @@ function isBudgetPark(label: string, issue: GhIssue): boolean {
   return markers.at(-1)?.stage === "budget";
 }
 
+// merge-policy.ts's dry-run audit comment carries its own `factory:merge-policy:`
+// marker rather than the generic factory:data one, so a dry-run assessment on
+// an in-review PR gets its own inbox kind instead of the generic "review-pr"
+// (plan v2.8.0 item 2). latestRunnerComment already re-derives from the most
+// recent factory: comment, so an older merge-policy comment stops counting
+// once a newer non-merge comment is posted.
+function isMergeDryRun(label: string, comment: GhComment | undefined): boolean {
+  return label === LABEL.inReview && (comment?.body.includes("<!-- factory:merge-policy:") ?? false);
+}
+
 export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
   const items: InboxItem[] = [];
   for (const issue of issues) {
     const label = issue.labels.map((l) => l.name).find((n) => WAITING[n]);
     if (!label) continue;
     const { kind: labelKind, actions } = WAITING[label]!;
-    const kind = isBudgetPark(label, issue) ? "budget" : labelKind;
     const comment = latestRunnerComment(issue.comments);
+    const kind = isBudgetPark(label, issue) ? "budget" : isMergeDryRun(label, comment) ? "merge-dry-run" : labelKind;
     items.push({
       id: `issue-${issue.number}`,
       kind,

@@ -64,6 +64,16 @@ describe("buildInbox", () => {
     const many = Array.from({ length: 250 }, (_, i) => issue(i + 1, LABEL.needsHuman));
     expect(buildInbox(many)).toHaveLength(250);
   });
+
+  test("an in-review PR with a merge-policy dry-run comment gets its own kind, not the generic review-pr", () => {
+    const items = buildInbox([issue(3, LABEL.inReview, "<!-- factory:merge-policy:abc123 -->\nMerge policy: **dry-run** — would auto-merge.")]);
+    expect(items[0]!.kind).toBe("merge-dry-run");
+  });
+
+  test("an in-review PR with no merge-policy comment keeps the generic review-pr kind", () => {
+    const items = buildInbox([issue(3, LABEL.inReview, "<!-- factory:plan v1 -->\nready for review")]);
+    expect(items[0]!.kind).toBe("review-pr");
+  });
 });
 
 describe("act", () => {
