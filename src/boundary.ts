@@ -16,3 +16,16 @@ export function touchesProtectedPath(changedFiles: readonly string[], protectedP
   }
   return hits;
 }
+
+// Inverse check for `factory learn` (plan v2.10.0 item 4): a learning PR is
+// exempt from protectedPaths but is only ever allowed to touch its own two
+// globs, so this refuses anything outside them rather than checking for a hit.
+export function outsideAllowedPaths(changedFiles: readonly string[], allowedPaths: readonly string[]): string[] {
+  const misses: string[] = [];
+  for (const file of changedFiles) {
+    if (!allowedPaths.some((pattern) => new Bun.Glob(pattern).match(file))) {
+      misses.push(file);
+    }
+  }
+  return misses;
+}

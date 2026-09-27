@@ -26,6 +26,7 @@ import {
   runDir,
   type BuildArtifact,
   type PlanArtifact,
+  type RetroArtifact,
   type TriageArtifact,
   type VerdictArtifact,
 } from "./artifacts";
@@ -41,7 +42,7 @@ import { runPool } from "./pool";
 import type { GhComment, GhIssue, GitHub } from "./github";
 import type { Git } from "./git";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "./setup";
-import { FactoryState, type Stage } from "./state";
+import { FactoryState, type RetroTrigger, type Stage } from "./state";
 import { LABEL, issueType, typesFor } from "./labels";
 import { effectiveSlots, type MachineConfig, type MachineLeases, type MachineSpend } from "./machine";
 
@@ -218,6 +219,19 @@ function stageFailure(result: StageRunResult, fallback?: string): string | undef
   return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
 }
 
+// The agent's own cost wins; otherwise price the tokens. No price means the
+// cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
+function priceResult(result: StageRunResult): { cached: number; costUsd: number | null; usageComplete: boolean } {
+  const cached = result.tokensCached ?? 0;
+  const priced =
+    result.costReported === false
+      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
+      : result.costUsd;
+  const usageComplete = result.usageComplete !== false && priced !== undefined;
+  const costUsd = usageComplete ? (priced ?? null) : null;
+  return { cached, costUsd, usageComplete };
+}
+
 async function runStage(
   deps: WatchDeps,
   config: FactoryConfig,
@@ -250,15 +264,7 @@ async function runStage(
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
-  // The agent's own cost wins; otherwise price the tokens. No price means the
-  // cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
-  const cached = result.tokensCached ?? 0;
-  const priced =
-    result.costReported === false
-      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
-      : result.costUsd;
-  const usageComplete = result.usageComplete !== false && priced !== undefined;
-  const costUsd = usageComplete ? (priced ?? null) : null;
+  const { cached, costUsd, usageComplete } = priceResult(result);
   deps.state.recordStageRun({
     repo: config.repo,
     issue: issueNumber,
@@ -285,6 +291,76 @@ async function runStage(
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
   return result;
+}
+
+// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
+// rejected, or given up on after verify rejections). Never goes through
+// runStage: that wrapper's upsertRun would put an already-terminal run back
+// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary
+// sums stage_runs, not runs, so the spend caps still see it via recordStageRun).
+// `existingId` is set only when a row was queued earlier (the dashboard's
+// operator-merge route, which has no Executor to run this itself) and is now
+// being drained by runQueuedRetros; the three watch.ts triggers queue and run
+// in the same call.
+async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, outcome: RetroTrigger, existingId?: number): Promise<void> {
+  const id = existingId ?? deps.state.queueRetro(config.repo, issue.number, outcome);
+  const issueNumber = issue.number;
+  const worktree = worktreeFor(deps, issueNumber);
+  try {
+    await rehydrate(worktree, issue);
+    await writeIssueSnapshot(worktree, issue);
+    await clearStageArtifacts(worktree, issueNumber, "retro");
+    const startedAt = new Date();
+    const result = await deps.executor.runStage({
+      stage: "retro",
+      issue: issueNumber,
+      cwd: worktree,
+      maxBudgetUsd: config.maxBudgetUsd.retro,
+      timeoutMinutes: config.stageTimeoutMinutes,
+      maxToolCalls: config.maxToolCalls,
+      agentCommands: config.agentCommands,
+    });
+    const finishedAt = new Date();
+    const { cached, costUsd, usageComplete } = priceResult(result);
+    deps.state.recordStageRun({
+      repo: config.repo,
+      issue: issueNumber,
+      stage: "retro" as Stage,
+      agent: result.agent ?? "claude",
+      model: result.model ?? null,
+      started_at: startedAt.toISOString(),
+      finished_at: finishedAt.toISOString(),
+      duration_ms: finishedAt.getTime() - startedAt.getTime(),
+      tool_calls: result.toolCalls,
+      tokens_in: result.tokensIn,
+      tokens_out: result.tokensOut,
+      tokens_cached: cached,
+      cost_usd: costUsd,
+      usage_complete: usageComplete ? 1 : 0,
+      exit_code: result.exitCode,
+      killed_reason: result.killedReason ?? null,
+    });
+    if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
+    const art = await readStageArtifacts(worktree, issueNumber, "retro");
+    deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
+  } catch (err) {
+    console.error(`retro failed for #${issue.number}:`, err);
+    deps.state.completeRetro(id, undefined, "failed");
+  }
+}
+
+// Drains rows the dashboard's operator-merge route queued but could not run
+// itself. Called once per pollOnce tick.
+async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): Promise<void> {
+  for (const row of deps.state.listQueuedRetros(config.repo)) {
+    try {
+      const issue = await deps.github.getIssue(config.repo, row.issue);
+      await runRetro(deps, config, issue, row.outcome, row.id);
+    } catch (err) {
+      console.error(`queued retro failed for #${row.issue}:`, err);
+      deps.state.completeRetro(row.id, undefined, "failed");
+    }
+  }
 }
 
 // A stage's JSON, or why it cannot be used: an unknown field is refused, and
@@ -567,6 +643,7 @@ async function runFromStage(
         ctx.rejectRound += 1;
         if (ctx.rejectRound > MAX_VERIFY_REJECTS) {
           await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
+          await runRetro(deps, config, issue, "gave-up");
           finish(deps, config, issueNumber, "needs-human", `rejected ${ctx.rejectRound} times`);
           return "needs-human";
         }
@@ -639,6 +716,7 @@ async function cancelRun(issue: GhIssue, deps: WatchDeps, config: FactoryConfig)
   if (pr) await deps.github.closePr(config.repo, pr.number);
   await postComment(deps, config, issue.number, `Cancelled by \`/factory cancel\`. The branch \`${head}\` is kept; label the issue \`${LABEL.ready}\` after deleting it to start over.`);
   await deps.github.closeIssue(config.repo, issue.number);
+  await runRetro(deps, config, issue, "rejected");
   await deps.git.removeWorktree(deps.cloneDir, worktreeFor(deps, issue.number));
   finish(deps, config, issue.number, "cancelled");
   return "cancelled";
@@ -764,7 +842,8 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
 
     const marker = mergePolicyMarker(decision.headSha);
     if (!issue.comments.some((c) => c.body.includes(marker))) await postComment(deps, config, issueNumber, renderAuditComment(decision));
-    await attemptMerge(deps.github, config.repo, pr.number, decision);
+    const merged = await attemptMerge(deps.github, config.repo, pr.number, decision);
+    if (merged) await runRetro(deps, config, issue, "merged");
   } catch (err) {
     console.error(`merge-policy check failed for #${issue.number}:`, err);
   }
@@ -874,7 +953,16 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
     return true;
   });
 
+  // candidates was filtered against inFlight above; mark them before any
+  // await so an overlapping poll's own candidates filter (same check) never
+  // sees this batch as still unclaimed.
   for (const issue of candidates) inFlight?.add(issue.number);
+
+  // Drains retros the dashboard's operator-merge route queued (v2.10.0 item
+  // 3); independent of intake, so it runs even while stopIf/budgetPaused
+  // holds back new pickups.
+  await runQueuedRetros(deps, config);
+
   try {
     // A pool of `concurrency` workers, not one-at-a-time and not
     // Promise.all-everything: before this, issue #4 never started until #1's

@@ -33,7 +33,7 @@ async function readOptional(path: string): Promise<string | undefined> {
 // Keeps the most recent lessons (the tail of the file, whole lines only) when
 // over the cap, since a newer lesson is more likely to still apply than an
 // older one it may have superseded.
-function capLessons(raw: string): string {
+export function capLessons(raw: string): string {
   if (Buffer.byteLength(raw) <= MAX_LESSONS_BYTES) return raw;
   const lines = raw.split("\n");
   const kept: string[] = [];

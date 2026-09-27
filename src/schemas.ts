@@ -45,6 +45,7 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       criteria: { type: "array", items: { type: "object" } },
     },
     pr: {},
+    retro: { lesson: str, skill_name: str, skill_edit: str },
   };
   return byStage[stage];
 }
@@ -55,6 +56,8 @@ const REQUIRED: Record<ArtifactStage, readonly string[]> = {
   build: ["status", "gate_line", "rounds"],
   verify: ["result", "rounds", "findings"],
   pr: [],
+  // Nothing is required: "no proposal" is a valid, and expected, retro.
+  retro: [],
 };
 
 // `types` bounds the triage `type` enum: TYPE_LABELS unless the caller knows

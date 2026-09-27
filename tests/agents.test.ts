@@ -20,7 +20,9 @@ import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub } from "./harness";
 
-const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
+const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr", "retro"];
+// The stages a "shipped" run (no merge, so no retro) actually executes.
+const RUN_STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr"];
 const scratch = mkdtempSync(join(tmpdir(), "factory-agents-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -152,7 +154,7 @@ describe("an agent with no preset", () => {
     }
     expect(github.createdPrs[0]!.body).toContain("Closes #1");
     // Every stage was handed its contract on stdin.
-    for (const stage of STAGES) expect(readFileSync(join(log, `${stage}.prompt`), "utf8")).toContain(JSON_FILENAMES[stage]);
+    for (const stage of RUN_STAGES) expect(readFileSync(join(log, `${stage}.prompt`), "utf8")).toContain(JSON_FILENAMES[stage]);
     // The run history names the agent and says the numbers are not reported.
     const rows = state.listStageRuns("acme/widgets");
     expect(rows.map((r) => r.agent)).toEqual(Array(rows.length).fill("scripted"));

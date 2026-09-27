@@ -5,13 +5,14 @@ import { expect, test, describe } from "bun:test";
 import { STEP_KEYS, validateStepJson, validateVerdict, type ArtifactStage } from "../src/artifacts";
 import { replySchema, stageSchema } from "../src/schemas";
 
-const STAGES: ArtifactStage[] = ["triage", "plan", "build", "verify", "pr"];
+const STAGES: ArtifactStage[] = ["triage", "plan", "build", "verify", "pr", "retro"];
 const GOOD: Record<ArtifactStage, object> = {
   triage: { disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: [], gate_level: "g", confidence: 0.9 },
   plan: { risk: "low", revision: 1, files: [], autoApproveEligible: true },
   build: { status: "green", gate_line: "l", rounds: 1 },
   verify: { result: "pass", rounds: 1, findings: [] },
   pr: {},
+  retro: {},
 };
 
 test("every stage has a schema whose properties are exactly the validator's fields", () => {

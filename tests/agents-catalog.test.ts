@@ -10,7 +10,7 @@ import { createDashboard } from "../dashboard/server";
 test("a configured agent lists the stages it serves, and every other preset is listed as not configured", () => {
   const rows = agentCatalog({ claude: { preset: "claude" }, checker: { preset: "codex" }, mine: { command: ["aider", "--yes"] } }, { default: "claude", verify: "checker" });
   const by = Object.fromEntries(rows.map((r) => [r.name, r]));
-  expect(by.claude!.stages).toEqual(["triage", "plan", "build", "pr"]);
+  expect(by.claude!.stages).toEqual(["triage", "plan", "build", "pr", "retro"]);
   expect(by.checker!.stages).toEqual(["verify"]);
   expect(by.mine).toMatchObject({ preset: null, binary: "aider", pin: null, verified: false, stages: [] });
   for (const name of Object.keys(PRESETS)) if (name !== "claude" && name !== "codex") expect(by[name]).toMatchObject({ configured: false, stages: [] });
@@ -18,7 +18,7 @@ test("a configured agent lists the stages it serves, and every other preset is l
 
 test("a stage with no agent set is served by claude, as the executor runs it", () => {
   const rows = agentCatalog({ claude: { preset: "claude" } }, {});
-  expect(rows.find((r) => r.name === "claude")!.stages).toEqual(["triage", "plan", "build", "verify", "pr"]);
+  expect(rows.find((r) => r.name === "claude")!.stages).toEqual(["triage", "plan", "build", "verify", "pr", "retro"]);
 });
 
 test("only a preset flagged verified shows as verified", () => {
@@ -30,7 +30,7 @@ test("GET /api/agents returns the catalog from the configured fleet", async () =
   const res = await dash.handle(new Request("http://localhost:4100/api/agents"), "127.0.0.1");
   expect(res.status).toBe(200);
   const body = (await res.json()) as { agents: { name: string; stages: string[] }[] };
-  expect(body.agents.find((a) => a.name === "claude")!.stages).toHaveLength(5);
+  expect(body.agents.find((a) => a.name === "claude")!.stages).toHaveLength(6);
   expect(body.agents.length).toBe(Object.keys(PRESETS).length);
 });
 

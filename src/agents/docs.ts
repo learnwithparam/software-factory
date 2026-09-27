@@ -36,7 +36,7 @@ export function renderAgentsDoc(doc: string): string {
   return `${doc.slice(0, start + TABLE_START.length)}\n${agentsTable()}\n${doc.slice(end)}`;
 }
 
-const STAGE_NAMES = ["triage", "plan", "build", "verify", "pr"] as const;
+const STAGE_NAMES = ["triage", "plan", "build", "verify", "pr", "retro"] as const;
 
 export interface AgentRow {
   readonly name: string;

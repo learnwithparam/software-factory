@@ -85,6 +85,23 @@ export class Git {
     return this.ensureWorktree(cloneDir, worktreeDir, issue);
   }
 
+  // Generic (non-issue) counterpart to ensureWorktree, for `factory learn`
+  // (plan v2.10.0 item 4): reuses `branch` if origin already has one (a
+  // same-day run resuming after a restart), otherwise branches it fresh off
+  // origin/base, since there is no issue number to derive the name from.
+  async ensureBranchWorktree(cloneDir: string, worktreeDir: string, branch: string, base: string): Promise<void> {
+    await this.runner.run(["fetch", "origin", base], { cwd: cloneDir });
+    const list = await this.runner.run(["worktree", "list", "--porcelain"], { cwd: cloneDir });
+    if (list.stdout.includes(`worktree ${worktreeDir}\n`)) return;
+    const remote = await this.runner.run(["ls-remote", "--heads", "origin", branch], { cwd: cloneDir });
+    if (remote.stdout.trim()) {
+      await this.runner.run(["fetch", "origin", branch], { cwd: cloneDir });
+      await this.runner.run(["worktree", "add", worktreeDir, branch], { cwd: cloneDir });
+    } else {
+      await this.runner.run(["worktree", "add", "-b", branch, worktreeDir, `origin/${base}`], { cwd: cloneDir });
+    }
+  }
+
   async removeWorktree(cloneDir: string, worktreeDir: string): Promise<void> {
     await this.runner.run(["worktree", "remove", "--force", worktreeDir], { cwd: cloneDir });
   }
@@ -105,7 +122,11 @@ export class Git {
 
   // Regular push only; the guard hook and settings.json refuse --force and merge.
   async push(worktreeDir: string, issue: number): Promise<CommandResult> {
-    const branch = this.branchName(issue);
+    return this.pushBranch(worktreeDir, this.branchName(issue));
+  }
+
+  // Generic (non-issue) counterpart to push, for `factory learn`'s branch.
+  async pushBranch(worktreeDir: string, branch: string): Promise<CommandResult> {
     return this.runner.run(["push", "origin", `HEAD:refs/heads/${branch}`], { cwd: worktreeDir });
   }
 

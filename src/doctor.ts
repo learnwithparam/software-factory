@@ -128,7 +128,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   const agents = ctx.agents ?? { claude: { preset: "claude" } };
   const stages = ctx.stages ?? { default: "claude" };
   // The default only counts if some stage falls back to it.
-  const STAGES = ["triage", "plan", "build", "verify", "pr"] as const;
+  const STAGES = ["triage", "plan", "build", "verify", "pr", "retro"] as const;
   const used = new Set(STAGES.map((st) => stages[st] ?? stages.default ?? "claude"));
   for (const name of [...used].sort()) checks.push(...(await agentChecks(name, agents, deps)));
   checks.push({
