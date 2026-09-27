@@ -50,3 +50,33 @@ describe("validators enforce the schema, not just the key list", () => {
     expect(validateVerdict({ outcome: "complete" }).ok).toBe(false);
   });
 });
+
+// v2.7.0 item 1: the triage schema's `type` enum is bounded by the repo's
+// actual type list, not a fixed five, so a route-added type (e.g. "content")
+// validates when the caller passes it, and still fails closed by default.
+describe("triage's type enum follows the repo's routes, not a fixed list", () => {
+  const contentTriage = { disposition: "proceed", type: "content", risk: "low", done_when: "x", files_expected: [], gate_level: "g", confidence: 0.9 };
+
+  test("a route-added type is rejected against the default TYPE_LABELS", () => {
+    expect(validateStepJson("triage", contentTriage).ok).toBe(false);
+  });
+
+  test("the same type validates once the repo's type list is passed", () => {
+    expect(validateStepJson("triage", contentTriage, ["bug", "feature", "docs", "security", "dependency", "content"])).toEqual({ ok: true });
+  });
+});
+
+// v2.7.0 item 8: build/verify read `proof` from the plan artifact, never the
+// type name, so the plan schema has to carry and validate it.
+describe("plan's proof field", () => {
+  test("\"test\" and \"check\" both validate; a typo does not", () => {
+    const base = { risk: "low", revision: 1, files: [] as string[], autoApproveEligible: true };
+    expect(validateStepJson("plan", { ...base, proof: "test" })).toEqual({ ok: true });
+    expect(validateStepJson("plan", { ...base, proof: "check" })).toEqual({ ok: true });
+    expect(validateStepJson("plan", { ...base, proof: "vibes" }).ok).toBe(false);
+  });
+
+  test("proof is optional: an older plan with none still validates", () => {
+    expect(validateStepJson("plan", { risk: "low", revision: 1, files: [], autoApproveEligible: true })).toEqual({ ok: true });
+  });
+});

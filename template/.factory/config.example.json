@@ -15,5 +15,14 @@
   "riskPolicy": { "autoApproveLowRisk": true },
   "maxOpenFactoryPrs": 3,
   "concurrency": 3,
-  "pollIntervalSeconds": 15
+  "pollIntervalSeconds": 15,
+  "agents": {
+    "opus": { "preset": "claude", "model": "claude-opus-5-5" },
+    "sonnet": { "preset": "claude", "model": "claude-sonnet-5" },
+    "haiku": { "preset": "claude", "model": "claude-haiku-4-5-20251001" }
+  },
+  "stages": { "triage": "haiku", "plan": "opus", "build": "sonnet", "verify": "sonnet", "pr": "haiku" },
+  "routes": {
+    "docs": { "stages": { "build": "haiku" } }
+  }
 }

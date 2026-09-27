@@ -39,6 +39,20 @@ export interface GateSpec {
   readonly required: boolean;
 }
 
+// A route for one issue type (a label: the five in TYPE_LABELS, or one a repo
+// adds, e.g. lwp's "content"). `resolveRoute` (src/agents/executor.ts) checks
+// `stages[stage]` here before falling back to the repo-wide `stages`. Triage
+// runs before the type is known, so it never consults a route.
+export interface RouteConfig {
+  readonly stages?: Partial<StageAgents>;
+  readonly skills?: readonly string[];
+  // "test" (default): build writes a failing test first, verify checks it
+  // catches the bug. "check": build runs the named commands instead of a
+  // test, verify re-runs them and a reviewer judges the diff (plan v2.7.0
+  // item 8: a blog post can only ever end uncertain/reject under "test").
+  readonly proof?: "test" | "check";
+}
+
 export interface FactoryConfig {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
@@ -63,6 +77,21 @@ export interface FactoryConfig {
   // Named agents, each a preset or a command; `stages` says which one runs a stage.
   readonly agents: Readonly<Record<string, AgentConfig>>;
   readonly stages: StageAgents;
+  // Per-type overrides, keyed by the type label. See RouteConfig.
+  readonly routes: Readonly<Record<string, RouteConfig>>;
+  // Checked before every stage (plan v2.7.0 item 7). perIssueUsd is that
+  // issue's own lifetime spend; dailyUsd is this repo's spend since 00:00 UTC
+  // today. Either breached parks the issue with a "budget" inbox item.
+  // maxUnreportedRuns caps the count of stage runs with unknown cost (no
+  // price, no self-reported total) on one issue — a separate cap from the
+  // dollar ones, since an unpriced run can't be summed into them.
+  readonly spend: SpendConfig;
+}
+
+export interface SpendConfig {
+  readonly perIssueUsd?: number;
+  readonly dailyUsd?: number;
+  readonly maxUnreportedRuns?: number;
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -83,6 +112,8 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   agentCommands: { read: [], build: [], verify: [] },
   agents: { claude: { preset: "claude" } },
   stages: { default: "claude" },
+  routes: {},
+  spend: {},
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -94,6 +125,8 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     agentCommands: { ...DEFAULT_CONFIG.agentCommands, ...partial.agentCommands },
     agents: { ...DEFAULT_CONFIG.agents, ...partial.agents },
     stages: { ...DEFAULT_CONFIG.stages, ...partial.stages },
+    routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
+    spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
   };
 }
 
@@ -120,6 +153,8 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   agentCommands: "object",
   agents: "object",
   stages: "object",
+  routes: "object",
+  spend: "object",
   riskCriteria: "object",
 };
 
@@ -155,6 +190,7 @@ export function configProblems(raw: unknown): string[] {
   };
   nested("riskPolicy", { autoApproveLowRisk: "boolean" });
   nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive" });
+  nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
   if (cfg.gates !== undefined) {
     if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");
@@ -163,15 +199,17 @@ export function configProblems(raw: unknown): string[] {
       else checkKeys(g as Record<string, unknown>, { name: "string", cmd: "string", required: "boolean" }, `gates[${i}].`, problems);
     });
   }
-  problems.push(...agentProblems(cfg.agents, cfg.stages));
+  problems.push(...agentProblems(cfg.agents, cfg.stages, cfg.routes));
   return problems;
 }
 
 const STAGE_KEYS = ["default", "triage", "plan", "build", "verify", "pr"];
+// Triage runs before an issue's type is known, so a route can never override it.
+const ROUTABLE_STAGE_KEYS = STAGE_KEYS.filter((s) => s !== "triage" && s !== "default");
 
 // An agent is a preset or a command. `{{prompt}}` in the executable slot would
 // run the prompt as a program (assembler validateConfig), so it is refused.
-function agentProblems(agents: unknown, stages: unknown): string[] {
+function agentProblems(agents: unknown, stages: unknown, routes?: unknown): string[] {
   const problems: string[] = [];
   const named = new Set(["claude"]);
   if (agents !== undefined && typeof agents === "object" && agents !== null && !Array.isArray(agents)) {
@@ -205,6 +243,29 @@ function agentProblems(agents: unknown, stages: unknown): string[] {
       else if (typeof agent !== "string" || !named.has(agent)) problems.push(`stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
     }
   } else if (stages !== undefined) problems.push("stages: expected an object");
+  if (routes !== undefined && typeof routes === "object" && routes !== null && !Array.isArray(routes)) {
+    for (const [type, raw] of Object.entries(routes as Record<string, unknown>)) {
+      if (type.startsWith("_")) continue;
+      const where = `routes.${type}.`;
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        problems.push(`routes.${type}: expected an object`);
+        continue;
+      }
+      const r = raw as Record<string, unknown>;
+      checkKeys(r, { stages: "object", skills: "strings", proof: "string" }, where, problems);
+      if (r.proof !== undefined && r.proof !== "test" && r.proof !== "check") problems.push(`${where}proof: expected "test" or "check", got ${JSON.stringify(r.proof)}`);
+      if (r.stages !== undefined) {
+        if (typeof r.stages !== "object" || r.stages === null || Array.isArray(r.stages)) problems.push(`${where}stages: expected an object`);
+        else {
+          for (const [stage, agent] of Object.entries(r.stages as Record<string, unknown>)) {
+            if (stage.startsWith("_")) continue;
+            if (!ROUTABLE_STAGE_KEYS.includes(stage)) problems.push(`${where}stages.${stage}: unknown stage (allowed: ${ROUTABLE_STAGE_KEYS.join(", ")})`);
+            else if (typeof agent !== "string" || !named.has(agent)) problems.push(`${where}stages.${stage}: "${String(agent)}" is not an agent in config.agents`);
+          }
+        }
+      }
+    }
+  } else if (routes !== undefined) problems.push("routes: expected an object");
   return problems;
 }
 
@@ -237,6 +298,16 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   if (origin && origin.toLowerCase() !== config.repo.toLowerCase()) {
     throw new ConfigError(`${path}: "repo" is ${config.repo} but this clone's origin is ${origin}; fix "repo" or remove it to use the origin`);
   }
+  // configProblems is pure and cannot see the worktree, so a route naming a
+  // skill that was never installed would otherwise only surface as a silent
+  // no-op in buildContextPack, mid-run (plan v2.7.0 item 3).
+  const missing: string[] = [];
+  for (const [type, route] of Object.entries(config.routes)) {
+    for (const name of route.skills ?? []) {
+      if (!existsSync(`${targetRepoDir}/.claude/skills/${name}/SKILL.md`)) missing.push(`routes.${type}.skills: "${name}" (.claude/skills/${name}/SKILL.md not found)`);
+    }
+  }
+  if (missing.length > 0) throw new ConfigError(`${path} names a skill that does not exist:\n  - ${missing.join("\n  - ")}`);
   return config;
 }
 

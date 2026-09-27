@@ -36,6 +36,29 @@ describe("runtime code does not name the demo app", () => {
   });
 });
 
+// The stage skills and agents run against any repo's own gate and its own
+// stack (plan v2.7.0 item 8: `proof: check` exists so a Markdown-only repo
+// never needs a test runner at all). A skill that names a stack tool by name
+// smuggles an assumption back in, so this greps the exact same files an agent
+// reads at runtime, not the whole template/ tree (gates.sh and the CI
+// workflow are allowed to be Bun/npm-specific; they say so).
+describe("stage skills and agents name no stack tool", () => {
+  const STACK_TOOL = /\bnpm\b|\bbun\b|\bpytest\b|\bcargo\b|\bgo test\b/i;
+  const dirs = ["template/.claude/skills", "template/.claude/agents"];
+  const files = dirs.flatMap((d) => walk(join(ROOT, d)));
+
+  test("no skill or agent file names npm, bun, pytest, cargo or go test", () => {
+    expect(files.length).toBeGreaterThan(0);
+    const offenders: string[] = [];
+    for (const file of files) {
+      readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+        if (STACK_TOOL.test(line)) offenders.push(`${relative(ROOT, file)}:${i + 1}: ${line.trim().slice(0, 80)}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("remote URLs", () => {
   test("github https and ssh forms give owner/name; anything else is not judged", () => {
     expect(repoFromRemoteUrl("https://github.com/acme/pyapp.git\n")).toBe("acme/pyapp");

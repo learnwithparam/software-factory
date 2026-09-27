@@ -21,6 +21,10 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 - `AGENTS.md`, `.factory/charter.md`, and the repo's skills index
   (`.claude/skills/*/SKILL.md`, minus `factory-*`) — what repo-specific
   skills exist to apply (e.g. `handling-money`).
+- `.factory/config.json`'s `routes[type].proof` — this issue's proof kind,
+  `"test"` (default, when absent) or `"check"`. Carry it into `plan.json` so
+  `factory-build` and `factory-verify` read it from there, never from the
+  type name.
 - `.factory/runs/issue-<N>/plan.json`, if this is a revision: read the
   current `revision` number so you increment it, not reset it.
 
@@ -35,9 +39,14 @@ own context doing the same search yourself.
 
 One line goal. Acceptance criteria `AC-1..n` (ids are never renumbered on a revision), each checkable by a named
 command or test. Non-goals `NG-1..n`: binding — the verifier fails a diff
-that crosses one, so write ones you actually mean. Files to touch. Tests to
-write first, named. Repo skills to apply, or "none". Risk: low, medium, or
-high, with the charter rule that justifies it.
+that crosses one, so write ones you actually mean. Files to touch. Repo
+skills to apply, or "none". Risk: low, medium, or high, with the charter rule
+that justifies it.
+
+When `proof` is `test` (the default): name the test to write first for each
+AC. When `proof` is `check`: name the exact command that proves each AC
+instead (e.g. a repo-specific audit script, a prose lint, a link check) —
+build runs that command, and no test file is expected.
 
 **Risk policy:**
 - **low** — docs, test-only, or a single non-protected module. Eligible for
@@ -61,7 +70,8 @@ plan, or the previous revision + 1 when `revise.md` is present. Then write
   "risk": "low",
   "revision": 1,
   "files": ["src/…"],
-  "autoApproveEligible": true
+  "autoApproveEligible": true,
+  "proof": "test"
 }
 ```
 

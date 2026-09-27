@@ -38,6 +38,10 @@ export interface StageRunOptions {
   readonly agentCommands?: AgentCommands;
   // The agent name from config; recorded in stage_runs. Unset means "claude".
   readonly agent?: string;
+  // The issue's type label (e.g. "docs", or a repo-added type like "content"),
+  // read from its GitHub labels. Unset on triage, which runs before the type
+  // is known and so never routes on it (plan v2.7.0 item 1).
+  readonly type?: string;
 }
 
 export interface StageRunResult {

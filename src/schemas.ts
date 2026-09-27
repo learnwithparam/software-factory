@@ -3,6 +3,7 @@
 // definition of which fields exist; only the field types are written here.
 
 import { type ArtifactStage, STEP_KEYS, VERDICT_KEY_LIST } from "./artifacts";
+import { TYPE_LABELS } from "./labels";
 
 type Prop = Record<string, unknown>;
 const str: Prop = { type: "string" };
@@ -11,26 +12,42 @@ const strings: Prop = { type: "array", items: str };
 const outcome: Prop = { enum: ["complete", "blocked", "failed"] };
 const risk: Prop = { enum: ["low", "medium", "high"] };
 
-const TYPES: Record<ArtifactStage, Record<string, Prop>> = {
-  triage: {
-    disposition: { enum: ["proceed", "needs-info", "refused", "duplicate"] },
-    type: { enum: ["bug", "feature", "docs", "security", "dependency"] },
-    risk,
-    done_when: str,
-    files_expected: strings,
-    gate_level: str,
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-  },
-  plan: { status: { enum: ["needs-info"] }, risk, revision: int, files: strings, autoApproveEligible: { type: "boolean" }, commentId: int },
-  build: { status: { enum: ["green", "red", "needs-info"] }, gate_line: str, rounds: int },
-  verify: {
-    result: { enum: ["pass", "reject", "uncertain"] },
-    rounds: int,
-    findings: { type: "array", items: { anyOf: [str, { type: "object" }] } },
-    criteria: { type: "array", items: { type: "object" } },
-  },
-  pr: {},
-};
+// `types` is the repo's full type list (TYPE_LABELS plus config.routes keys,
+// per typesFor in labels.ts): a repo-added type (e.g. lwp's "content") must
+// validate here too, not just at the config layer (plan v2.7.0 item 1).
+function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string, Prop> {
+  const byStage: Record<ArtifactStage, Record<string, Prop>> = {
+    triage: {
+      disposition: { enum: ["proceed", "needs-info", "refused", "duplicate"] },
+      type: { enum: [...types] },
+      risk,
+      done_when: str,
+      files_expected: strings,
+      gate_level: str,
+      confidence: { type: "number", minimum: 0, maximum: 1 },
+    },
+    plan: {
+      status: { enum: ["needs-info"] },
+      risk,
+      revision: int,
+      files: strings,
+      autoApproveEligible: { type: "boolean" },
+      commentId: int,
+      // Read by factory-build/factory-verify, never inferred from the type
+      // name (plan v2.7.0 item 8). Absent means "test", today's behavior.
+      proof: { enum: ["test", "check"] },
+    },
+    build: { status: { enum: ["green", "red", "needs-info"] }, gate_line: str, rounds: int },
+    verify: {
+      result: { enum: ["pass", "reject", "uncertain"] },
+      rounds: int,
+      findings: { type: "array", items: { anyOf: [str, { type: "object" }] } },
+      criteria: { type: "array", items: { type: "object" } },
+    },
+    pr: {},
+  };
+  return byStage[stage];
+}
 
 const REQUIRED: Record<ArtifactStage, readonly string[]> = {
   triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence"],
@@ -40,19 +57,23 @@ const REQUIRED: Record<ArtifactStage, readonly string[]> = {
   pr: [],
 };
 
-export function stageSchema(stage: ArtifactStage): Record<string, unknown> {
+// `types` bounds the triage `type` enum: TYPE_LABELS unless the caller knows
+// the repo's config.routes and passes typesFor(routes) instead (plan v2.7.0
+// item 1). Only triage's schema uses it.
+export function stageSchema(stage: ArtifactStage, types: readonly string[] = TYPE_LABELS): Record<string, unknown> {
   const keys = stage === "verify" ? VERDICT_KEY_LIST : STEP_KEYS[stage];
+  const types_ = typesOf(stage, types);
   const properties: Record<string, Prop> = {};
-  for (const k of keys) properties[k] = k === "outcome" ? outcome : k === "summary" ? str : (TYPES[stage][k] ?? {});
+  for (const k of keys) properties[k] = k === "outcome" ? outcome : k === "summary" ? str : (types_[k] ?? {});
   return { $schema: "http://json-schema.org/draft-07/schema#", type: "object", properties, required: REQUIRED[stage], additionalProperties: false };
 }
 
 // The read-only reply envelope around a stage's schema.
-export function replySchema(stage: ArtifactStage): Record<string, unknown> {
+export function replySchema(stage: ArtifactStage, types: readonly string[] = TYPE_LABELS): Record<string, unknown> {
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
     type: "object",
-    properties: { artifact: stageSchema(stage), comment: str, question: str },
+    properties: { artifact: stageSchema(stage, types), comment: str, question: str },
     required: ["artifact"],
     additionalProperties: false,
   };
@@ -61,8 +82,8 @@ export function replySchema(stage: ArtifactStage): Record<string, unknown> {
 // Checks a parsed artifact against its own schema: required fields, types and
 // enums. A step that reports blocked or failed owes only its outcome, so the
 // required list is skipped for it.
-export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>): string | undefined {
-  const schema = stageSchema(stage) as { properties: Record<string, Prop>; required: readonly string[] };
+export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>, types: readonly string[] = TYPE_LABELS): string | undefined {
+  const schema = stageSchema(stage, types) as { properties: Record<string, Prop>; required: readonly string[] };
   if (o.outcome !== "blocked" && o.outcome !== "failed") {
     const missing = schema.required.find((k) => o[k] === undefined);
     if (missing) return `"${missing}" is required`;

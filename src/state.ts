@@ -360,6 +360,21 @@ export class FactoryState {
       .all({ $repo: repo, $after: after, $limit: limit }) as StageRun[];
   }
 
+  // Sum of known cost plus a count of runs whose cost is unknown (NULL, never
+  // $0), since started_at, for this repo — or one issue in it when given.
+  // `sinceIso` is the caller's window: the epoch for an issue's lifetime
+  // spend, or 00:00 UTC today for the repo's daily spend (plan v2.7.0 item 7).
+  spendSummary(repo: string, sinceIso: string, issue?: number): { costUsd: number; unreportedRuns: number } {
+    const issueClause = issue !== undefined ? "AND issue = $issue" : "";
+    const row = this.db
+      .query(
+        `SELECT COALESCE(SUM(cost_usd), 0) AS cost, SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END) AS unreported
+         FROM stage_runs WHERE repo = $repo AND started_at >= $since ${issueClause}`,
+      )
+      .get(issue !== undefined ? { $repo: repo, $since: sinceIso, $issue: issue } : { $repo: repo, $since: sinceIso }) as { cost: number; unreported: number };
+    return { costUsd: row.cost, unreportedRuns: row.unreported };
+  }
+
   getToggle(key: string, fallback: boolean): boolean {
     const row = this.db.query("SELECT value FROM toggles WHERE key = $key").get({ $key: key }) as
       | { value: string }

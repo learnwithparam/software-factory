@@ -40,7 +40,8 @@ import type { GhComment, GhIssue, GitHub } from "./github";
 import type { Git } from "./git";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "./setup";
 import { FactoryState, type Stage } from "./state";
-import { LABEL } from "./labels";
+import { LABEL, issueType, typesFor } from "./labels";
+import { effectiveSlots, type MachineConfig, type MachineLeases, type MachineSpend } from "./machine";
 
 export type { Stage };
 export type Outcome =
@@ -78,6 +79,12 @@ export interface WatchDeps {
   // Runs config.setup once per worktree; defaults to a real shell so tests
   // can inject a fake instead of actually running `npm ci`.
   readonly setupRunner?: SetupRunner;
+  // Absent means this process alone decides concurrency (config.concurrency,
+  // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
+  // a machine-wide lease, so a second watcher (another repo, same
+  // FACTORY_HOME) sharing this machine's slots is respected too (plan
+  // v2.7.0 item 5).
+  readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
 }
 
 export interface PollResult {
@@ -237,6 +244,7 @@ async function runStage(
     timeoutMinutes: config.stageTimeoutMinutes,
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
+    type: issueType(config.routes, labelsOf(issue)),
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
@@ -267,6 +275,7 @@ async function runStage(
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
   });
+  if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
   deps.state.updateRun(config.repo, issueNumber, {
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
@@ -279,9 +288,9 @@ async function runStage(
 // A stage's JSON, or why it cannot be used: an unknown field is refused, and
 // an `outcome` of blocked or failed stops the run where the agent said it did.
 type StepStage = "triage" | "plan" | "build";
-function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown): { json?: T; problem?: string } {
+function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown, types?: readonly string[]): { json?: T; problem?: string } {
   if (raw === undefined) return {};
-  const checked = validateStepJson(stage, raw);
+  const checked = validateStepJson(stage, raw, types);
   return checked.ok ? { json: raw as T } : { problem: checked.reason };
 }
 
@@ -294,6 +303,39 @@ async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumber: num
 interface RunCtx {
   rejectRound: number;
   questionRound: number;
+}
+
+const EPOCH = "1970-01-01T00:00:00.000Z";
+
+function startOfTodayUtc(): string {
+  return `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+}
+
+// Checked before every stage (plan v2.7.0 item 7): an issue's own lifetime
+// spend and unreported-run count, this repo's spend today, and — when a
+// machine is configured — the whole machine's spend today. The first
+// breached cap wins and its message is what parks the issue.
+function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): string | undefined {
+  const { perIssueUsd, dailyUsd, maxUnreportedRuns } = config.spend;
+  const perIssue = deps.state.spendSummary(config.repo, EPOCH, issueNumber);
+  if (perIssueUsd !== undefined && perIssue.costUsd >= perIssueUsd) {
+    return `this issue has spent $${perIssue.costUsd.toFixed(2)}, at or over its perIssueUsd cap of $${perIssueUsd.toFixed(2)}`;
+  }
+  if (maxUnreportedRuns !== undefined && perIssue.unreportedRuns >= maxUnreportedRuns) {
+    return `this issue has ${perIssue.unreportedRuns} stage run(s) with unknown cost, at or over the maxUnreportedRuns cap of ${maxUnreportedRuns}`;
+  }
+  const repoToday = deps.state.spendSummary(config.repo, startOfTodayUtc());
+  if (dailyUsd !== undefined && repoToday.costUsd >= dailyUsd) {
+    return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
+  }
+  const machineDailyUsd = deps.machine?.config.dailyUsd;
+  if (machineDailyUsd !== undefined) {
+    const machineToday = deps.machine!.spend.todayUsd();
+    if (machineToday >= machineDailyUsd) {
+      return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
+    }
+  }
+  return undefined;
 }
 
 // The heart of the loop: drives one issue forward from `startStage` until it
@@ -313,6 +355,12 @@ async function runFromStage(
   let stage: Stage = startStage;
 
   for (;;) {
+    const overBudget = checkSpendCap(deps, config, issueNumber);
+    if (overBudget) {
+      await postComment(deps, config, issueNumber, `Parked: ${overBudget}.`, { stage: "budget", json: { reason: overBudget } });
+      return stopStep(deps, config, issueNumber, STAGE_LABEL[stage], { status: "needs-human", reason: overBudget });
+    }
+
     if (stage === "triage") {
       // Someone else's open PR already closes this issue: don't spend tokens on a second fix.
       const own = deps.git.branchName(issueNumber);
@@ -326,7 +374,7 @@ async function runFromStage(
       }
       const result = await runStage(deps, config, issue, "triage", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "triage");
-      const { json, problem } = stageJson<TriageArtifact>("triage", art.json);
+      const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
       if (result.exitCode !== 0 || !json) {
         await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.failed);
         finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "triage produced no valid triage.json"));
@@ -723,15 +771,53 @@ export async function advanceIssue(deps: WatchDeps, config: FactoryConfig, issue
   return "waiting";
 }
 
-export async function pollOnce(deps: WatchDeps, config: FactoryConfig): Promise<PollResult> {
+// This process's own cap, narrowed to the machine's cap when one is
+// configured (plan v2.7.0 item 5: "repo concurrency becomes a cap for that
+// repo, the limit is the smaller of the two").
+function dispatchConcurrency(deps: WatchDeps, config: FactoryConfig): number {
+  return deps.machine ? effectiveSlots(config.concurrency, deps.machine.config) : config.concurrency;
+}
+
+// A lease is required before an issue actually advances, so two watcher
+// processes (splitbill-demo and lwp-website, say) sharing one FACTORY_HOME
+// never together run more than the machine's own slot count, even though
+// each has already capped its own pool at that same number (belt and
+// suspenders: the pool cap alone would still let a second process
+// oversubscribe). No lease available this poll just means "waiting" — the
+// next poll tries again, exactly like a candidate that wasn't picked yet.
+async function dispatch(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<Outcome> {
+  if (!deps.machine) return advanceIssue(deps, config, issue);
+  const leaseId = deps.machine.leases.acquire(`${config.repo}#${issue.number}`, dispatchConcurrency(deps, config));
+  if (leaseId === undefined) return "waiting";
+  try {
+    return await advanceIssue(deps, config, issue);
+  } finally {
+    deps.machine.leases.release(leaseId);
+  }
+}
+
+// `inFlight` is shared across overlapping poll cycles (startWatch no longer
+// waits for one poll's whole batch before starting the next — plan v2.7.0
+// item 6), so an issue this poll is still working on is never handed to a
+// second, concurrent runPool call. Absent, every poll is self-contained, the
+// pre-v2.6.2 behaviour that the scenario and pool tests already exercise.
+export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?: Set<number>): Promise<PollResult> {
   const openPrs = await deps.github.listPrs(config.repo, { state: "open" });
   const factoryPrs = openPrs.filter((p) => p.headRefName.startsWith("factory/"));
   // STOP_IF pauses new pickups only; approvals, answers, retries and
   // revises on existing runs keep flowing so a human can clear the backlog.
   const stopIf = factoryPrs.length >= config.maxOpenFactoryPrs;
   const autoStart = deps.state.getToggle("auto_start", true);
+  // Intake pauses (new factory:ready pickups only) while a daily cap is hit;
+  // an issue already in flight keeps going, since checkSpendCap parks it on
+  // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
+  const repoDailyUsd = config.spend.dailyUsd;
+  const repoDailyCapHit = repoDailyUsd !== undefined && deps.state.spendSummary(config.repo, startOfTodayUtc()).costUsd >= repoDailyUsd;
+  const machineDailyUsd = deps.machine?.config.dailyUsd;
+  const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
+  const budgetPaused = repoDailyCapHit || machineDailyCapHit;
   const buckets = await Promise.all([
-    autoStart && !stopIf ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
+    autoStart && !stopIf && !budgetPaused ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
     deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
     deps.github.listIssuesByLabel(config.repo, LABEL.failed),
@@ -741,19 +827,24 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig): Promise<
 
   const seen = new Set<number>();
   const candidates = buckets.flat().filter((issue) => {
-    if (seen.has(issue.number)) return false;
+    if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
     seen.add(issue.number);
     return true;
   });
 
-  // A pool of `concurrency` workers, not one-at-a-time and not
-  // Promise.all-everything: before this, issue #4 never started until #1's
-  // whole five-stage chain finished (audit finding #2).
-  const outcomes = await runPool(candidates, config.concurrency, (issue) => advanceIssue(deps, config, issue));
-  const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
-  return stopIf
-    ? { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed }
-    : { paused: false, processed };
+  for (const issue of candidates) inFlight?.add(issue.number);
+  try {
+    // A pool of `concurrency` workers, not one-at-a-time and not
+    // Promise.all-everything: before this, issue #4 never started until #1's
+    // whole five-stage chain finished (audit finding #2).
+    const outcomes = await runPool(candidates, dispatchConcurrency(deps, config), (issue) => dispatch(deps, config, issue));
+    const processed = candidates.filter((_, i) => outcomes[i] && outcomes[i] !== "waiting").map((issue) => issue.number);
+    if (stopIf) return { paused: true, reason: `STOP_IF: ${factoryPrs.length} factory PRs open in review (limit ${config.maxOpenFactoryPrs})`, processed };
+    if (budgetPaused) return { paused: true, reason: "budget: today's spend cap is hit, new pickups are paused", processed };
+    return { paused: false, processed };
+  } finally {
+    for (const issue of candidates) inFlight?.delete(issue.number);
+  }
 }
 
 // Re-drives any issue a crashed or restarted process left sitting in a
@@ -763,7 +854,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig): Promise<
 export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): Promise<number[]> {
   const lists = await Promise.all(RUNNING_LABELS.map((l) => deps.github.listIssuesByLabel(config.repo, l)));
   const issues = lists.flat();
-  await runPool(issues, config.concurrency, async (issue) => {
+  await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
     const derived = deriveIssueState(issue);
     const worktree = worktreeFor(deps, issue.number);
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, STAGE_LABEL[derived.resumeStage]))) return "needs-human";
@@ -775,26 +866,26 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
   return issues.map((i) => i.number);
 }
 
-// Awaits each poll before scheduling the next one, instead of `setInterval`
-// (which fires on a fixed clock regardless of whether the previous tick
-// finished) — that overlap is what let the same issue get double-dispatched
-// (audit finding #2).
+// Fires on a fixed cadence and never waits for the previous poll's whole
+// batch to finish first (plan v2.7.0 item 6): before this, one long build
+// held back every new pickup until its entire batch — not just its own
+// stage — was done. A shared `inFlight` set is what makes that safe instead
+// of a repeat of audit finding #2 (double-dispatch): an issue still being
+// worked by an earlier, still-running poll is invisible to a newer one.
 export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const inFlight = new Set<number>();
 
-  async function loop(): Promise<void> {
+  function tick(): void {
     if (stopped) return;
-    try {
-      const result = await pollOnce(deps, config);
-      onTick?.(result);
-    } catch (err) {
-      console.error("factory watch: poll failed", err);
-    }
-    if (!stopped) timer = setTimeout(loop, config.pollIntervalSeconds * 1000);
+    pollOnce(deps, config, inFlight)
+      .then((result) => onTick?.(result))
+      .catch((err) => console.error("factory watch: poll failed", err));
+    timer = setTimeout(tick, config.pollIntervalSeconds * 1000);
   }
 
-  timer = setTimeout(loop, 0);
+  tick();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);

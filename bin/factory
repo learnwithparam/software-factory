@@ -21,6 +21,7 @@ import { plain } from "../src/display";
 import { act, buildInbox, inboxPositionals, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
+import { loadMachineConfig, MachineLeases, MachineSpend } from "../src/machine";
 import { createDashboard } from "../dashboard/server";
 import { versionOf, which } from "../src/probes";
 import { workspacesDir as defaultWorkspacesDir, defaultStatePath } from "../src/paths";
@@ -77,12 +78,16 @@ function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
-    executor: new CommandExecutor(config.agents, config.stages),
+    executor: new CommandExecutor(config.agents, config.stages, config.routes),
     gateRunner: new ShellGateRunner(),
     rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),
+    // Real cross-process leases: every real CLI invocation (watch, run, tick)
+    // shares this machine's FACTORY_HOME/machine.db, so a second repo's
+    // watcher on the same machine is respected (plan v2.7.0 item 5).
+    machine: { leases: new MachineLeases(), config: loadMachineConfig(), spend: new MachineSpend() },
   };
 }
 
@@ -306,9 +311,11 @@ async function cmdDoctor(): Promise<void> {
       factoryMode: process.env.FACTORY_MODE,
       agents: config.agents,
       stages: config.stages,
+      routes: config.routes,
       templateSkills: templateSkills(),
       legacyStatePath: defaultStatePath(process.env),
       legacyWorkspacesDir: defaultWorkspacesDir(process.env),
+      configuredSlots: loadMachineConfig().slots,
     },
   );
   const allOk = checks.every((c) => c.ok || c.warn);
@@ -316,7 +323,7 @@ async function cmdDoctor(): Promise<void> {
   else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
   if (!allOk && has("fix")) {
     console.error("factory doctor --fix: creating missing labels");
-    await fixDoctor(github, config.repo);
+    await fixDoctor(github, config.repo, config.routes);
   }
   if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
 }
@@ -382,7 +389,7 @@ async function cmdVerifyAgent(): Promise<void> {
   const loaded = await loadConfig(cloneDir);
   const config: FactoryConfig = { ...loaded, ...configFor(name) };
   const out = resolve(flag("out") ?? `tests/fixtures/agents/${name}`);
-  const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, new FixtureRecorder(out, name)) };
+  const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, config.routes, new FixtureRecorder(out, name)) };
   const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
   if (outcome === "awaiting-approval") {
     console.log(`Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`);

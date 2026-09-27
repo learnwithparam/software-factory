@@ -12,7 +12,9 @@ export function stripFrontmatter(text: string): string {
   return text.startsWith("---\n") ? text.slice(text.indexOf("\n---", 3) + 4).replace(/^\n+/, "") : text;
 }
 
-export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">, readOnly = false): string {
+// `types` bounds the triage schema's `type` enum to the repo's actual type
+// list (typesFor(config.routes)); omitted, it falls back to TYPE_LABELS.
+export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">, readOnly = false, types?: readonly string[]): string {
   if (readOnly) {
     return [
       "## Artifact contract",
@@ -20,7 +22,7 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
       "This stage is read-only: you cannot write files. Do not try. Your final message must be ONE JSON object and nothing else, with no code fence:",
       `{"artifact": <the structured result, exactly as the instructions above describe for ${JSON_FILENAMES[opts.stage]}>, "comment": "<the comment the runner posts on the issue, in markdown>", "question": "<only when you cannot proceed without a human answer>"}`,
       "",
-      `The artifact must match this JSON Schema: ${JSON.stringify(stageSchema(opts.stage))}`,
+      `The artifact must match this JSON Schema: ${JSON.stringify(stageSchema(opts.stage, types))}`,
       "",
       "You have no GitHub access and cannot push or merge; the runner does that.",
     ].join("\n");
@@ -29,7 +31,7 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
     "## Artifact contract",
     "",
     `You run in the issue's worktree. Write your results as files in $FACTORY_ARTIFACT_DIR (${runDir(opts.issue)}/):`,
-    `- ${JSON_FILENAMES[opts.stage]}: the structured result, exactly as the instructions above describe. Schema: ${JSON.stringify(stageSchema(opts.stage))}`,
+    `- ${JSON_FILENAMES[opts.stage]}: the structured result, exactly as the instructions above describe. Schema: ${JSON.stringify(stageSchema(opts.stage, types))}`,
     `- ${COMMENT_FILENAMES[opts.stage]}: the comment the runner posts on the issue.`,
     "- question-comment.md: only when you cannot proceed without an answer from a human.",
     "",
@@ -37,7 +39,10 @@ export function artifactContract(opts: Pick<StageRunOptions, "stage" | "issue">,
   ].join("\n");
 }
 
-export async function renderPrompt(opts: StageRunOptions, readOnly = false): Promise<string> {
+// `contextPack` (buildContextPack, plan v2.7.0 item 3) is inlined here for
+// every non-Claude agent; Claude gets the same text through
+// --append-system-prompt instead (see agents/presets/claude.ts).
+export async function renderPrompt(opts: StageRunOptions, readOnly = false, types?: readonly string[], contextPack = ""): Promise<string> {
   const skill = await readFile(`${opts.cwd}/.claude/skills/factory-${opts.stage}/SKILL.md`, "utf8").catch(() => {
     throw new Error(`stage skill .claude/skills/factory-${opts.stage}/SKILL.md not found in ${opts.cwd}; run \`factory install --update\``);
   });
@@ -46,7 +51,8 @@ export async function renderPrompt(opts: StageRunOptions, readOnly = false): Pro
     "",
     stripFrontmatter(skill).trim(),
     "",
-    artifactContract(opts, readOnly),
+    ...(contextPack ? [contextPack, ""] : []),
+    artifactContract(opts, readOnly, types),
     "",
   ].join("\n");
 }

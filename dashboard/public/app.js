@@ -243,7 +243,7 @@ function analyticsView() {
       h("div", { class: "kpis" },
         [[a.successRate == null ? "None yet" : `${Math.round(a.successRate * 1000) / 10}%`, "Runs that shipped, of those finished"], [String(a.runs), "Runs started"], [money(a.spend7dUsd), "Spent in 7 days"], [money(a.spend30dUsd), "Spent in 30 days"]]
           .map(([v, l]) => h("div", { class: "kpi" }, h("span", { class: "value" }, v), h("span", { class: "label" }, l)))),
-      bars("Cost by stage", a.byStage), bars("Cost by agent", a.byAgent))));
+      bars("Cost by stage", a.byStage), bars("Cost by agent", a.byAgent), bars("Cost by model", a.byModel))));
 }
 
 /* ---- Agents ---- */

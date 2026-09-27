@@ -49,7 +49,7 @@ describe("verify-agent", () => {
     const script = join(cwd, "agent.sh");
     await Bun.write(script, `#!/bin/sh\necho '{"type":"x","text":"sk-abcdefghijklmnopqrstuv"}'\n`);
     Bun.spawnSync(["chmod", "+x", script]);
-    const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" }, new FixtureRecorder(dir, "x"));
+    const ex = new CommandExecutor({ x: { command: [script] } }, { default: "x" }, {}, new FixtureRecorder(dir, "x"));
     await ex.runStage({ stage: "triage", issue: 1, cwd, maxBudgetUsd: 1 });
     const lines = readFileSync(join(dir, "triage.jsonl"), "utf8");
     expect(lines).toContain("<redacted>");

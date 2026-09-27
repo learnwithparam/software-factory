@@ -21,11 +21,17 @@ the runner posts the verdict and moves the issue's label.
 
 ## 2. Run the subagents
 
-Dispatch to `factory-verifier` (fresh context): it reverts the non-test
-hunks, confirms each new test fails without them, restores the change,
-confirms the gate is green, and checks that every AC has real evidence —
-not a claim, an actual command and its output. "When uncertain, reject" is
-its rule, not yours to override.
+Read `plan.json`'s `proof` (absent means `test`) and pass it to
+`factory-verifier`.
+
+Dispatch to `factory-verifier` (fresh context): under `proof: "test"` it
+reverts the non-test hunks, confirms each new test fails without them,
+restores the change, confirms the gate is green, and checks that every AC
+has real evidence — not a claim, an actual command and its output. Under
+`proof: "check"` it skips the revert step (there is no test to prove), and
+instead re-runs every check command the plan named and confirms each
+proves its AC; it never asks for or expects a test. "When uncertain,
+reject" is its rule either way, not yours to override.
 
 Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
 security (injection, authz, secrets), and whether the diff crosses any

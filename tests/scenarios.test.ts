@@ -623,6 +623,26 @@ describe("cancel from every waiting state", () => {
   });
 });
 
+// Plan v2.7.0 item 8: proof:check exists so Markdown-only work (a blog post,
+// a docs page) is never forced through "build writes a failing test first".
+// The runner reads proof off plan.json and never branches on it itself (that
+// branching is the skills' job), so this pins the property that a
+// proof:check plan naming no test file still reaches shipped like any other.
+describe("proof: check ships markdown-only work with no test file", () => {
+  test("23. a blog-post plan proved by a prose lint ships with no test file anywhere in its artifact", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage({ type: "docs", gate_level: "npm run check-prose" }));
+    c.push("plan", plan("low", { proof: "check", files: ["content/blog/2026-09-27-launch.md"] }));
+    build_to_pr(c);
+    expect(await c.step()).toBe("shipped");
+    const planJson = JSON.parse(readFileSync(join(c.workspacesDir, "issue-1", runDir(1), "plan.json"), "utf8"));
+    expect(planJson.proof).toBe("check");
+    expect(planJson.files.some((f: string) => /test|spec/i.test(f))).toBe(false);
+    done(c);
+  });
+});
+
 test("every state and parked label is reached by a scenario", () => {
   const unreached = Object.values(LABEL).filter((l) => l !== LABEL.monitor && !seen.has(l));
   expect(unreached).toEqual([]);

@@ -22,7 +22,9 @@ export interface TriageArtifact {
   readonly outcome?: StepOutcome;
   readonly summary?: string;
   readonly disposition: Disposition;
-  readonly type: "bug" | "feature" | "docs" | "security" | "dependency";
+  // One of TYPE_LABELS, or a type this repo added via config.routes (e.g.
+  // "content"); validated against the repo's actual type list in schemas.ts.
+  readonly type: string;
   readonly risk: Risk;
   readonly done_when: string;
   readonly files_expected: string[];
@@ -39,6 +41,9 @@ export interface PlanArtifact {
   readonly files: string[];
   readonly autoApproveEligible: boolean;
   readonly commentId?: number;
+  // "test" (build writes a failing test first) or "check" (build runs named
+  // commands instead). Absent means "test" (plan v2.7.0 item 8).
+  readonly proof?: "test" | "check";
 }
 
 export interface BuildArtifact {
@@ -98,18 +103,20 @@ function stepEnvelopeProblem(o: Record<string, unknown>): string | undefined {
 // pass as a silent no-op. The verdict has its own, deeper validator above.
 export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
   triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence", "outcome", "summary"],
-  plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "outcome", "summary"],
+  plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "proof", "outcome", "summary"],
   build: ["status", "gate_line", "rounds", "outcome", "summary"],
   pr: ["outcome", "summary"],
 };
 
-export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: unknown): { ok: true } | { ok: false; reason: string } {
+// `types` bounds triage's `type` enum to the repo's actual type list
+// (typesFor(config.routes)); omit it to fall back to the fixed TYPE_LABELS.
+export function validateStepJson(stage: Exclude<ArtifactStage, "verify">, raw: unknown, types?: readonly string[]): { ok: true } | { ok: false; reason: string } {
   const name = JSON_FILENAMES[stage];
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { ok: false, reason: `${name} is not a JSON object` };
   const o = raw as Record<string, unknown>;
   const extra = unknownKey(o, new Set(STEP_KEYS[stage]));
   if (extra) return { ok: false, reason: `${name} has unknown field "${extra}"` };
-  const problem = stepEnvelopeProblem(o) ?? schemaProblem(stage, o);
+  const problem = stepEnvelopeProblem(o) ?? schemaProblem(stage, o, types);
   return problem ? { ok: false, reason: `${name}: ${problem}` } : { ok: true };
 }
 
