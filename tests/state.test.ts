@@ -109,3 +109,60 @@ test("a run's event budget is released when the run stops running, and a resume 
   expect(stored).toBeLessThanOrEqual(2 << 10);
   state.close();
 });
+
+// v2.10.0 item 3: one row per final outcome, queued first and completed
+// (immediately, or later by runQueuedRetros) with at most one proposal.
+test("queueRetro starts a row queued; completeRetro fills in the proposal, status and completed_at", () => {
+  const path = join(dir, "retro-complete.db");
+  const state = new FactoryState(path);
+  const id = state.queueRetro("acme/widgets", 1, "merged");
+  expect(state.listQueuedRetros("acme/widgets").map((r) => r.id)).toEqual([id]);
+  state.completeRetro(id, { lesson: "keep acceptance criteria checkable", skill_name: "factory-plan", skill_edit: "require a done_when per AC" });
+  expect(state.listQueuedRetros("acme/widgets")).toEqual([]);
+  state.close();
+  const check = new Database(path);
+  const stored = check.query("SELECT status, lesson, skill_name, skill_edit, completed_at FROM retros WHERE id = $id").get({ $id: id }) as Record<string, unknown>;
+  expect(stored).toMatchObject({ status: "done", lesson: "keep acceptance criteria checkable", skill_name: "factory-plan", skill_edit: "require a done_when per AC" });
+  expect(stored.completed_at).not.toBeNull();
+  check.close();
+});
+
+test("completeRetro with no proposal defaults to done with null proposal fields; a failed retro can record 'failed'", () => {
+  const path = join(dir, "retro-defaults.db");
+  const state = new FactoryState(path);
+  const doneId = state.queueRetro("acme/widgets", 2, "gave-up");
+  state.completeRetro(doneId);
+  const failedId = state.queueRetro("acme/widgets", 3, "rejected");
+  state.completeRetro(failedId, undefined, "failed");
+  state.close();
+  const check = new Database(path);
+  const rows = check.query("SELECT id, status, lesson FROM retros ORDER BY id").all() as { id: number; status: string; lesson: string | null }[];
+  expect(rows).toEqual([
+    { id: doneId, status: "done", lesson: null },
+    { id: failedId, status: "failed", lesson: null },
+  ]);
+  check.close();
+});
+
+test("listQueuedRetros is scoped to its own repo and only ever returns queued rows", () => {
+  const state = new FactoryState(":memory:");
+  const mine = state.queueRetro("acme/widgets", 1, "rejected");
+  state.queueRetro("other/repo", 1, "merged");
+  const done = state.queueRetro("acme/widgets", 2, "merged");
+  state.completeRetro(done, undefined, "failed");
+  expect(state.listQueuedRetros("acme/widgets").map((r) => r.id)).toEqual([mine]);
+  state.close();
+});
+
+test("listRetros returns every status for a repo, newest first, scoped to that repo", () => {
+  const state = new FactoryState(":memory:");
+  const first = state.queueRetro("acme/widgets", 1, "merged");
+  state.completeRetro(first, { lesson: "l" });
+  const second = state.queueRetro("acme/widgets", 2, "gave-up");
+  state.queueRetro("other/repo", 1, "rejected");
+  expect(state.listRetros("acme/widgets").map((r) => [r.id, r.status, r.outcome])).toEqual([
+    [second, "queued", "gave-up"],
+    [first, "done", "merged"],
+  ]);
+  state.close();
+});

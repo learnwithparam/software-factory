@@ -80,6 +80,17 @@ export interface VerdictArtifact {
   readonly criteria?: Criterion[];
 }
 
+// v2.10.0 item 3: read-only, runs after a final outcome. At most one proposal
+// (neo's rule of at most one task per review); all three fields absent means
+// "nothing worth changing".
+export interface RetroArtifact {
+  readonly outcome?: StepOutcome;
+  readonly summary?: string;
+  readonly lesson?: string;
+  readonly skill_name?: string;
+  readonly skill_edit?: string;
+}
+
 // A step result is one JSON object of at most 16 KiB (machinist workflow.go).
 export const MAX_STEP_JSON_BYTES = 16 * 1024;
 export const VERDICT_KEY_LIST = ["result", "rounds", "findings", "criteria", "outcome", "summary"] as const;
@@ -106,6 +117,7 @@ export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string
   plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "proof", "outcome", "summary"],
   build: ["status", "gate_line", "rounds", "outcome", "summary"],
   pr: ["outcome", "summary"],
+  retro: ["lesson", "skill_name", "skill_edit", "outcome", "summary"],
 };
 
 // `types` bounds triage's `type` enum to the repo's actual type list
@@ -173,7 +185,7 @@ export function validateVerdict(raw: unknown): { ok: true; verdict: VerdictArtif
   return { ok: true, verdict };
 }
 
-export type ArtifactStage = "triage" | "plan" | "build" | "verify" | "pr";
+export type ArtifactStage = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
 export function runDir(issue: number): string {
   return `.factory/runs/issue-${issue}`;
@@ -188,6 +200,7 @@ export const COMMENT_FILENAMES: Record<ArtifactStage, string> = {
   build: "status-comment.md",
   verify: "verdict-comment.md",
   pr: "pr-body.md",
+  retro: "retro-comment.md",
 };
 
 export const JSON_FILENAMES: Record<ArtifactStage, string> = {
@@ -196,6 +209,7 @@ export const JSON_FILENAMES: Record<ArtifactStage, string> = {
   build: "build.json",
   verify: "verdict.json",
   pr: "pr.json",
+  retro: "retro.json",
 };
 
 // Undefined for a missing file, and also for one that is too big, not JSON, or

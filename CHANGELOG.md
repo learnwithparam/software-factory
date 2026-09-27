@@ -1,5 +1,64 @@
 # Changelog
 
+## v2.10.0
+
+Memory across runs. A run's lessons now survive it: a read-only retro stage proposes at
+most one lesson or skill edit after an issue's final outcome, and `factory learn` batches
+whatever's pending into a PR you review, never merges automatically.
+
+- **`research/agents/claude/memory.md`.** Headless Claude's own auto-memory writes to a
+  path keyed by a hash of the worktree's absolute directory, under the operator's home
+  directory: operator-machine-local state, gone once a worktree is torn down, invisible in
+  CI, and never shared across machines. Confirms the roadmap's pre-decided design: the
+  factory never relies on `~/.claude`.
+- **`src/context.ts`: repo-local memory.** `.factory/memory/lessons.md` is capped at 8 KiB
+  (`MAX_LESSONS_BYTES`), keeping the most recent lines and dropping the oldest when it
+  would grow past the cap, and is injected into every stage's context pack the same way on
+  the Mac, a VPS or in CI.
+- **`src/watch.ts`: a retro stage after each final outcome** (merged, rejected by you, or
+  given up on after the third verify rejection past `MAX_VERIFY_REJECTS`), plus a fourth
+  trigger from the dashboard's operator-merge route, which queues the retro for `pollOnce`
+  to drain since it has no `Executor` of its own to run it. `runRetro` never goes through
+  `runStage`'s `upsertRun` (an already-terminal run would be put back to "running"), but
+  its cost still rolls into spend-cap accounting through the same `recordStageRun` call.
+  Read-only, on Haiku by default; it proposes at most one lesson or skill edit, or none
+  (neo's rule of at most one task per review, idea only, no code copied), and writes a
+  `retro.json` artifact linking the run.
+- **`src/learn.ts`: `factory learn`.** A deterministic, non-agent command that batches
+  every pending retro proposal into `.factory/memory/lessons.md` and per-skill
+  `.claude/skills/<name>/PROPOSED_EDITS.md` files, commits, and diffs the branch against
+  base before pushing. `outsideAllowedPaths` (`src/boundary.ts`) is the one exemption from
+  `protectedPaths`, and only for a `factory/learning-YYYYMMDD` branch: it may touch
+  `.factory/memory/**` and `.claude/skills/**`, nothing else. A row is marked learned only
+  after its branch pushes and its PR exists, so a refusal or a crash first leaves it
+  pending for the next run rather than dropping it. Idempotent per day: a second run
+  reuses the same branch and PR. It never auto-merges, and shows in the dashboard inbox as
+  its own read-only `learning-pr` kind, since it has no linked issue to chatops against.
+- **`src/boundary.ts`: `touchesProtectedPath` now always refuses `.claude/**` and
+  `.factory/**`, merged inside the function itself rather than at each call site.** A
+  normal build's push check (`src/watch.ts`) relied entirely on the repo's own
+  `protectedPaths`, which defaults to `[]`; `guard-paths.sh` already hardcoded both paths
+  unconditionally for interactive edits, so a Bash-made edit outside that hook could still
+  reach a push. Baking the merge into `touchesProtectedPath` itself, rather than patching
+  the build-stage call site alone, also closes the same gap at `src/merge-policy.ts`'s
+  `autoEligible`, a second call site the first fix missed.
+
+Structural tests: a learning PR outside its allowed paths is refused before any push
+(`tests/learn.test.ts`); the lessons file cap holds (`tests/context-pack.test.ts`); a
+normal build still cannot touch `.claude/**` with the default empty `protectedPaths`
+(`tests/scenarios.test.ts`), and neither can an auto-merge-eligible PR
+(`tests/boundary.test.ts`, covering both `touchesProtectedPath` call sites at once).
+
+Not in v2.10.0:
+- A live run of the retro stage and `factory learn` against splitbill-demo: the
+  currently-installed production `factory` predates this branch, so a genuine run needs a
+  reset to a clean baseline first, the same category of blocker as v2.7.0's live run,
+  pending your reset OK.
+- Mutual-exclusion enforcement between a lesson and a skill edit on one retro row: the
+  retro skill's own instructions say "propose at most one," but nothing in `src/schemas.ts`
+  or `src/learn.ts` would refuse a row carrying both. Left as a prompt-level rule, since no
+  run has produced one yet.
+
 ## v2.9.0
 
 The review inbox stops sending you to GitHub. A PR waiting on you now shows its diff, gate

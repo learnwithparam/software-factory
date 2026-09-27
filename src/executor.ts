@@ -7,7 +7,7 @@ import type { AgentCommands } from "./config";
 import { truncateFinalMessage } from "./agents/final-message";
 import { parseStreamJsonLine } from "./agents/presets/claude";
 
-export type StageName = "triage" | "plan" | "build" | "verify" | "pr";
+export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
 export interface StageEvent {
   readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated";

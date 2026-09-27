@@ -73,7 +73,7 @@ describe("config validation of routes", () => {
 
   test("a route naming triage is refused: triage never routes on type", () => {
     const problems = configProblems({ ...DEFAULT_CONFIG, repo: "a/b", routes: { docs: { stages: { triage: "claude" } } } });
-    expect(problems).toContain("routes.docs.stages.triage: unknown stage (allowed: plan, build, verify, pr)");
+    expect(problems).toContain("routes.docs.stages.triage: unknown stage (allowed: plan, build, verify, pr, retro)");
   });
 
   test("proof must be \"test\" or \"check\"", () => {

@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { claudeArgs } from "../src/agents/presets/claude";
 import { renderPrompt } from "../src/agents/prompt";
 import { runDir } from "../src/artifacts";
-import { buildContextPack, MAX_CONTEXT_PACK_BYTES } from "../src/context";
+import { buildContextPack, MAX_CONTEXT_PACK_BYTES, MAX_LESSONS_BYTES } from "../src/context";
 import { STAGE_GUIDANCE } from "../src/stage-permissions";
 
 function worktree(): string {
@@ -76,6 +76,33 @@ describe("buildContextPack", () => {
     const pack = await buildContextPack("build", 1, cwd, []);
 
     expect(pack).toBe(""); // nothing else to hold, and a missing file is not a "drop"
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("holds .factory/memory/lessons.md (v2.10.0 item 2)", async () => {
+    const cwd = worktree();
+    mkdirSync(`${cwd}/.factory/memory`, { recursive: true });
+    writeFileSync(`${cwd}/.factory/memory/lessons.md`, "- 2026-09-01: the checkout API needs a 30s timeout, not the default.");
+
+    const pack = await buildContextPack("build", 1, cwd, []);
+
+    expect(pack).toContain("lessons learned");
+    expect(pack).toContain("the checkout API needs a 30s timeout");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("caps the lessons file on its own budget, keeping the most recent lines", async () => {
+    const cwd = worktree();
+    mkdirSync(`${cwd}/.factory/memory`, { recursive: true });
+    const oldLine = `- an old lesson that should drop: ${"x".repeat(MAX_LESSONS_BYTES)}`;
+    const newLine = "- a recent lesson that must survive the cap";
+    writeFileSync(`${cwd}/.factory/memory/lessons.md`, `${oldLine}\n${newLine}\n`);
+
+    const pack = await buildContextPack("build", 1, cwd, []);
+
+    expect(pack).toContain("a recent lesson that must survive the cap");
+    expect(pack).not.toContain("an old lesson that should drop");
+    expect(pack).toContain("lessons-file cap");
     rmSync(cwd, { recursive: true, force: true });
   });
 });

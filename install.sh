@@ -104,8 +104,8 @@ while IFS= read -r -d '' file; do
     continue
   fi
 
-  # Repo-owned files: the charter and config example are the repo's to edit.
-  if [[ "$rel" == ".factory/charter.md" || "$rel" == ".factory/config.example.json" ]] && [[ -e "$dest" || -L "$dest" ]]; then
+  # Repo-owned files: the charter, config example and accumulated lessons are the repo's to edit.
+  if [[ "$rel" == ".factory/charter.md" || "$rel" == ".factory/config.example.json" || "$rel" == ".factory/memory/lessons.md" ]] && [[ -e "$dest" || -L "$dest" ]]; then
     echo "skip (repo-owned): $rel"
     skipped=$((skipped + 1))
     continue

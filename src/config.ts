@@ -20,6 +20,7 @@ export interface StageBudgets {
   readonly build: number;
   readonly verify: number;
   readonly pr: number;
+  readonly retro: number;
 }
 
 // Extra Bash patterns the repo grants its agents, on top of the read-only
@@ -116,7 +117,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   maxOpenFactoryPrs: 3,
   concurrency: 3,
   pollIntervalSeconds: 15,
-  maxBudgetUsd: { triage: 1, plan: 2, build: 5, verify: 3, pr: 1 },
+  maxBudgetUsd: { triage: 1, plan: 2, build: 5, verify: 3, pr: 1, retro: 0.5 },
   baselineTag: "baseline",
   base: "main",
   stageTimeoutMinutes: 15,
@@ -207,7 +208,7 @@ export function configProblems(raw: unknown): string[] {
     if (v !== undefined && kindOk(v, "object") && !Array.isArray(v)) checkKeys(v as Record<string, unknown>, shape, `${key}.`, problems);
   };
   nested("riskPolicy", { autoApproveLowRisk: "boolean" });
-  nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive" });
+  nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive", retro: "positive" });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
@@ -228,7 +229,7 @@ export function configProblems(raw: unknown): string[] {
   return problems;
 }
 
-const STAGE_KEYS = ["default", "triage", "plan", "build", "verify", "pr"];
+const STAGE_KEYS = ["default", "triage", "plan", "build", "verify", "pr", "retro"];
 // Triage runs before an issue's type is known, so a route can never override it.
 const ROUTABLE_STAGE_KEYS = STAGE_KEYS.filter((s) => s !== "triage" && s !== "default");
 

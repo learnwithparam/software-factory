@@ -18,7 +18,7 @@ import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
 import { plain } from "../src/display";
-import { act, buildInbox, inboxPositionals, type InboxAction } from "../src/inbox";
+import { act, buildInbox, inboxPositionals, learningPrItems, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { loadMachineConfig, MachineLeases, MachineSpend } from "../src/machine";
@@ -30,6 +30,7 @@ import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
 import { FixtureRecorder } from "../src/agents/record";
 import { configFor, formatReport, reportFor } from "../src/verify-agent";
+import { runLearn } from "../src/learn";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -182,7 +183,7 @@ async function cmdInbox(): Promise<void> {
   const repo = flag("repo") ?? process.env.FACTORY_REPO;
   if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
   const github = new GitHub();
-  const items = buildInbox(await github.listOpenIssues(repo));
+  const items = [...buildInbox(await github.listOpenIssues(repo)), ...learningPrItems(await github.listPrs(repo, { state: "open" }))];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
     const item = items.find((i) => i.issue === Number(issueArg));
@@ -400,6 +401,22 @@ async function cmdVerifyAgent(): Promise<void> {
   if (!report.pass) process.exit(EXIT.runFailed);
 }
 
+async function cmdLearn(): Promise<void> {
+  const cloneDir = await resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const deps = buildWatchDeps(cloneDir, config);
+  const result = await runLearn(deps, config.repo, config.base);
+  if (has("json")) {
+    console.log(successJson(result, true));
+    return;
+  }
+  if (result.batched === 0) {
+    console.log("factory learn: nothing pending.");
+    return;
+  }
+  console.log(`factory learn: batched ${result.batched} proposal(s) on ${result.branch} -> ${result.prUrl}`);
+}
+
 async function cmdInstall(): Promise<void> {
   const target = args[1];
   if (!target) throw new UsageError("install: usage: factory install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]");
@@ -445,6 +462,8 @@ async function main(): Promise<void> {
       return cmdInstall();
     case "verify-agent":
       return cmdVerifyAgent();
+    case "learn":
+      return cmdLearn();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

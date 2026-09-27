@@ -6,10 +6,10 @@
 import { parseChatOps } from "./chatops";
 import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
-import type { GhComment, GhIssue, GitHub } from "./github";
+import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
 
-export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "merge-dry-run" | "parked" | "failed" | "budget";
+export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "merge-dry-run" | "parked" | "failed" | "budget" | "learning-pr";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
 
 // Actions that carry the human's own words.
@@ -89,6 +89,25 @@ export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
     });
   }
   return items.sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
+}
+
+// `factory learn` (plan v2.10.0 item 4) opens a PR with no linked GitHub
+// issue, so it can't derive from labels/comments like buildInbox. Visibility
+// only: no chatops actions exist for a learning PR, it never auto-merges.
+export function learningPrItems(prs: readonly GhPr[]): InboxItem[] {
+  return prs
+    .filter((pr) => pr.headRefName.startsWith("factory/learning-"))
+    .map((pr) => ({
+      id: `learning-pr-${pr.number}`,
+      kind: "learning-pr" as const,
+      issue: pr.number,
+      title: `Learning PR #${pr.number}`,
+      label: "",
+      waitingSince: undefined,
+      ask: `Batched memory/skill-edit proposals: ${pr.url}`,
+      actions: [] as const,
+    }))
+    .sort((a, b) => a.issue - b.issue);
 }
 
 export function commandText(action: InboxAction, text: string): string {

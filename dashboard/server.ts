@@ -15,7 +15,7 @@ import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, type InboxAction } from "../src/inbox";
+import { InboxError, act, buildInbox, learningPrItems, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
@@ -88,6 +88,8 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
   const sessions = new Map<string, number>();
   const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> }>();
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>>>();
+  const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<GitHub["listPrs"]>> }>();
+  const prsInflight = new Map<string, Promise<Awaited<ReturnType<GitHub["listPrs"]>>>>();
 
   // The Agents page shows each configured agent's installed version and doctor rows.
   // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
@@ -143,6 +145,30 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
 
   function invalidateIssuesCache(r: string): void {
     issuesCache.delete(r);
+  }
+
+  // Same single-flight + cache pattern as cachedIssuesFor, for the inbox's
+  // learning-PR items (plan v2.10.0 item 4), which come from `gh pr list`,
+  // not issues.
+  async function cachedPrsFor(r: string) {
+    const now = Date.now();
+    const cached = prsCache.get(r);
+    if (cached && now - cached.at < BOARD_CACHE_MS) return cached.prs;
+    const inflight = prsInflight.get(r);
+    if (inflight) return inflight;
+    const promise = github
+      .listPrs(r, { state: "open" })
+      .then((prs) => {
+        prsCache.set(r, { at: Date.now(), prs });
+        prsInflight.delete(r);
+        return prs;
+      })
+      .catch((err) => {
+        prsInflight.delete(r);
+        throw err;
+      });
+    prsInflight.set(r, promise);
+    return promise;
   }
 
   async function cachedIssues() {
@@ -360,7 +386,13 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         const decision = decideOperatorMerge(readiness, ci);
         const merged = await attemptMerge(github, r, pr.number, decision);
         await github.commentIssue(r, issueNumber, renderOperatorAuditComment(decision));
-        if (merged) invalidateIssuesCache(r);
+        // The dashboard has no Executor to run retro itself (plan v2.10.0 item
+        // 3); queueRetro just records the row, and watch.ts's poll loop
+        // (runQueuedRetros) drains it on its next tick.
+        if (merged) {
+          invalidateIssuesCache(r);
+          state.queueRetro(r, issueNumber, "merged");
+        }
         return json({ ok: merged, decision });
       },
     },
@@ -425,7 +457,12 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         const filter = url.searchParams.get("repo");
         const repos = filter ? [filter] : inboxRepos();
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
-        const perRepo = await Promise.all(repos.map(async (r) => buildInbox(await cachedIssuesFor(r)).map((i) => ({ ...i, repo: r }))));
+        const perRepo = await Promise.all(
+          repos.map(async (r) => [
+            ...buildInbox(await cachedIssuesFor(r)).map((i) => ({ ...i, repo: r })),
+            ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
+          ]),
+        );
         const items = perRepo.flat().sort((a, b) => (a.waitingSince ?? "").localeCompare(b.waitingSince ?? "") || a.issue - b.issue);
         return json({ repos: inboxRepos(), repo, items });
       },

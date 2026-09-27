@@ -9,6 +9,31 @@ import { dirname } from "node:path";
 import { defaultStatePath } from "./paths";
 
 export type Stage = "triage" | "plan" | "build" | "verify" | "pr";
+
+// The final pipeline outcome that triggers a retro (plan v2.10.0 item 3),
+// distinct from a stage artifact's own outcome field (complete/blocked/failed).
+export type RetroTrigger = "merged" | "rejected" | "gave-up";
+export type RetroStatus = "queued" | "done" | "failed";
+
+// One row per final outcome. Queued by all four triggers (checkMergePolicy,
+// cancelRun, the verify-reject cap, and the dashboard's operator-merge route);
+// only the dashboard trigger, which has no Executor to run retro itself,
+// stays "queued" until watch.ts's poll loop drains it.
+export interface RetroRow {
+  id: number;
+  repo: string;
+  issue: number;
+  outcome: RetroTrigger;
+  status: RetroStatus;
+  lesson: string | null;
+  skill_name: string | null;
+  skill_edit: string | null;
+  created_at: string;
+  completed_at: string | null;
+  // Set once `factory learn` (plan v2.10.0 item 4) has batched this row's
+  // proposal into a learning PR, so a later run never batches it twice.
+  learned_at: string | null;
+}
 export type RunStatus =
   | "running"
   | "needs-info"
@@ -153,6 +178,20 @@ export class FactoryState {
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS retros (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repo TEXT NOT NULL,
+        issue INTEGER NOT NULL,
+        outcome TEXT NOT NULL,
+        status TEXT NOT NULL,
+        lesson TEXT,
+        skill_name TEXT,
+        skill_edit TEXT,
+        created_at TEXT NOT NULL,
+        completed_at TEXT,
+        learned_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS retros_repo_status ON retros(repo, status);
     `);
     // Forward-only and idempotent: safe to run on boot from several replicas.
     const have = new Set((this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name));
@@ -373,6 +412,66 @@ export class FactoryState {
       )
       .get(issue !== undefined ? { $repo: repo, $since: sinceIso, $issue: issue } : { $repo: repo, $since: sinceIso }) as { cost: number; unreported: number };
     return { costUsd: row.cost, unreportedRuns: row.unreported };
+  }
+
+  // Called first by all four retro triggers, even the three that then complete
+  // the row within the same call: one queue, one status path, whether retro
+  // runs immediately or (the dashboard's merge route) waits for the poll loop.
+  queueRetro(repo: string, issue: number, outcome: RetroTrigger): number {
+    this.db
+      .query("INSERT INTO retros (repo, issue, outcome, status, created_at) VALUES ($repo, $issue, $outcome, 'queued', $now)")
+      .run({ $repo: repo, $issue: issue, $outcome: outcome, $now: new Date().toISOString() });
+    return (this.db.query("SELECT last_insert_rowid() AS id").get() as { id: number }).id;
+  }
+
+  completeRetro(id: number, proposal?: { lesson?: string; skill_name?: string; skill_edit?: string }, status: "done" | "failed" = "done"): void {
+    this.db
+      .query(
+        `UPDATE retros SET status = $status, lesson = $lesson, skill_name = $skill_name, skill_edit = $skill_edit, completed_at = $now WHERE id = $id`,
+      )
+      .run({
+        $id: id,
+        $status: status,
+        $lesson: proposal?.lesson ?? null,
+        $skill_name: proposal?.skill_name ?? null,
+        $skill_edit: proposal?.skill_edit ?? null,
+        $now: new Date().toISOString(),
+      });
+  }
+
+  // Rows the dashboard's operator-merge route queued but nothing has run yet.
+  listQueuedRetros(repo: string, limit = 50): RetroRow[] {
+    return this.db
+      .query("SELECT * FROM retros WHERE repo = $repo AND status = 'queued' ORDER BY id ASC LIMIT $limit")
+      .all({ $repo: repo, $limit: limit }) as RetroRow[];
+  }
+
+  // Every retro for a repo regardless of status, newest first. `factory learn`
+  // (plan v2.10.0 item 4) will filter this to done rows with a lesson.
+  listRetros(repo: string, limit = 50): RetroRow[] {
+    return this.db.query("SELECT * FROM retros WHERE repo = $repo ORDER BY id DESC LIMIT $limit").all({ $repo: repo, $limit: limit }) as RetroRow[];
+  }
+
+  // Done rows with a proposal that `factory learn` (plan v2.10.0 item 4)
+  // hasn't yet batched into a learning PR. Oldest first, so a batch applies
+  // lessons in the order they were learned.
+  pendingLessons(repo: string): RetroRow[] {
+    return this.db
+      .query(
+        "SELECT * FROM retros WHERE repo = $repo AND status = 'done' AND learned_at IS NULL AND (lesson IS NOT NULL OR skill_name IS NOT NULL) ORDER BY id ASC",
+      )
+      .all({ $repo: repo }) as RetroRow[];
+  }
+
+  // Stamps the rows a learning PR just batched so a later run never re-batches them.
+  markLearned(ids: readonly number[], when: string): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map((_, i) => `$id${i}`).join(", ");
+    const params: Record<string, string | number> = { $when: when };
+    ids.forEach((id, i) => {
+      params[`$id${i}`] = id;
+    });
+    this.db.query(`UPDATE retros SET learned_at = $when WHERE id IN (${placeholders})`).run(params);
   }
 
   getToggle(key: string, fallback: boolean): boolean {

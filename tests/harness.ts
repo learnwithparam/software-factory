@@ -233,6 +233,18 @@ export class FakeGit extends Git {
     return { stdout: "", stderr: "", code: 0 };
   }
 
+  pushedBranches: string[] = [];
+  override async pushBranch(_worktreeDir: string, branch: string) {
+    this.pushedBranches.push(branch);
+    return { stdout: "", stderr: "", code: 0 };
+  }
+
+  branchWorktrees: string[] = [];
+  override async ensureBranchWorktree(_cloneDir: string, worktreeDir: string, branch: string): Promise<void> {
+    this.branchWorktrees.push(branch);
+    mkdirSync(worktreeDir, { recursive: true });
+  }
+
   trees = ["faketree"];
   // Each call returns the next tree, then repeats the last, so a test can move HEAD between build and verify.
   override async treeHash(): Promise<string> {
