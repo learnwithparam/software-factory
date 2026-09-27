@@ -7,15 +7,19 @@
 // Hardcoded regardless of repo config, mirroring guard-paths.sh's own
 // unconditional additions (template/.claude/hooks/guard-paths.sh): a normal
 // build must never touch the factory's own state or skills, even with the
-// default empty protectedPaths. `factory learn`'s branch never calls this
-// check (it uses outsideAllowedPaths instead), so its exemption never
-// weakens this for a normal build.
+// default empty protectedPaths. Merged inside touchesProtectedPath itself,
+// not at each call site, so a new caller can never forget it (one resolver
+// per concept: this repo already has two call sites, src/watch.ts and
+// src/merge-policy.ts). `factory learn`'s branch never calls this check (it
+// uses outsideAllowedPaths instead), so its exemption never weakens this for
+// a normal build.
 export const ALWAYS_PROTECTED_PATHS = [".claude/**", ".factory/**"] as const;
 
 export function touchesProtectedPath(changedFiles: readonly string[], protectedPaths: readonly string[]): string[] {
+  const patterns = [...protectedPaths, ...ALWAYS_PROTECTED_PATHS];
   const hits: string[] = [];
   for (const file of changedFiles) {
-    for (const pattern of protectedPaths) {
+    for (const pattern of patterns) {
       if (new Bun.Glob(pattern).match(file)) {
         hits.push(file);
         break;

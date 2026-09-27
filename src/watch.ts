@@ -36,7 +36,7 @@ import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState } from "./derive";
 import { rehydrate } from "./rehydrate";
 import { runGates, type GateRunner } from "./gates";
-import { ALWAYS_PROTECTED_PATHS, touchesProtectedPath } from "./boundary";
+import { touchesProtectedPath } from "./boundary";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue, GitHub } from "./github";
@@ -571,7 +571,7 @@ async function runFromStage(
       // protected path never reaches Edit/Write, so the hook never sees it
       // (audit finding #12). Diff the branch itself before pushing anything.
       const changed = await deps.git.changedFiles(worktree, config.base);
-      const hits = touchesProtectedPath(changed, [...config.protectedPaths, ...ALWAYS_PROTECTED_PATHS]);
+      const hits = touchesProtectedPath(changed, config.protectedPaths);
       if (hits.length) {
         await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);

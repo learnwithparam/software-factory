@@ -6,6 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { ALWAYS_PROTECTED_PATHS, touchesProtectedPath } from "../src/boundary";
+import { autoEligible } from "../src/merge-policy";
 
 describe("touchesProtectedPath", () => {
   test("flags an exact-path match", () => {
@@ -34,14 +35,34 @@ describe("touchesProtectedPath", () => {
     expect(touchesProtectedPath([".env.production"], [".env*"])).toEqual([".env.production"]);
   });
 
-  // A normal build merges ALWAYS_PROTECTED_PATHS into its call (src/watch.ts),
-  // so .claude/** and .factory/** are refused even with the default empty
-  // protectedPaths config, matching what guard-paths.sh already hardcodes.
+  // touchesProtectedPath merges ALWAYS_PROTECTED_PATHS itself (one resolver,
+  // not a spread every caller must remember), so .claude/** and .factory/**
+  // are refused for every caller even with the default empty protectedPaths
+  // config, matching what guard-paths.sh already hardcodes. This covers both
+  // call sites at once: src/watch.ts's build-stage push check and
+  // src/merge-policy.ts's autoEligible.
   test("ALWAYS_PROTECTED_PATHS flags .claude/** and .factory/** with no repo config at all", () => {
     const changed = [".claude/skills/factory-build/SKILL.md", ".factory/memory/lessons.md", "src/ui/button.tsx"];
-    expect(touchesProtectedPath(changed, [...ALWAYS_PROTECTED_PATHS])).toEqual([
-      ".claude/skills/factory-build/SKILL.md",
-      ".factory/memory/lessons.md",
-    ]);
+    expect(touchesProtectedPath(changed, [])).toEqual([".claude/skills/factory-build/SKILL.md", ".factory/memory/lessons.md"]);
+  });
+
+  // Explicitly passing ALWAYS_PROTECTED_PATHS too (as a caller migrating from
+  // the old caller-side merge might still do) must not double-count a hit.
+  test("passing ALWAYS_PROTECTED_PATHS explicitly alongside the built-in merge does not duplicate hits", () => {
+    expect(touchesProtectedPath([".claude/x.md"], [...ALWAYS_PROTECTED_PATHS])).toEqual([".claude/x.md"]);
+  });
+
+  // The second call site (src/merge-policy.ts's autoEligible, used by the
+  // "auto" merge policy) gets the same hardening for free because it goes
+  // through touchesProtectedPath, not a separate check. Proven end to end,
+  // not just against the shared helper in isolation.
+  test("a PR touching .claude/** is never auto-eligible, even with an empty repo protectedPaths config", () => {
+    const refusals = autoEligible(
+      "low",
+      [{ path: ".claude/skills/factory-build/SKILL.md", additions: 1, deletions: 0 }],
+      { autoPaths: [".claude/**"], maxFiles: 10, maxLines: 200 },
+      [],
+    );
+    expect(refusals.map((r) => r.reason)).toContain("not-auto-eligible");
   });
 });
