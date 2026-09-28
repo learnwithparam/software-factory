@@ -37,7 +37,18 @@ function typesOf(stage: ArtifactStage, types: readonly string[]): Record<string,
       // name (plan v2.7.0 item 8). Absent means "test", today's behavior.
       proof: { enum: ["test", "check"] },
     },
-    build: { status: { enum: ["green", "red", "needs-info"] }, gate_line: str, rounds: int },
+    build: {
+      status: { enum: ["green", "red", "needs-info"] },
+      gate_line: str,
+      rounds: int,
+      // The ui route's proof: one entry per state x viewport x theme (plan
+      // v2.12.0 item B.5, "a factory-verify visual check"). Absent on every
+      // other route, where there is nothing to screenshot. `fits` checks
+      // array-of-object shallowly, same as verify's findings/criteria; the
+      // per-item shape (state, viewport, theme, path, all required) is
+      // enforced by factory-verify reading the manifest, not by this schema.
+      screenshots: { type: "array", items: { type: "object" } },
+    },
     verify: {
       result: { enum: ["pass", "reject", "uncertain"] },
       rounds: int,

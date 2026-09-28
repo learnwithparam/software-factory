@@ -48,7 +48,26 @@ Keep it factual and short: what changed, how each AC was checked, what was
 deliberately left out (the non-goals). Do not restate the whole verdict
 comment; link to it instead of copying it.
 
-## 3. Write the outputs
+## 3. UI route: embed the screenshots
+
+Skip this step unless `triage.json`'s `type` is `ui`. Read `build.json`'s
+`screenshots` array. Add a `## Screenshots` section after `## Gate
+evidence`, one row per state, light theme by default:
+
+```markdown
+## Screenshots
+| State | 390px | 1440px |
+|---|---|---|
+| {{state}} | ![]({{raw_url_390_light}}) | ![]({{raw_url_1440_light}}) |
+```
+
+`{{raw_url}}` is `https://raw.githubusercontent.com/<repo>/factory/issue-<N>/<path>`,
+built from `.factory/config.json`'s `repo` and this issue's number; the
+branch is already pushed by the time this stage runs. Mention in a line
+below the table that dark-theme captures exist at the same paths with
+`-dark` in place of `-light`, for a reviewer who wants them.
+
+## 4. Write the outputs
 
 Write `.factory/runs/issue-<N>/pr-body.md` with the filled body above;
 this is the only file this stage reads back. The runner opens the PR as a
