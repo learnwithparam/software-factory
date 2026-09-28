@@ -10,10 +10,10 @@ import { afterEach, describe, expect, test, setDefaultTimeout } from "bun:test";
 
 // Real git processes: a loaded machine can exceed bun's 5s default.
 setDefaultTimeout(30_000);
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Git, GitCommandRunner } from "../src/git";
+import { Git, GitCommandRunner, sparseCheckoutPatterns } from "../src/git";
 
 const roots: string[] = [];
 
@@ -179,5 +179,49 @@ describe("Git.treeHash", () => {
     writeFileSync(join(root, ".factory/runs/issue-1/gate.json"), "{}\n");
     expect(await git.treeHash(root)).toBe(before);
     expect((await run(["git", "diff", "--cached", "--name-only"], root)).trim()).toBe("");
+  });
+});
+
+describe("sparseCheckoutPatterns", () => {
+  test("keeps everything, then negates one pattern per holdout path", () => {
+    expect(sparseCheckoutPatterns([".factory/holdout/**"])).toEqual(["/*", "!/.factory/holdout/**"]);
+    expect(sparseCheckoutPatterns(["a/b", "/c/d"])).toEqual(["/*", "!/a/b", "!/c/d"]);
+  });
+
+  test("is a no-op pattern set for no holdout paths", () => {
+    expect(sparseCheckoutPatterns([])).toEqual(["/*"]);
+  });
+});
+
+describe("Git.excludeFromSparseCheckout", () => {
+  test("removes a committed holdout path from disk, but leaves it recoverable from history", async () => {
+    const root = tmpRoot();
+    await initSeededRepo(root);
+    mkdirSync(join(root, ".factory", "holdout"), { recursive: true });
+    writeFileSync(join(root, ".factory", "holdout", "secret.test.ts"), "the answer is 42\n");
+    writeFileSync(join(root, "src.ts"), "kept\n");
+    await run(["git", "add", "-A"], root);
+    await run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "add holdout"], root);
+
+    const git = new Git(new GitCommandRunner());
+    await git.excludeFromSparseCheckout(root, [".factory/holdout/**"]);
+
+    // Gone from the working directory, so no agent operating in this worktree
+    // can ever read it...
+    expect(existsSync(join(root, ".factory", "holdout", "secret.test.ts"))).toBe(false);
+    expect(existsSync(join(root, "src.ts"))).toBe(true);
+    // ...but still fully present in the commit itself, for the holdout runner
+    // to restore from later.
+    const fromHistory = await run(["git", "show", "HEAD:.factory/holdout/secret.test.ts"], root);
+    expect(fromHistory).toBe("the answer is 42\n");
+  });
+
+  test("is a no-op when there are no holdout paths configured", async () => {
+    const root = tmpRoot();
+    await initSeededRepo(root);
+    const git = new Git(new GitCommandRunner());
+    await git.excludeFromSparseCheckout(root, []);
+    expect(existsSync(join(root, "README.md"))).toBe(true);
+    expect(existsSync(join(root, ".git", "info", "sparse-checkout"))).toBe(false);
   });
 });

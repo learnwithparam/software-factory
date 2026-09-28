@@ -10,6 +10,8 @@ import { runDir } from "../src/artifacts";
 import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { Git } from "../src/git";
 import type { GateRunner } from "../src/gates";
+import type { HoldoutConfig } from "../src/config";
+import type { HoldoutRunner } from "../src/holdout";
 
 // Strictly increasing timestamps, so "newer than" comparisons never tie the
 // way `new Date()` can inside one millisecond.
@@ -259,6 +261,13 @@ export class FakeGit extends Git {
   override async hasCommits(): Promise<boolean> {
     return true;
   }
+
+  // Real git would shell out to `git sparse-checkout`; there's no real repo
+  // backing these fakes' worktrees, so this just records what was asked for.
+  sparseExcluded: string[] | undefined;
+  override async excludeFromSparseCheckout(_worktreeDir: string, holdoutPaths: readonly string[]): Promise<void> {
+    this.sparseExcluded = [...holdoutPaths];
+  }
 }
 
 // The runner grades the build itself now (audit finding #11), so every test
@@ -272,6 +281,22 @@ export class FakeGateRunner implements GateRunner {
   async run(_worktreeDir: string) {
     this.runs++;
     return { stdout: this.next.shift() ?? this.line, stderr: "", code: 0 };
+  }
+}
+
+// Defaults to passing, so every existing scenario that never configures
+// holdout is unaffected; a test that cares sets `ok`/`detail` directly.
+export class FakeHoldoutRunner implements HoldoutRunner {
+  ok = true;
+  detail = "";
+  runs = 0;
+  // Results to return before falling back to `ok`/`detail`, one per run —
+  // same shape as FakeGateRunner's `next`, for scripting fail-then-pass retries.
+  next: boolean[] = [];
+  async run(_worktreeDir: string, _base: string, _holdout: HoldoutConfig) {
+    this.runs++;
+    const result = this.next.length > 0 ? this.next.shift()! : this.ok;
+    return { stdout: result ? "" : this.detail, stderr: "", code: result ? 0 : 1 };
   }
 }
 

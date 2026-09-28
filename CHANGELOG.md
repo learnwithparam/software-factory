@@ -1,5 +1,41 @@
 # Changelog
 
+## v2.11.0
+
+Ready for "Build a Claude Code Verification Harness": holdout tests give the Doer-and-Tester
+loop a check the builder's own `gates.sh` cannot have been tuned to pass, and two install-time
+gaps found in an audit of a live second repo (lwp-website) are closed before they can break one.
+
+- **`src/holdout.ts`: holdout tests.** `holdout: { paths: [...], cmd: "..." }` in config, off by
+  default (`holdoutEnabled` reads it off an empty `cmd`). `Git.excludeFromSparseCheckout`
+  (`src/git.ts`, non-cone sparse-checkout) hides the configured paths from every stage's worktree
+  from the moment `ensureWorktreeReady` creates it, so no agent (Claude, Codex or Cursor alike)
+  ever reads them. Verify runs them against a scratch copy assembled from `git archive HEAD` with
+  the holdout paths force-overlaid from `origin/<base>` (defense in depth if one ever reached HEAD
+  altered), and rejects on failure with only the truncated stdout/stderr, never source, feeding the
+  existing reject-and-rebuild loop (`MAX_VERIFY_REJECTS`) so a failing holdout escalates to
+  `factory:needs-human` with a `gave-up` retro the same way an AI-verifier reject does. Holdout
+  paths are also merged into the pre-push protected-path diff check, so a build that creates or
+  edits one is refused regardless of how it did it. `factory-verify/SKILL.md` notes that holdout
+  results are the runner's; the skill itself never reads the paths.
+- **`src/doctor.ts`: the baseline-tag check is gated on `config.resettable`.** A repo that never
+  opts into `reset`/`rebaseline` (lwp-website, which must never be reset) has no reason to keep a
+  `baseline` tag current, and previously failed doctor for a tag it could never use.
+- **`bin/factory install`: labels are created right after a real install**, calling the existing
+  `fixDoctor` (labels resolver: `labelsFor` in `src/labels.ts`, already used by `doctor --fix` and
+  `reset`) instead of leaving a fresh repo with no `factory:*` labels until someone remembers to run
+  `doctor --fix` first. Skipped on `--dry-run`; best-effort on a fresh clone with no filled-in
+  `config.json` yet.
+
+Not in v2.11.0:
+- `bin/factory` itself typechecked: `tsconfig.json` lists `bin` under `include`, but the file has no
+  `.ts` extension, so `tsc --noEmit` silently skips it (confirmed by planting a type error in it and
+  seeing `tsc` exit 0). Pre-existing, not introduced here; fixing it means either renaming the
+  entrypoint or adding an extension-less override, both out of scope for this release.
+- A holdout test actually written for any real repo: this release ships the mechanism, off by
+  default. splitbill-demo gets its first holdout test in the next release.
+- Live Codex/Cursor cross-agent verification: unrelated to holdout itself, tracked separately.
+
 ## v2.10.0
 
 Memory across runs. A run's lessons now survive it: a read-only retro stage proposes at

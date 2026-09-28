@@ -14,7 +14,7 @@ import { mergeConfig } from "../src/config";
 import type { StageRunOptions, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 // Every stage run ends the issue at "needs-info" after triage alone, same
 // shape as machine-dispatch.test.ts's fixture. `active` tracks, per issue
@@ -57,7 +57,7 @@ function setup(delayMsFor: (issue: number) => number) {
   const github = new FakeGitHub([baseIssue(1, ["factory:ready"])]);
   const executor = new SlowTriageExecutor(delayMsFor);
   const config = mergeConfig({ repo: "acme/repo", concurrency: 1 });
-  const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
+  const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
   return { deps, config, github, executor, workspacesDir, cloneDir };
 }
 

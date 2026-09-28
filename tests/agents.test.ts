@@ -18,7 +18,7 @@ import { STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr", "retro"];
 // The stages a "shipped" run (no merge, so no retro) actually executes.
@@ -146,7 +146,7 @@ describe("an agent with no preset", () => {
       agents: { scripted: { command: [join(import.meta.dir, "fixtures/agents/fake-agent.sh")] } },
       stages: { default: "scripted" },
     });
-    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
+    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
     try {
       expect(await processReadyIssue(issue, deps, config)).toBe("shipped");
     } finally {
@@ -184,7 +184,7 @@ describe("codex with read-only stages", () => {
     const state = new FactoryState(":memory:");
     state.setToggle("auto_approve_low_risk", true);
     const config = mergeConfig({ repo: "acme/widgets", agents: { codex: { preset: "codex", model: "gpt-5.6-terra", ...(outputSchema ? { outputSchema } : {}) } }, stages: { default: "codex" } });
-    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
+    const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir: mkdtempSync(join(scratch, "clone-")), workspacesDir: mkdtempSync(join(scratch, "ws-")) };
     try {
       return { result: await processReadyIssue(issue, deps, config), github, state, log };
     } finally {
@@ -234,7 +234,7 @@ describe("the runner refuses a self-contradicting verdict", () => {
       }
     }
     try {
-      const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), cloneDir: scratch, workspacesDir };
+      const deps = { github, git: new SkillGit(), state, executor: new CommandExecutor(config.agents, config.stages), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir: scratch, workspacesDir };
       state.setToggle("auto_approve_low_risk", true);
       expect(await processReadyIssue(issue, deps, config)).toBe("needs-human");
     } finally {

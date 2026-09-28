@@ -13,7 +13,7 @@ import type { StageName, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, fixtureFor, MultiStageExecutor } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const seen = new Set<string>();
 const initialLabels = new Map<object, string[]>();
@@ -32,13 +32,14 @@ function setup(initial: string[], overrides: Partial<typeof DEFAULT_CONFIG> = {}
   const state = new FactoryState(":memory:");
   const executor = new MultiStageExecutor();
   const gateRunner = new FakeGateRunner();
+  const holdoutRunner = new FakeHoldoutRunner();
   const config = mergeConfig({ repo: "acme/widgets", ...overrides });
-  const deps = { github, git, state, executor, gateRunner, cloneDir, workspacesDir };
+  const deps = { github, git, state, executor, gateRunner, holdoutRunner, cloneDir, workspacesDir };
   initialLabels.set(github, initial);
   const step = async () => advanceIssue(deps, config, github.issues.get(n)!);
   const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) =>
     executor.push(stage, n, fixtureFor(stage, n), files, result);
-  return { n, github, git, state, executor, gateRunner, config, deps, step, push, workspacesDir };
+  return { n, github, git, state, executor, gateRunner, holdoutRunner, config, deps, step, push, workspacesDir };
 }
 type Ctx = ReturnType<typeof setup>;
 

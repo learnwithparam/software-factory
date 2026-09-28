@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { configProblems, DEFAULT_CONFIG, loadConfig } from "../src/config";
+import { configProblems, DEFAULT_CONFIG, holdoutEnabled, loadConfig } from "../src/config";
 
 const dir = mkdtempSync(join(tmpdir(), "factory-cfg-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -74,6 +74,14 @@ describe("base branch defaults to origin/HEAD, not the hard-coded \"main\"", () 
   });
 });
 
+describe("holdoutEnabled", () => {
+  test("off when cmd is empty, on otherwise, regardless of paths", () => {
+    expect(holdoutEnabled({ paths: [], cmd: "" })).toBe(false);
+    expect(holdoutEnabled({ paths: [".factory/holdout/**"], cmd: "" })).toBe(false);
+    expect(holdoutEnabled({ paths: [], cmd: "bun test .factory/holdout" })).toBe(true);
+  });
+});
+
 describe("config validation at boot", () => {
   test("an unknown top-level key refuses to start and names the key", async () => {
     await expect(loadConfig(repoWith({ repo: "a/b", maxOpenFactoryPr: 3 }))).rejects.toThrow(/maxOpenFactoryPr: unknown key/);
@@ -91,6 +99,16 @@ describe("config validation at boot", () => {
 
   test("agent-facing riskCriteria and _comment keys are allowed", () => {
     expect(configProblems({ repo: "a/b", _comment: "hi", riskCriteria: { low: {} } })).toEqual([]);
+  });
+
+  // Plan v2.11.0 item C: holdout is off by default (empty cmd), so "" must
+  // pass even though every other "string"-kind key requires non-empty.
+  test("holdout.cmd may be empty (the off switch), but not the wrong type", () => {
+    expect(configProblems({ repo: "a/b", holdout: { paths: [], cmd: "" } })).toEqual([]);
+    const problems = configProblems({ repo: "a/b", holdout: { cmd: 1, paths: "nope", extra: true } });
+    expect(problems.join("\n")).toMatch(/holdout\.cmd: expected string/);
+    expect(problems.join("\n")).toMatch(/holdout\.paths: expected strings/);
+    expect(problems.join("\n")).toMatch(/holdout\.extra: unknown key/);
   });
 
   test("every key of DEFAULT_CONFIG validates, and the shipped example config passes", () => {

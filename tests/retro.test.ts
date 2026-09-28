@@ -15,7 +15,7 @@ import type { StageName, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue, pollOnce } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, fixtureFor, MultiStageExecutor } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -31,8 +31,9 @@ function setup(initial: string[], overrides: Parameters<typeof mergeConfig>[0] =
   const state = new FactoryState(":memory:");
   const executor = new MultiStageExecutor();
   const gateRunner = new FakeGateRunner();
+  const holdoutRunner = new FakeHoldoutRunner();
   const config = mergeConfig({ repo: "acme/widgets", ...overrides });
-  const deps = { github, git, state, executor, gateRunner, cloneDir, workspacesDir };
+  const deps = { github, git, state, executor, gateRunner, holdoutRunner, cloneDir, workspacesDir };
   const push = (stage: StageName, files: Record<string, string>, result?: Partial<StageRunResult>) => executor.push(stage, n, fixtureFor(stage, n), files, result);
   return { n, github, state, executor, config, deps, push };
 }

@@ -15,7 +15,7 @@ import type { StageRunOptions, StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { pollOnce } from "../src/watch";
 import { MachineLeases, MachineSpend } from "../src/machine";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 // Every stage run this executor serves takes `delayMs` and always ends the
 // issue at "needs-info" after triage alone — one runStage call is enough to
@@ -54,6 +54,7 @@ function makeDeps(repo: string, issues: number[], executor: SlowTriageExecutor, 
     state: new FactoryState(":memory:"),
     executor,
     gateRunner: new FakeGateRunner(),
+    holdoutRunner: new FakeHoldoutRunner(),
     cloneDir,
     workspacesDir,
     machine: { leases, config: { slots }, spend },
