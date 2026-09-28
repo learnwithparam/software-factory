@@ -26,6 +26,14 @@ async function spawnGit(args: string[], cwd?: string, env?: Record<string, strin
 // configured, so a developer's own identity is never overridden.
 export const FALLBACK_IDENTITY = ["-c", "user.name=software-factory", "-c", "user.email=factory@users.noreply.github.com"];
 
+// Pure so it's unit-testable without a real repo: non-cone sparse-checkout
+// wants a leading "/*" (everything) followed by a "!"-negated pattern per
+// excluded path, each anchored at the repo root the same way `Bun.Glob`
+// patterns already are elsewhere in this codebase (src/boundary.ts).
+export function sparseCheckoutPatterns(holdoutPaths: readonly string[]): string[] {
+  return ["/*", ...holdoutPaths.map((p) => `!/${p.replace(/^\/+/, "")}`)];
+}
+
 export class GitCommandRunner implements CommandRunner {
   async run(args: string[], opts?: { cwd?: string; env?: Record<string, string> }): Promise<CommandResult> {
     if (args[0] === "commit" || args[0] === "commit-tree") {
@@ -83,6 +91,17 @@ export class Git {
   /** @deprecated use ensureWorktree */
   async addWorktree(cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     return this.ensureWorktree(cloneDir, worktreeDir, issue);
+  }
+
+  // Holdout tests (plan v2.11.0 item C): hides the configured paths from the
+  // worktree by content, not just by convention, so no stage's agent — Claude,
+  // Codex or Cursor alike — can ever read them, regardless of what a prompt
+  // asks for. A no-op when there is nothing to hide, so a repo with holdout
+  // off never pays for a sparse-checkout it doesn't use.
+  async excludeFromSparseCheckout(worktreeDir: string, holdoutPaths: readonly string[]): Promise<void> {
+    if (holdoutPaths.length === 0) return;
+    await this.runner.run(["sparse-checkout", "init", "--no-cone"], { cwd: worktreeDir });
+    await this.runner.run(["sparse-checkout", "set", ...sparseCheckoutPatterns(holdoutPaths)], { cwd: worktreeDir });
   }
 
   // Generic (non-issue) counterpart to ensureWorktree, for `factory learn`

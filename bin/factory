@@ -13,6 +13,7 @@ import { loadConfig, type FactoryConfig } from "../src/config";
 import { EXIT, UsageError, failureJson, successJson } from "../src/cli-output";
 import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } from "../src/watch";
 import { ShellGateRunner } from "../src/gates";
+import { ShellHoldoutRunner } from "../src/holdout";
 import { ShellSetupRunner } from "../src/setup";
 import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
@@ -81,6 +82,7 @@ function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
     state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
     gateRunner: new ShellGateRunner(),
+    holdoutRunner: new ShellHoldoutRunner(),
     rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
@@ -317,6 +319,7 @@ async function cmdDoctor(): Promise<void> {
       legacyStatePath: defaultStatePath(process.env),
       legacyWorkspacesDir: defaultWorkspacesDir(process.env),
       configuredSlots: loadMachineConfig().slots,
+      resettable: config.resettable,
     },
   );
   const allOk = checks.every((c) => c.ok || c.warn);
@@ -430,6 +433,18 @@ async function cmdInstall(): Promise<void> {
   const proc = Bun.spawn(["bash", script, target, ...passthrough], { stdout: "inherit", stderr: "inherit" });
   const code = await proc.exited;
   if (code !== 0) process.exit(code);
+  if (has("dry-run")) return;
+  // Labels are cheap and idempotent, so create them right after a real install
+  // instead of making every repo run a separate `doctor --fix` first. Best
+  // effort: a fresh install with no filled-in config.json still gets the
+  // "next:" hint above, and `doctor --fix` stays the authoritative fixer.
+  try {
+    const config = await loadConfig(resolve(target));
+    await fixDoctor(new GitHub(), config.repo, config.routes);
+    console.log(`factory install: labels ensured on ${config.repo}`);
+  } catch {
+    // no usable config.json yet
+  }
 }
 
 async function main(): Promise<void> {

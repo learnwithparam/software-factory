@@ -15,7 +15,7 @@ import { aggregateStageEvents, ReplayExecutor, type StageName } from "../src/exe
 import { claudeArgs, parseStreamJsonLine } from "../src/agents/presets/claude";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, fixtureFor, MultiStageExecutor } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue, resumeNeedsInfo } from "../src/watch";
@@ -172,7 +172,7 @@ describe("full happy-path pipeline (triage -> plan -> build -> verify -> pr)", (
       "pr-body.md": "## Summary\nDid the thing.\nCloses #1",
     });
 
-    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
+    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("shipped");
@@ -225,7 +225,7 @@ describe("needs-info path", () => {
       "question-comment.md": "<!-- factory:question v1 -->\n1. Which environment?\na) staging\nb) production",
     });
 
-    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
+    const deps = { github, git, state, executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
     const outcome = await processReadyIssue(issue, deps, config);
 
     expect(outcome).toBe("needs-info");

@@ -88,6 +88,7 @@ export interface FactoryConfig {
   // dollar ones, since an unpriced run can't be summed into them.
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
+  readonly holdout: HoldoutConfig;
 }
 
 export interface SpendConfig {
@@ -108,6 +109,23 @@ export interface MergeConfig {
   readonly autoPaths: readonly string[];
   readonly maxFiles: number;
   readonly maxLines: number;
+}
+
+// Holdout tests (plan v2.11.0 item C, for "Build a Claude Code Verification
+// Harness"): hidden from every agent's worktree by a sparse-checkout
+// exclusion (src/git.ts) and refused as a build target by the boundary check
+// (src/boundary.ts); verify restores them from the base commit into a
+// separate scratch copy and runs `cmd`, rejecting on failure with the test
+// name and assertion message only, never the source. Off (the default) when
+// `cmd` is empty — the one place that decides on/off, so nothing else
+// re-derives it.
+export interface HoldoutConfig {
+  readonly paths: readonly string[];
+  readonly cmd: string;
+}
+
+export function holdoutEnabled(holdout: HoldoutConfig): boolean {
+  return holdout.cmd !== "";
 }
 
 export const DEFAULT_CONFIG: FactoryConfig = {
@@ -131,6 +149,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   routes: {},
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
+  holdout: { paths: [], cmd: "" },
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -145,6 +164,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...partial.merge },
+    holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
   };
 }
 
@@ -174,6 +194,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   routes: "object",
   spend: "object",
   merge: "object",
+  holdout: "object",
   riskCriteria: "object",
 };
 
@@ -218,6 +239,17 @@ export function configProblems(raw: unknown): string[] {
     }
   }
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
+  if (cfg.holdout !== undefined && kindOk(cfg.holdout, "object")) {
+    const holdout = cfg.holdout as Record<string, unknown>;
+    for (const [key, value] of Object.entries(holdout)) {
+      if (key.startsWith("_")) continue;
+      if (key === "paths") { if (!kindOk(value, "strings")) problems.push(`holdout.paths: expected strings, got ${JSON.stringify(value)}`); }
+      // "" is the explicit off switch (holdoutEnabled), so unlike every other
+      // "string" key here, empty is allowed: only a non-string is a problem.
+      else if (key === "cmd") { if (typeof value !== "string") problems.push(`holdout.cmd: expected string, got ${JSON.stringify(value)}`); }
+      else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
+    }
+  }
   if (cfg.gates !== undefined) {
     if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");
     else cfg.gates.forEach((g, i) => {

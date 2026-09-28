@@ -13,7 +13,7 @@ import { buildInbox } from "../src/inbox";
 import { MachineLeases, MachineSpend } from "../src/machine";
 import { FactoryState } from "../src/state";
 import { pollOnce, processReadyIssue } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 class ThrowingExecutor {
   async runStage(): Promise<never> {
@@ -26,7 +26,7 @@ function setup(config: Parameters<typeof mergeConfig>[0]) {
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   const github = new FakeGitHub([baseIssue(1, ["factory:ready"])]);
   const state = new FactoryState(":memory:");
-  const deps = { github, git: new FakeGit(), state, executor: new ThrowingExecutor(), gateRunner: new FakeGateRunner(), cloneDir, workspacesDir };
+  const deps = { github, git: new FakeGit(), state, executor: new ThrowingExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
   const merged = mergeConfig({ repo: "acme/repo", concurrency: 1, ...config });
   return { deps, config: merged, github, state, workspacesDir, cloneDir };
 }

@@ -45,6 +45,9 @@ export interface DoctorContext {
   // check only names the path and leaves the move to the operator.
   readonly legacyStatePath?: string;
   readonly legacyWorkspacesDir?: string;
+  // config.resettable (default false). Gates the baseline-tag check below:
+  // a repo that never sets this has no reason to keep a baseline tag current.
+  readonly resettable?: boolean;
   // The machine's own slot count (loadMachineConfig().slots), so doctor can
   // compare it against suggestSlots()'s cores/memory heuristic. Advice only
   // (plan v2.7.0 item 5): nothing here enforces the suggestion.
@@ -197,13 +200,19 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
     });
   }
 
-  const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
-  checks.push({
-    name: `baseline tag "${ctx.baselineTag}" exists`,
-    ok: tag.code === 0,
-    detail: tag.stdout.trim() || tag.stderr.trim(),
-    fixable: false,
-  });
+  // Only `reset`/`rebaseline` ever read this tag, and both already refuse on
+  // a repo that isn't resettable (reset.ts). A live repo (lwp-website) that
+  // deliberately never sets one would otherwise fail doctor for a tag it can
+  // never use, so this check doesn't fire unless the repo opted in.
+  if (ctx.resettable) {
+    const tag = await deps.git.run(["rev-parse", ctx.baselineTag], { cwd: ctx.cloneDir });
+    checks.push({
+      name: `baseline tag "${ctx.baselineTag}" exists`,
+      ok: tag.code === 0,
+      detail: tag.stdout.trim() || tag.stderr.trim(),
+      fixable: false,
+    });
+  }
 
   let existingLabels: Set<string>;
   try {

@@ -162,6 +162,31 @@ describe("install.sh scaffold", () => {
   });
 });
 
+// `bin/factory install` wiring: fixDoctor itself is unit-tested directly
+// (tests/doctor.test.ts) since `cmdInstall` hardcodes `new GitHub()` with no
+// seam to inject a fake for an in-process test. This proves the wiring
+// exists and is skipped on --dry-run, so a real install is never silently
+// missing the label-creation step it claims to run (plan v2.11.0 item A).
+describe("bin/factory install calls fixDoctor", () => {
+  const bin = readFileSync(join(import.meta.dir, "..", "bin", "factory"), "utf8");
+  const start = bin.indexOf("async function cmdInstall");
+  const end = bin.indexOf("async function main");
+  const cmdInstall = bin.slice(start, end);
+
+  test("calls fixDoctor after a real install", () => {
+    expect(cmdInstall).toContain("await fixDoctor(new GitHub(), config.repo, config.routes)");
+  });
+
+  test("returns before fixDoctor when --dry-run is set", () => {
+    const dryRunIdx = cmdInstall.indexOf('has("dry-run")');
+    const returnIdx = cmdInstall.indexOf("return;", dryRunIdx);
+    const fixDoctorIdx = cmdInstall.indexOf("fixDoctor(");
+    expect(dryRunIdx).toBeGreaterThan(-1);
+    expect(returnIdx).toBeGreaterThan(dryRunIdx);
+    expect(returnIdx).toBeLessThan(fixDoctorIdx);
+  });
+});
+
 describe("install.sh --agents", () => {
   const { PRESETS } = require("../src/agents/presets") as typeof import("../src/agents/presets");
   const { lstatSync, readlinkSync } = require("node:fs") as typeof import("node:fs");

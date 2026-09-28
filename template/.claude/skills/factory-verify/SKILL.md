@@ -18,6 +18,7 @@ the runner posts the verdict and moves the issue's label.
   differs, or the file is missing, the evidence is stale: report `uncertain`.
 - The worktree at its current state (build's commits, uncommitted or not).
 - The runner counts verify rounds itself: write `"rounds": 1` and it replaces the value.
+- Holdout results are the runner's: it runs them and posts a reject comment on failure before this skill is ever invoked again, so the skill never reads the holdout paths.
 
 ## 2. Run the subagents
 

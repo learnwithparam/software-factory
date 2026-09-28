@@ -10,7 +10,8 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
-import type { FactoryConfig } from "./config";
+import { holdoutEnabled, type FactoryConfig } from "./config";
+import { runHoldout, type HoldoutRunner } from "./holdout";
 import { writeRevision } from "./revision";
 import { TRUNCATION_KIND } from "./event-budget";
 import { costFor } from "./pricing";
@@ -75,6 +76,7 @@ export interface WatchDeps {
   readonly state: FactoryState;
   readonly executor: Executor;
   readonly gateRunner: GateRunner;
+  readonly holdoutRunner: HoldoutRunner;
   // A tool-free second look at must/should findings; absent means findings stand as written.
   readonly rechecker?: Rechecker;
   readonly cloneDir: string;
@@ -125,6 +127,9 @@ async function ensureWorktreeReady(
   fromLabel: string,
 ): Promise<boolean> {
   await deps.git.ensureWorktree(deps.cloneDir, worktree, issueNumber);
+  // Every resume path funnels through here, so this is the one place that has
+  // to hide holdout paths for triage, plan, build, verify and pr alike.
+  if (holdoutEnabled(config.holdout)) await deps.git.excludeFromSparseCheckout(worktree, config.holdout.paths);
   const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
   if (result.ok) return true;
   await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
@@ -571,7 +576,11 @@ async function runFromStage(
       // protected path never reaches Edit/Write, so the hook never sees it
       // (audit finding #12). Diff the branch itself before pushing anything.
       const changed = await deps.git.changedFiles(worktree, config.base);
-      const hits = touchesProtectedPath(changed, config.protectedPaths);
+      // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
+      // covering the default holdout location; this adds any holdout path a
+      // repo configured outside it.
+      const protectedPaths = holdoutEnabled(config.holdout) ? [...config.protectedPaths, ...config.holdout.paths] : config.protectedPaths;
+      const hits = touchesProtectedPath(changed, protectedPaths);
       if (hits.length) {
         await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
@@ -604,6 +613,29 @@ async function runFromStage(
             finish(deps, config, issueNumber, "failed", `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`);
             return "failed";
           }
+          stage = "build";
+          continue;
+        }
+      }
+      // Also a build problem, not something for the verifier to judge: a
+      // holdout test the build never saw is the one check its own gates.sh
+      // cannot have been tuned to pass. Unlike the gates recheck above, this
+      // runs on every entry to verify, not only a stale one — a fresh build
+      // flowing straight into verify in the same tick is the common case,
+      // and gate.json (written by the build, which never saw these paths)
+      // cannot possibly already cover them.
+      if (holdoutEnabled(config.holdout)) {
+        const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
+        if (!holdout.ok) {
+          ctx.rejectRound += 1;
+          await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, { stage: "verify", json: { holdout: holdout.detail } });
+          if (ctx.rejectRound > MAX_VERIFY_REJECTS) {
+            await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
+            await runRetro(deps, config, issue, "gave-up");
+            finish(deps, config, issueNumber, "needs-human", `holdout tests failed ${ctx.rejectRound} times`);
+            return "needs-human";
+          }
+          await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.building);
           stage = "build";
           continue;
         }

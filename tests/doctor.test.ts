@@ -5,9 +5,9 @@
 // jq (which gates.sh and the CI workflow assume). Audit findings #13.
 
 import { describe, expect, test } from "bun:test";
-import { runDoctor, type DoctorDeps } from "../src/doctor";
+import { fixDoctor, runDoctor, type DoctorDeps } from "../src/doctor";
 import { GitHub, type CommandResult, type CommandRunner } from "../src/github";
-import { LABELS } from "../src/labels";
+import { LABELS, labelsFor } from "../src/labels";
 
 class FakeGitHub extends GitHub {
   constructor(private readonly auth: { ok: boolean; detail: string }) {
@@ -18,6 +18,13 @@ class FakeGitHub extends GitHub {
   }
   override async listLabels(): Promise<string[]> {
     return LABELS.map((l) => l.name); // doctor's label check isn't what this file is testing
+  }
+}
+
+class TrackingGitHub extends GitHub {
+  readonly ensured: { repo: string; name: string; color: string; description: string }[] = [];
+  override async ensureLabel(repo: string, name: string, color: string, description: string): Promise<void> {
+    this.ensured.push({ repo, name, color, description });
   }
 }
 
@@ -137,6 +144,30 @@ describe("legacy shared state warning", () => {
   });
 });
 
+// Plan v2.11.0 item B: lwp-website never sets `resettable` and must never be
+// reset, so it has no reason to keep a baseline tag current. The check now
+// only fires for a repo that opted in via `config.resettable`.
+describe("baseline tag, gated on resettable", () => {
+  test("silent when resettable is unset", async () => {
+    const checks = await runDoctor(deps(), ctx);
+    expect(checks.some((c) => c.name.includes("baseline tag"))).toBe(false);
+  });
+
+  test("fails when resettable is true and the tag doesn't exist", async () => {
+    const failingGit: CommandRunner = { run: async () => ({ stdout: "", stderr: "fatal: bad revision 'baseline'", code: 128 }) };
+    const checks = await runDoctor({ ...deps(), git: failingGit }, { ...ctx, resettable: true });
+    const check = checks.find((c) => c.name.includes("baseline tag"))!;
+    expect(check.ok).toBe(false);
+    expect(check.detail).toContain("bad revision");
+  });
+
+  test("passes when resettable is true and the tag exists", async () => {
+    const checks = await runDoctor(deps(), { ...ctx, resettable: true });
+    const check = checks.find((c) => c.name.includes("baseline tag"))!;
+    expect(check.ok).toBe(true);
+  });
+});
+
 describe("agents in doctor", () => {
   const agents = { claude: { preset: "claude" }, codex: { preset: "codex" }, aider: { command: ["aider", "--yes"] }, unused: { preset: "codex" } };
 
@@ -192,6 +223,30 @@ describe("installed skills drift", () => {
 
   test("passes when the installed skills equal the template", async () => {
     expect((await drift("new text")).ok).toBe(true);
+  });
+});
+
+// Plan v2.11.0 item A: `factory install` calls this right after a real
+// install instead of leaving it to a separate `doctor --fix`. This is the
+// only place that exercises it: `bin/factory` hardcodes `new GitHub()` with
+// no seam to inject a fake, so the wiring itself is a source check below.
+describe("fixDoctor", () => {
+  test("ensures every labelsFor(routes) label, including a repo-added type", async () => {
+    const github = new TrackingGitHub();
+    const routes = { content: {}, bug: {} }; // "content" is not in TYPE_LABELS, "bug" already is
+    await fixDoctor(github, "acme/widgets", routes);
+    const want = labelsFor(routes);
+    expect(github.ensured.length).toBe(want.length);
+    for (const label of want) {
+      expect(github.ensured).toContainEqual({ repo: "acme/widgets", name: label.name, color: label.color, description: label.description });
+    }
+    expect(github.ensured.some((l) => l.name === "content")).toBe(true);
+  });
+
+  test("with no routes, ensures exactly LABELS", async () => {
+    const github = new TrackingGitHub();
+    await fixDoctor(github, "acme/widgets");
+    expect(github.ensured.map((l) => l.name).sort()).toEqual(LABELS.map((l) => l.name).sort());
   });
 });
 
