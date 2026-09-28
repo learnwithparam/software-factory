@@ -33,6 +33,10 @@ export interface GhIssue {
   body: string;
   labels: { name: string }[];
   comments: GhComment[];
+  // Only populated by getIssue (blockers.ts is the one caller that needs
+  // them); listIssuesByLabel and listOpenIssues leave both undefined.
+  state?: "OPEN" | "CLOSED";
+  stateReason?: string | null;
 }
 
 export interface GhComment {
@@ -125,10 +129,16 @@ export class GitHub {
       "open",
       "--json",
       "number,title,body,labels,comments",
+      // gh defaults to 30; a repo can carry far more than 30 ready issues at
+      // once (audit: silently dropped tickets past the default).
+      "--limit",
+      "500",
     ]);
     return JSON.parse(result.stdout || "[]");
   }
 
+  // Includes state/stateReason (blockers.ts's only reader of either field) so
+  // a blocker check needs one call, not a separate `gh issue view --json state`.
   async getIssue(repo: string, number: number): Promise<GhIssue> {
     const result = await this.exec([
       "issue",
@@ -137,7 +147,7 @@ export class GitHub {
       "--repo",
       repo,
       "--json",
-      "number,title,body,labels,comments",
+      "number,title,body,labels,comments,state,stateReason",
     ]);
     return JSON.parse(result.stdout);
   }

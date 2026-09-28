@@ -747,6 +747,49 @@ describe("proof: check ships markdown-only work with no test file", () => {
   });
 });
 
+// blockers.ts: the "Blocked by" line on a ready issue's body gates it out of
+// pollOnce's candidate list until every referenced issue is closed, then
+// promotes it back to ready the same poll its last blocker clears.
+describe("blocker gate", () => {
+  test("24. a ready issue blocked by an open issue demotes, then promotes and ships once its blocker closes", async () => {
+    const c = setup([LABEL.ready]);
+    c.github.issues.get(1)!.body = "Blocked by: #2";
+    c.github.issues.set(2, baseIssue(2, []));
+
+    let result = await pollOnce(c.deps, c.config);
+    expect(result.processed).toEqual([]);
+    expect(labels(c.github, 1)).toEqual([LABEL.blocked]);
+    expect(c.github.issues.get(1)!.comments).toHaveLength(1);
+    expect(c.github.issues.get(1)!.comments[0]!.body).toContain("#2");
+
+    // Polling again with the blocker still open must not comment a second time.
+    result = await pollOnce(c.deps, c.config);
+    expect(c.github.issues.get(1)!.comments).toHaveLength(1);
+
+    c.github.issues.get(2)!.state = "CLOSED";
+    c.state.setToggle("auto_approve_low_risk", true);
+    happy(c);
+    result = await pollOnce(c.deps, c.config);
+    expect(result.processed).toEqual([1]);
+    expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+
+  test("24b. a blocker closed as not planned still blocks", async () => {
+    const c = setup([LABEL.ready]);
+    c.github.issues.get(1)!.body = "Blocked by: #2";
+    const blocker = baseIssue(2, []);
+    blocker.state = "CLOSED";
+    blocker.stateReason = "NOT_PLANNED";
+    c.github.issues.set(2, blocker);
+
+    const result = await pollOnce(c.deps, c.config);
+    expect(result.processed).toEqual([]);
+    expect(labels(c.github, 1)).toEqual([LABEL.blocked]);
+    done(c);
+  });
+});
+
 test("every state and parked label is reached by a scenario", () => {
   const unreached = Object.values(LABEL).filter((l) => l !== LABEL.monitor && !seen.has(l));
   expect(unreached).toEqual([]);

@@ -26,7 +26,7 @@ describe("inbox structure", () => {
   });
 
   test("every factory state or parked label yields one item with actions, or none for in-flight labels", () => {
-    const inFlight = new Set<string>([LABEL.ready, LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying]);
+    const inFlight = new Set<string>([LABEL.ready, LABEL.blocked, LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying]);
     for (const l of LABELS.filter((x) => x.category === "state" || x.category === "parked")) {
       const items = buildInbox([issue(1, l.name)]);
       if (inFlight.has(l.name)) expect(items, l.name).toHaveLength(0);
