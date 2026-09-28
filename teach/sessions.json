@@ -1,13 +1,14 @@
 {
-  "note": "One row per teaching session. `tag` is the factory release it teaches; `planned` means it has no CHANGELOG entry yet. `checkpoint` names the immutable splitbill tag `checkpoint/<name>` a participant starts from, or null when the session has none. `issue` is a file in splitbill's .factory/issues/. `demo` lists the DEMO.md steps to run.",
+  "note": "One row per teaching session. `tag` is the factory release it teaches; `planned` means it has no CHANGELOG entry yet. `checkpoint` names the immutable splitbill-demo tag `checkpoint/<name>` a participant starts from, or null when none has been cut yet. `issue` is a file in splitbill-demo's .factory/issues/. `demo` lists the DEMO.md steps to run. Rekeyed to the Maven `lightning-*` lesson keys and the `agentic-software-factory` cohort's six modules (see lwp-website/src/data/maven.generated.ts) instead of the old internal lesson-N numbering, which did not match either curriculum.",
   "sessions": [
-    { "id": "lesson-1", "title": "Boundary", "tag": "v2.3.0", "planned": false, "checkpoint": "01-boundary", "issue": "01-readme-missing-run-steps.md", "demo": ["Setup", "Live sequence 1"] },
-    { "id": "interim-a", "title": "Cockpit and inbox", "tag": "v2.4.0", "planned": false, "checkpoint": null, "issue": "03-csv-raw-cents.md", "demo": ["Live sequence 1", "Live sequence 2"] },
-    { "id": "lesson-2", "title": "Execution: any agent, checked and costed", "tag": "v2.5.2", "planned": false, "checkpoint": "02-execution", "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "Live sequence 3"] },
-    { "id": "interim-b", "title": "One factory, any agent", "tag": "v2.6.1", "planned": false, "checkpoint": null, "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1"] },
-    { "id": "lesson-3", "title": "Context routing", "tag": "v2.7.0", "planned": false, "checkpoint": "03-context", "issue": "04-search-sql-injection.md", "demo": ["Live sequence 3"] },
-    { "id": "lesson-6", "title": "Risk-gated merge", "tag": "v2.8.0", "planned": false, "checkpoint": "06-delivery", "issue": "01-readme-missing-run-steps.md", "demo": ["Deliver and reset"] },
-    { "id": "lesson-5", "title": "Self-healing loop", "tag": "v3.0.0", "planned": true, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Live sequence 1"] },
-    { "id": "interim-c", "title": "Enterprise hardening", "tag": "v3.3.0", "planned": true, "checkpoint": null, "issue": "05-delete-expense-idor.md", "demo": ["Live sequence 5"] }
+    { "id": "lightning-2", "title": "Build Your First Software Factory Execution Harness", "tag": "v2.6.2", "planned": false, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Setup", "By release"] },
+    { "id": "lightning-3", "title": "Build a Claude Code Verification Harness", "tag": "v2.11.0", "planned": false, "checkpoint": null, "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "By release"] },
+    { "id": "lightning-4", "title": "Build an AI-Native Software Factory: Issue to Verified PR", "tag": "v2.9.0", "planned": false, "checkpoint": null, "issue": "03-csv-raw-cents.md", "demo": ["Live sequence 1", "Deliver and reset"] },
+    { "id": "module-1", "title": "Design Your Software Factory Architecture", "tag": "v2.3.0", "planned": false, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Setup"] },
+    { "id": "module-2", "title": "Isolate Agent Work with an Execution Harness", "tag": "v2.6.1", "planned": false, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Setup", "By release"] },
+    { "id": "module-3", "title": "Route the Right Context to Every Task", "tag": "v2.7.0", "planned": false, "checkpoint": null, "issue": "04-search-sql-injection.md", "demo": ["Live sequence 3"] },
+    { "id": "module-4", "title": "Make Agents Prove Their Work", "tag": "v2.5.2", "planned": false, "checkpoint": null, "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "By release"] },
+    { "id": "module-5", "title": "Build Self-Healing Engineering Loops", "tag": "v3.0.0", "planned": true, "checkpoint": null, "issue": "01-readme-missing-run-steps.md", "demo": ["Paths you cannot force live"] },
+    { "id": "module-6", "title": "Orchestrate and Ship Verified PRs", "tag": "v2.8.0", "planned": false, "checkpoint": null, "issue": "03-csv-raw-cents.md", "demo": ["Live sequence 1", "Deliver and reset"] }
   ]
 }

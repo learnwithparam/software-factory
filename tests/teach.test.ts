@@ -8,7 +8,9 @@ interface Session { id: string; title: string; tag: string; planned: boolean; ch
 const root = join(import.meta.dir, "..");
 const { sessions } = JSON.parse(readFileSync(join(root, "teach/sessions.json"), "utf8")) as { sessions: Session[] };
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
-const splitbill = [process.env.SPLITBILL_DIR, join(root, "../../../splitbill"), join(root, "../splitbill")].find((d) => d && existsSync(join(d, "DEMO.md")));
+const splitbill = [process.env.SPLITBILL_DIR, join(root, "../../../splitbill-demo"), join(root, "../splitbill-demo"), join(root, "../../../splitbill"), join(root, "../splitbill")].find(
+  (d) => d && existsSync(join(d, "DEMO.md")),
+);
 
 describe("teach/sessions.json", () => {
   test("ids and tags are unique, and checkpoints are used once", () => {
