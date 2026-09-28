@@ -115,7 +115,7 @@ function stepEnvelopeProblem(o: Record<string, unknown>): string | undefined {
 export const STEP_KEYS: Record<Exclude<ArtifactStage, "verify">, readonly string[]> = {
   triage: ["disposition", "type", "risk", "done_when", "files_expected", "gate_level", "confidence", "outcome", "summary"],
   plan: ["status", "risk", "revision", "files", "autoApproveEligible", "commentId", "proof", "outcome", "summary"],
-  build: ["status", "gate_line", "rounds", "outcome", "summary"],
+  build: ["status", "gate_line", "rounds", "screenshots", "outcome", "summary"],
   pr: ["outcome", "summary"],
   retro: ["lesson", "skill_name", "skill_edit", "outcome", "summary"],
 };

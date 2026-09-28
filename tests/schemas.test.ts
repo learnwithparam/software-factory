@@ -55,6 +55,29 @@ describe("validators enforce the schema, not just the key list", () => {
 // v2.7.0 item 1: the triage schema's `type` enum is bounded by the repo's
 // actual type list, not a fixed five, so a route-added type (e.g. "content")
 // validates when the caller passes it, and still fails closed by default.
+// plan v2.12.0 item B.5: the ui route's build step records a screenshot
+// manifest so factory-verify can require and score it.
+describe("build's screenshots field", () => {
+  const base = { status: "green" as const, gate_line: "l", rounds: 1 };
+
+  test("an array of manifest entries validates", () => {
+    const good = { ...base, screenshots: [{ state: "guest", viewport: "1440", theme: "light", path: "x.png" }] };
+    expect(validateStepJson("build", good)).toEqual({ ok: true });
+  });
+
+  test("absent screenshots still validates: only the ui route ever sends it", () => {
+    expect(validateStepJson("build", base)).toEqual({ ok: true });
+  });
+
+  test("a non-array screenshots field fails", () => {
+    expect(validateStepJson("build", { ...base, screenshots: "x.png" }).ok).toBe(false);
+  });
+
+  test("an array of strings, not objects, fails", () => {
+    expect(validateStepJson("build", { ...base, screenshots: ["x.png"] }).ok).toBe(false);
+  });
+});
+
 describe("triage's type enum follows the repo's routes, not a fixed list", () => {
   const contentTriage = { disposition: "proceed", type: "content", risk: "low", done_when: "x", files_expected: [], gate_level: "g", confidence: 0.9 };
 

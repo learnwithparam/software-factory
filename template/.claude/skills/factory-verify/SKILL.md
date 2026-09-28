@@ -17,10 +17,26 @@ the runner posts the verdict and moves the issue's label.
   the gate result is current: use it and do not re-run the gates. If the tree
   differs, or the file is missing, the evidence is stale: report `uncertain`.
 - The worktree at its current state (build's commits, uncommitted or not).
-- The runner counts verify rounds itself: write `"rounds": 1` and it replaces the value.
-- Holdout results are the runner's: it runs them and posts a reject comment on failure before this skill is ever invoked again, so the skill never reads the holdout paths.
+  Write `"rounds": 1`; the runner counts verify rounds itself and replaces
+  the value. Holdout results are the runner's too: it runs them and posts a
+  reject comment on failure before this skill is ever invoked again, so the
+  skill never reads the holdout paths.
 
-## 2. Run the subagents
+## 2. UI route: the visual check
+
+Skip unless `triage.json`'s `type` is `ui`. Read `build.json`'s `screenshots`
+array against `.claude/skills/lwp-design/SKILL.md`'s state list and rubric.
+Every state x viewport (390, 1440) x theme (light, dark) combination the
+plan's AC-n list covers needs an entry; a gap is a `must` finding at
+confidence 5, and the verdict cannot be `pass`. Read each screenshot (a
+worktree file, not a URL) against lwp-design's five-criterion rubric
+(hierarchy, 390px thumb reach, AA contrast, token use, restraint, each
+1-5); any criterion under 4 is a `should` finding naming the screenshot,
+the criterion and the score, and three or more such findings become a
+`must`. This runs alongside, not instead of, step 3: a `ui`-typed issue
+still needs a green gate and every AC proven.
+
+## 3. Run the subagents
 
 Read `plan.json`'s `proof` (absent means `test`) and pass it to
 `factory-verifier`.
@@ -36,27 +52,24 @@ reject" is its rule either way, not yours to override.
 
 Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
 security (injection, authz, secrets), and whether the diff crosses any
-NG-n. Collect its findings verbatim; do not soften or drop one.
+NG-n. Collect its findings verbatim, do not soften or drop one, then
+re-check each yourself against the diff at the current head. Drop one the
+code does not support (confidence 0-2); never keep a finding you could not
+reproduce from the diff.
 
-Then re-check each finding yourself against the diff at the current head. Drop
-one the code does not support (confidence 0-2); keep the rest. Never keep a
-finding you could not reproduce from the diff.
-
-## 3. Decide the verdict
+## 4. Decide the verdict
 
 - **pass** — every AC has evidence, the gate is green, no NG-n crossed, no
-  blocking reviewer finding. A `pass` that lists a `must` or `should` finding
-  at confidence 3 or more, or a criterion that is not `pass`, is refused by the
-  runner and goes to a human.
+  blocking reviewer finding, and (on the `ui` route) no blocking step 2
+  finding. A `must`/`should` finding at confidence 3 or more, or a
+  non-`pass` criterion, refuses the verdict and routes to a human.
 - **reject** — any AC unproven, gate red, an NG-n crossed, or a blocking
-  finding. The runner sends the issue back to `factory-build` up to twice;
-  a third reject is routed to a human automatically, so just report
-  `reject` honestly each time rather than trying to track the limit
-  yourself.
+  finding. The runner retries `factory-build` up to twice, then routes to
+  a human automatically; just report `reject` honestly each time.
 - **uncertain** — the verifier or reviewer could not reach a confident
   answer, or round limit hit. Route to a human, don't guess.
 
-## 4. Write the outputs
+## 5. Write the outputs
 
 Use `factory-comment`'s `verdict.md` template for
 `.factory/runs/issue-<N>/verdict-comment.md`: per-AC pass/fail with the
@@ -81,10 +94,7 @@ criterion is `pass`, `fail`, or `unverified` (with a `gap`); AC ids come from th
 plan and are never renumbered. No other fields are allowed, and the file must be
 one JSON object under 16 KiB.
 
-Set `outcome` to `blocked` (with a `summary`) only if you could not review at all.
-
-`result` is `pass`, `reject`, or `uncertain`. `findings` is the reviewer's
-list verbatim (empty array if none). On `reject`, the runner sends the
-issue back to `factory-build`, up to twice; a third reject, or an
-`uncertain` verdict at any round, routes to `factory:needs-human` instead
-of looping again.
+Set `outcome` to `blocked` (with a `summary`) only if you could not review at
+all. `result` is `pass`, `reject`, or `uncertain`; `findings` is the
+reviewer's list verbatim plus any from step 2 (empty array if none) — the
+retry and escalation rules are step 4's, not repeated here.
