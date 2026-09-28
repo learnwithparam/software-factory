@@ -27,6 +27,7 @@ export interface BoardCard {
 
 const STATE_TO_COLUMN: Readonly<Record<string, BoardColumn>> = {
   [LABEL.ready]: "intake",
+  [LABEL.blocked]: "intake",
   [LABEL.triaging]: "triage",
   [LABEL.planning]: "plan",
   [LABEL.awaitingApproval]: "plan",

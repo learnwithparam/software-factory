@@ -10,6 +10,7 @@
 // comment thread alone, so a restarted watcher, a fresh CI job, or a runner
 // on a different machine can all resume any issue.
 
+import { resolveBlockers } from "./blockers";
 import { holdoutEnabled, type FactoryConfig } from "./config";
 import { runHoldout, type HoldoutRunner } from "./holdout";
 import { writeRevision } from "./revision";
@@ -969,21 +970,36 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const machineDailyUsd = deps.machine?.config.dailyUsd;
   const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;
-  const buckets = await Promise.all([
-    autoStart && !stopIf && !budgetPaused ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
+  const intakeGated = autoStart && !stopIf && !budgetPaused;
+  const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
+    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
     deps.github.listIssuesByLabel(config.repo, LABEL.awaitingApproval),
     deps.github.listIssuesByLabel(config.repo, LABEL.failed),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsHuman),
     deps.github.listIssuesByLabel(config.repo, LABEL.inReview),
+    intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.blocked) : Promise.resolve([]),
   ]);
 
+  // The dependency gate (blockers.ts): demotes a ready issue that still has
+  // an open "Blocked by" to LABEL.blocked, and promotes a blocked issue back
+  // to ready the poll its last blocker clears. Both moves happen here, once
+  // per poll, before anything is dispatched.
+  const { clear: ready } = await resolveBlockers(deps.github, config.repo, readyRaw, blockedRaw);
+  const buckets = [ready, needsInfo, awaitingApproval, failed, needsHuman, inReview];
+
   const seen = new Set<number>();
-  const candidates = buckets.flat().filter((issue) => {
-    if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
-    seen.add(issue.number);
-    return true;
-  });
+  const candidates = buckets
+    .flat()
+    .filter((issue) => {
+      if (seen.has(issue.number) || inFlight?.has(issue.number)) return false;
+      seen.add(issue.number);
+      return true;
+    })
+    // Oldest ticket first: tickets are filed in dependency order, and gh's
+    // own list order is otherwise unspecified (audit: newest-first in
+    // practice), which raced dependents ahead of what they were blocked on.
+    .sort((a, b) => a.number - b.number);
 
   // candidates was filtered against inFlight above; mark them before any
   // await so an overlapping poll's own candidates filter (same check) never
