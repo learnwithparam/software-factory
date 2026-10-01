@@ -3,6 +3,7 @@
 // Usage: bun teach/demo/snap.ts <session>:<window> <out.png>  (the page is kept beside it as .html)
 
 import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 export interface Pane { left: number; top: number; width: number; height: number; text: string }
 
@@ -73,7 +74,8 @@ async function tmux(args: string[]): Promise<string> {
 }
 
 async function cli(args: string[]): Promise<void> {
-  const p = Bun.spawn(["playwright-cli", "-s=factory-snap", ...args], { stdout: "pipe", stderr: "pipe" });
+  // It writes page snapshots into its cwd, so that is a temp dir, never the repo.
+  const p = Bun.spawn(["playwright-cli", "-s=factory-snap", ...args], { cwd: tmpdir(), stdout: "pipe", stderr: "pipe" });
   const out = await new Response(p.stdout).text();
   if ((await p.exited) !== 0 || out.includes("### Error")) throw new Error(`playwright-cli ${args[0]}: ${out}`);
 }
