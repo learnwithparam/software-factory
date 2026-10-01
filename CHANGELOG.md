@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.12.3
+
+Walk through a finished run without running it.
+
+- **The dashboard reads artifacts from the repo's own workspaces.** `factory dashboard --repo` looked in
+  the legacy `$FACTORY_HOME/workspaces`, so an issue's artifacts listed nothing.
+  `createDashboard` now defaults to `workspacesDir(env, repo)`, the path the watcher writes.
+- **`teach/demo/lightning-2.sh snapshot [dir]` and `replay [dir]`.** `snapshot` saves the state DB and
+  every issue's stage artifacts as a small `FACTORY_HOME` before a reset wipes them. `replay` serves the
+  dashboard on it, on port 4101 by default. `teach/lightning-2.md` section 8 is the walkthrough.
+
 ## v2.12.2
 
 Four things the Lightning-2 run on v2.12.0 showed wrong on screen, and the Claude pin.
