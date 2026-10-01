@@ -13,6 +13,8 @@ OUT="${FACTORY_HOME:-$HOME/.factory}/recordings/lightning-2/v$VERSION"
 WORKSPACES="${FACTORY_HOME:-$HOME/.factory}/$REPO/workspaces"
 DRY=0
 RECORD=0
+# gh and git page their output on a TTY, which would freeze a refreshing pane.
+NOPAGER=(-e PAGER=cat -e GH_PAGER=cat -e GIT_PAGER=cat)
 
 SCENES=(
   "0|setup|reset, doctor, layout"
@@ -29,13 +31,13 @@ run() {
 
 up() {
   if [ "$DRY" = 0 ] && tmux has-session -t "$SESSION" 2>/dev/null; then echo "session $SESSION already up"; return; fi
-  run tmux new-session -d -s "$SESSION" -n you -c "$DEMO_DIR" -x 200 -y 50
-  run tmux new-window -t "$SESSION" -n factory -c "$ROOT" "make up REPO_DIR=$DEMO_DIR"
-  run tmux split-window -t "$SESSION:factory" -v -c "$DEMO_DIR" \
+  run tmux new-session "${NOPAGER[@]}" -d -s "$SESSION" -n you -c "$DEMO_DIR" -x 200 -y 50
+  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n factory -c "$ROOT" "make up REPO_DIR=$DEMO_DIR"
+  run tmux split-window "${NOPAGER[@]}" -t "$SESSION:factory" -v -c "$DEMO_DIR" \
     "while :; do clear; git worktree list; ls $WORKSPACES 2>/dev/null; sleep 2; done"
-  run tmux new-window -t "$SESSION" -n logs -c "$ROOT"
-  run tmux new-window -t "$SESSION" -n boundary -c "$DEMO_DIR"
-  run tmux new-window -t "$SESSION" -n flow -c "$DEMO_DIR" \
+  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n logs -c "$ROOT"
+  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n boundary -c "$DEMO_DIR"
+  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n flow -c "$DEMO_DIR" \
     "while :; do clear; gh issue list -R $REPO --state all --limit 10 --json number,title,labels -q '.[]|\"#\\(.number) \\(.title[0:40])  \\(.labels|map(.name)|join(\" \"))\"'; sleep 5; done"
   run tmux set-option -t "$SESSION" status-left-length 80
   run tmux select-window -t "$SESSION:you"

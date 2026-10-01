@@ -21,6 +21,7 @@ describe("lightning-2 demo script", () => {
     const walkthrough = readFileSync(join(root, "teach/lightning-2.md"), "utf8");
     for (const w of windows) expect(walkthrough).toContain(`| \`${w}\` |`);
     expect(out).toContain("scene\\ 0:\\ setup");
+    for (const line of out.split("\n").filter((l) => /^tmux (new-session|new-window|split-window)/.test(l))) expect(line).toContain("GH_PAGER=cat");
   });
 
   test("snap writes html and png under the runner version's recording dir", () => {

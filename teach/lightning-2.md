@@ -13,6 +13,7 @@ gh issue list -R learnwithparam/splitbill-demo --state open
 
 | Step | Where | Command | Expect |
 |---|---|---|---|
+| 0 | `factory/` | `git pull` on `main` | includes #21 (holdout tree-hash fix). Without it every verify parks `factory:needs-human` with a stale `gate.json` tree |
 | 1 | any | `gh auth status` and `claude --version` | logged in to github.com; claude runs |
 | 2 | `factory/` | `bin/factory reset --repo-dir ../splitbill-demo --dry-run` | only `close-issue`, `create-issue`, `wipe-*` lines; no `drop-commit` unless a PR was merged |
 | 3 | `factory/` | `bin/factory reset --repo-dir ../splitbill-demo` | seven open issues, no `factory:*` label on any |
@@ -189,6 +190,9 @@ shows them side by side with yours.
 | An issue parks `factory:failed` or `factory:needs-human` | read the parking comment; `bin/factory inbox <N> retry --repo learnwithparam/splitbill-demo` |
 | A stage hits its budget | same as above: it parks, and the comment names the cap |
 | GitHub is slow | switch to the recorded run in `~/.factory/recordings/lightning-2/` |
+| `Failed to start server. Is port 4100 in use?` | an older dashboard holds the port: `lsof -ti :4100` and stop it, or read the dashboard on the port it is already serving |
+| Verify says `gate.json` tree differs from `HEAD^{tree}` | the runner predates #21: stop it, `git pull` in `factory/`, start it again, then `inbox <N> retry` |
+| An issue stops moving after a restart | stop the watcher with Ctrl-C in its pane, never by killing the pane: a killed pane can leave the old watcher running and holding the slots |
 
 ## 7. Close: deliver and reset
 
