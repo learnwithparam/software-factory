@@ -2,7 +2,7 @@
 
 ## v2.12.1
 
-Fixes a spend loop found in the Lightning-2 rehearsal on v2.12.0.
+Fixes a spend loop and an ignored revise, both found in the Lightning-2 rehearsal on v2.12.0.
 
 - **A `/factory retry` runs once (`src/watch.ts`).** A parked issue resumed on its latest human
   comment. When verify came back uncertain it parked without a comment, so the same retry stayed
@@ -11,6 +11,10 @@ Fixes a spend loop found in the Lightning-2 rehearsal on v2.12.0.
   comment. Scenario 10d covers it.
 - **An uncertain verdict is posted.** It used to be posted only after a re-check, so the issue
   parked at `needs-human` with nothing on GitHub saying why.
+- **Build reads a PR revise (`factory-build` skill).** `/factory revise <text>` on a PR wrote
+  `revise.md` and reran build, but only the plan skill read that file, so build saw a finished plan
+  and changed nothing. A test in `tests/skills.test.ts` checks that every stage a revise reruns
+  reads `revise.md`. Run `factory install --update` to pick up the skill.
 
 ## v2.12.0
 
