@@ -3,7 +3,7 @@
 // Thin dispatcher; all logic lives in src/ so it stays testable without a
 // child process.
 
-import { accessSync, constants, readdirSync, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { GitHub } from "../src/github";
 import { GitCommandRunner, Git } from "../src/git";
@@ -19,7 +19,7 @@ import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
 import { plain } from "../src/display";
-import { act, buildInbox, inboxPositionals, learningPrItems, type InboxAction } from "../src/inbox";
+import { act, buildInbox, inboxPositionals, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
 import { reset, rebaseline } from "../src/reset";
 import { runDoctor, fixDoctor } from "../src/doctor";
 import { loadMachineConfig, MachineLeases, MachineSpend } from "../src/machine";
@@ -27,7 +27,7 @@ import { createDashboard } from "../dashboard/server";
 import { versionOf, which } from "../src/probes";
 import { workspacesDir as defaultWorkspacesDir, defaultStatePath, livePath, transcriptPath } from "../src/paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "../src/tmux";
-import { readLive, resumeArgv, stopRunningStage } from "../src/takeover";
+import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "../src/takeover";
 import { LABEL } from "../src/labels";
 import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
@@ -207,7 +207,10 @@ async function cmdInbox(): Promise<void> {
   const repo = flag("repo") ?? process.env.FACTORY_REPO;
   if (!repo) throw new UsageError("inbox: --repo <owner/name> (or FACTORY_REPO) is required");
   const github = new GitHub();
-  const items = [...buildInbox(await github.listOpenIssues(repo)), ...learningPrItems(await github.listPrs(repo, { state: "open" }))];
+  // Only read the watcher's DB if it exists; the inbox must not create one.
+  const db = flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, repo);
+  const reasons = existsSync(db) ? parkReasons(new FactoryState(db).listRuns(repo)) : undefined;
+  const items = [...buildInbox(await github.listOpenIssues(repo), reasons), ...learningPrItems(await github.listPrs(repo, { state: "open" }))];
   const [issueArg, actionArg] = inboxPositionals(args);
   if (issueArg) {
     const item = items.find((i) => i.issue === Number(issueArg));
@@ -488,7 +491,7 @@ async function cmdTakeover(): Promise<void> {
   }
   if (!sessionId) throw new Error(`agent ${agent} cannot be resumed: no session recorded for #${n}`);
   const argv = resumeArgv(agent, config.agents, sessionId);
-  console.log(`factory takeover: ${argv.join(" ")}  (in ${worktree}; exit to hand back)`);
+  for (const line of takeoverBanner(argv, worktree)) console.log(line);
   await Bun.spawn(argv, { cwd: worktree, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited;
   if (has("no-handback")) {
     console.log(`factory takeover: #${n} left as it is; hand back with: factory inbox ${n} retry --repo ${repo}`);

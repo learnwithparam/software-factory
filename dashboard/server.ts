@@ -15,7 +15,7 @@ import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
 import { LABEL } from "../src/labels";
-import { InboxError, act, buildInbox, learningPrItems, type InboxAction } from "../src/inbox";
+import { InboxError, act, buildInbox, learningPrItems, parkReasons, type InboxAction } from "../src/inbox";
 import { plain } from "../src/display";
 import { agentCatalog } from "../src/agents/docs";
 import { agentChecks } from "../src/doctor";
@@ -69,8 +69,8 @@ const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js
 
 export const ARTIFACT_LIMIT = 1024 * 1024;
 
-function plainRun<T extends { title: string }>(run: T): T {
-  return { ...run, title: plain(run.title) };
+function plainRun<T extends { title: string; reason?: string | null }>(run: T): T {
+  return { ...run, title: plain(run.title), ...(run.reason ? { reason: plain(run.reason) } : {}) };
 }
 
 // The agent name and kill reason come from config and from what an agent printed.
@@ -429,7 +429,7 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
             run: plainRun(run),
             stages: attempts
               .filter((a) => a.issue === run.issue)
-              .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason })),
+              .map((a) => ({ stage: a.stage, agent: a.agent, duration_ms: a.duration_ms, cost_usd: a.cost_usd, ok: a.exit_code === 0 && !a.killed_reason && (a.verdict ?? "pass") === "pass" })),
           })),
         });
       },
@@ -459,7 +459,8 @@ export function createDashboard(state: FactoryState, github: GitHub, repo: strin
         if (repos.length === 0) return json({ error: "no repo configured or discovered" }, { status: 500 });
         const perRepo = await Promise.all(
           repos.map(async (r) => [
-            ...buildInbox(await cachedIssuesFor(r)).map((i) => ({ ...i, repo: r })),
+            // Park reasons live in this dashboard's own DB, so only its repo has them.
+            ...buildInbox(await cachedIssuesFor(r), r === repo ? parkReasons(state.listRuns(repo)) : undefined).map((i) => ({ ...i, repo: r })),
             ...learningPrItems(await cachedPrsFor(r)).map((i) => ({ ...i, repo: r })),
           ]),
         );

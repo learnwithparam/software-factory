@@ -4,10 +4,8 @@
 import { routeFromHash } from "/lib/routes.js";
 import { createStatusLoader } from "/lib/status-loader.js";
 import { formatElapsed } from "/lib/run-metrics.js";
+import { ACTIVE, stationStates, WAITING } from "/lib/stations.js";
 
-const STAGES = ["triage", "plan", "build", "verify", "pr"];
-const WAITING = new Set(["needs-info", "awaiting-approval", "needs-human", "failed"]);
-const ACTIVE = new Set(["running", "verifying"]);
 const ACTION_LABEL = { approve: "Approve plan", revise: "Request changes", answer: "Send answer", retry: "Retry", cancel: "Cancel run" };
 const REVIEW_KINDS = new Set(["review-pr", "merge-dry-run"]);
 const KIND_LABEL = { "approve-plan": "Plan to approve", "answer-question": "Question for you", "review-pr": "Pull request to review", "merge-dry-run": "Ready to merge", parked: "Needs a human", failed: "Failed", budget: "Over budget" };
@@ -79,14 +77,7 @@ const stateOr = (name, ready) => {
 
 /* ---- Line ---- */
 function stationsFor(row) {
-  const { run, stages } = row;
-  const at = STAGES.indexOf(run.stage);
-  return STAGES.map((name, i) => {
-    const attempts = stages.filter((s) => s.stage === name);
-    const ms = attempts.reduce((n, s) => n + s.duration_ms, 0);
-    const live = i === at && ACTIVE.has(run.status);
-    const failed = attempts.length > 0 && !attempts[attempts.length - 1].ok && (i < at || run.status === "failed");
-    const done = i < at || run.status === "shipped" || (i === at && attempts.length > 0 && !live && !failed && !WAITING.has(run.status));
+  return stationStates(row.run, row.stages).map(({ name, ms, live, failed, done }) => {
     const grow = Math.max(1, Math.min(8, Math.round(ms / 30000)));
     return { name, node: h("div", { class: "station", style: `flex-grow:${grow}`, "data-done": done, "data-live": live, "data-failed": failed, title: `${name}${ms ? ` · ${formatElapsed(ms)}` : ""}` }) };
   });
@@ -100,7 +91,7 @@ function lineRow(row) {
   return h("button", { class: "line-row", type: "button", onclick: () => (needs ? go("inbox", run.issue) : (location.hash = `#/runs/${run.issue}`)) },
     h("div", null, h("div", { class: "line-title" }, `#${run.issue} ${run.title}`), h("div", { class: "line-sub" }, [agents, `started ${age(run.started_at)} ago`].filter(Boolean).join(" · "))),
     h("div", { class: "stations-col" }, h("div", { class: "stations" }, stations.map((s) => s.node)), h("div", { class: "station-names" }, stations.map((s) => h("span", null, s.name)))),
-    h("div", { class: `line-state${needs ? " needs-you" : ""}` }, h("span", { class: "num" }, needs ? "Waiting on you" : statusText(run.status)), `${money(run.cost_usd)} · ${compact(run.tokens_in + run.tokens_out)} tokens`));
+    h("div", { class: `line-state${needs ? " needs-you" : ""}` }, h("span", { class: "num" }, needs ? "Waiting on you" : statusText(run.status)), needs && run.reason ? h("span", { class: "reason", title: run.reason }, run.reason) : null, `${money(run.cost_usd)} · ${compact(run.tokens_in + run.tokens_out)} tokens`));
 }
 
 function lineView() {

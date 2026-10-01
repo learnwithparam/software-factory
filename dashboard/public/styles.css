@@ -147,6 +147,7 @@ textarea.field-control { resize: vertical; min-height: 5rem; }
 .line-state { text-align: right; white-space: nowrap; font-size: .75rem; color: var(--muted-foreground); }
 .line-state.needs-you { color: var(--warning); font-weight: 600; }
 .line-state .num { display: block; color: var(--foreground); font-size: .875rem; }
+.line-state .reason { display: block; max-width: 16rem; margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
 
 /* Lists and panels */
 .split { display: grid; grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }

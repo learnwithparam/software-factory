@@ -137,6 +137,14 @@ describe("route walk", () => {
 });
 
 describe("inbox routes", () => {
+  test("a parked item leads with the reason this dashboard's DB holds", async () => {
+    const { dashboard, state } = await make("", [waiting(6, LABEL.needsHuman)]);
+    state.upsertRun({ issue: 6, repo: "acme/widgets", title: "t", stage: "verify", status: "running" });
+    state.updateRun("acme/widgets", 6, { status: "needs-human", reason: "verify uncertain" });
+    const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as { items: { ask: string }[] };
+    expect(list.items[0]!.ask).toBe("Parked: verify uncertain\n\nThe plan");
+  });
+
   test("lists what waits and posts the same comment a human would", async () => {
     const { dashboard, github } = await make("", [waiting(3, LABEL.awaitingApproval), waiting(4, LABEL.building)]);
     const list = (await (await dashboard.handle(call("GET /api/inbox"), "127.0.0.1")).json()) as { items: { issue: number; ask: string; actions: string[] }[] };
@@ -326,9 +334,15 @@ describe("line and assets", () => {
       repo: "acme/widgets", issue: 1, stage: "triage", agent: "claude", model: null, started_at: "2026-09-24T00:00:00Z",
       finished_at: "2026-09-24T00:00:05Z", duration_ms: 5000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0.01, exit_code: 0, killed_reason: null,
     });
+    const verify = { repo: "acme/widgets", issue: 1, stage: "verify", agent: "claude", model: null, started_at: "2026-09-24T00:00:06Z", finished_at: "2026-09-24T00:00:09Z", duration_ms: 3000, tool_calls: 1, tokens_in: 1, tokens_out: 1, cost_usd: 0.01, exit_code: 0, killed_reason: null } as const;
+    state.recordStageRun(verify);
+    state.setVerifyVerdict("acme/widgets", 1, "uncertain");
+    state.recordStageRun(verify);
+    state.setVerifyVerdict("acme/widgets", 1, "pass");
     const body = (await (await dashboard.handle(call("GET /api/line"), "127.0.0.1")).json()) as { rows: { stages: { stage: string; ok: boolean }[] }[] };
     expect(body.rows).toHaveLength(1);
-    expect(body.rows[0]!.stages).toMatchObject([{ stage: "triage", ok: true }]);
+    // A clean exit with an uncertain verdict is not an ok verify; the stamp only touches the newest row.
+    expect(body.rows[0]!.stages).toMatchObject([{ stage: "triage", ok: true }, { stage: "verify", ok: false }, { stage: "verify", ok: true }]);
   });
 
   test("assets are public, typed, and never escape dashboard/public", async () => {

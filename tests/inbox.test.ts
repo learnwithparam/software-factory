@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { parseChatOps } from "../src/chatops";
 import type { GhIssue } from "../src/github";
-import { InboxError, inboxPositionals, type InboxChannel, type InboxAction, WAITING, WAITING_LABELS, act, buildInbox, commandText } from "../src/inbox";
+import { InboxError, inboxPositionals, parkReasons, type InboxChannel, type InboxAction, WAITING, WAITING_LABELS, act, buildInbox, commandText } from "../src/inbox";
 import { LABELS, LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
 
 const at = (n: number) => `2026-09-2${n}T10:00:00Z`;
@@ -49,6 +49,17 @@ describe("inbox structure", () => {
 });
 
 describe("buildInbox", () => {
+  test("a parked item leads with the runner's park reason, not the older plan comment", () => {
+    const reasons = parkReasons([
+      { issue: 4, status: "needs-human", reason: "verify uncertain" },
+      { issue: 5, status: "shipped", reason: "stale" },
+    ]);
+    const [parked] = buildInbox([issue(4, LABEL.needsHuman)], reasons);
+    expect(parked!.ask).toBe("Parked: verify uncertain\n\nThe plan");
+    expect(buildInbox([issue(5, LABEL.needsHuman)], reasons)[0]!.ask).toBe("The plan");
+    expect(buildInbox([issue(4, LABEL.awaitingApproval)], reasons)[0]!.ask).toBe("The plan");
+  });
+
   test("orders the longest-waiting item first, strips markers and control codes, and caps the ask", () => {
     const items = buildInbox([
       issue(2, LABEL.failed, "<!-- factory:data {\"stage\":\"build\"} -->\n\x1b[31mBuild broke\x1b[0m", at(3)),

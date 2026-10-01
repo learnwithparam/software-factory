@@ -348,6 +348,7 @@ describe("failure paths", () => {
     c.push("verify", verdict("uncertain"));
     expect(await c.step()).toBe("needs-human");
     expect(c.github.issues.get(1)!.comments.at(-1)!.body).toContain("<!-- factory:verdict");
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).find((r) => r.stage === "verify")!.verdict).toBe("uncertain");
     c.push("verify", verdict("uncertain"));
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("needs-human");

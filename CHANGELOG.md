@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.12.2
+
+Four things the Lightning-2 run on v2.12.0 showed wrong on screen, and the Claude pin.
+
+- **The PR's run summary shows the verify verdict.** `stage_runs` gains a `verdict` column
+  (forward-only migration), stamped once `verdict.json` is read. A verify row reads `pass`, `reject` or
+  `uncertain` instead of `ok`, and only `pass` counts as a first-try success.
+- **The inbox says why an issue parked.** A `needs-human` or `failed` item leads with the runner's
+  own reason (`runs.reason`), such as "verify uncertain", instead of the latest factory comment, which
+  could be the plan. Both `factory inbox` and the dashboard read it.
+- **The Line view fills a stage that ended ok before a park.** A triage that refused an issue, or a
+  plan awaiting approval, shows its block as done, and the row shows the park reason. A verify whose
+  verdict was not `pass` shows as failed. The block logic moved to `dashboard/public/lib/stations.js`
+  so `tests/stations.test.ts` covers it.
+- **`factory takeover` says how to pass Claude's folder-trust prompt.** A fresh worktree is a folder
+  Claude has not seen. The runner does not edit `~/.claude.json` to skip the prompt; it prints
+  "choose Yes" before it hands over the terminal.
+- **Claude Code pin: 2.1.281 to 2.1.286** in the Dockerfile, CI template, preset and
+  `docs/agents.md`. `tests/agents-registry.test.ts` already holds the copies equal.
+
 ## v2.12.1
 
 Fixes a spend loop and an ignored revise, both found in the Lightning-2 rehearsal on v2.12.0.

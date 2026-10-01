@@ -1,6 +1,6 @@
 # Lightning-2 live walkthrough: Build Your First Software Factory Execution Harness
 
-This is the run sheet for a live demo on `splitbill-demo` with runner v2.12.1. It is organised around the four
+This is the run sheet for a live demo on `splitbill-demo` with runner v2.12.2. It is organised around the four
 outcomes the lesson promises: a worktree for every task, sandbox boundaries, one execution harness, and your
 own branch kept isolated. Every repo command runs from `factory/` unless a step says otherwise. Issues are
 named by title because `reset` reseeds them under new numbers; get the current numbers with:
@@ -17,7 +17,7 @@ gh issue list -R learnwithparam/splitbill-demo --state open
 | 1 | any | `gh auth status` and `claude --version` | logged in to github.com; claude runs |
 | 2 | `factory/` | `bin/factory reset --repo-dir ../splitbill-demo --dry-run` | only `close-issue`, `create-issue`, `wipe-*` lines; no `drop-commit` unless a PR was merged |
 | 3 | `factory/` | `bin/factory reset --repo-dir ../splitbill-demo` | seven open issues, no `factory:*` label on any |
-| 4 | `factory/` | `bin/factory doctor --repo-dir ../splitbill-demo` | no `[fail]` rows. Two `[warn]` rows are known: the claude version pin and skill drift |
+| 4 | `factory/` | `bin/factory doctor --repo-dir ../splitbill-demo` | no `[fail]` and no `[warn]` rows. A `[warn]` on the claude pin means your local `claude` is not 2.1.286 |
 | 5 | `splitbill-demo/` | `git switch -c my-feature` and edit one line of `README.md`, unstaged | your own work in progress, used in scene 4 |
 | 6 | any | the tmux layout in section 3 | five windows |
 

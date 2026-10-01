@@ -35,9 +35,9 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v2.12.1 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REF: v2.12.2 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
-  CLAUDE_CODE_VERSION: "2.1.281" # pinned claude, same version the Dockerfile installs
+  CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE
   # FACTORY_AGENTS (space separated, default "claude"); add a repo secret for each one's key
   # (docs/agents.md lists them). Cursor is host-only. A key you did not set stays empty.

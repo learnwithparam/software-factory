@@ -12,7 +12,7 @@ import { OPERATOR_TAKEOVER } from "../src/executor";
 import { livePath, takeoverMarker, transcriptPath } from "../src/paths";
 import { renderRunSummary } from "../src/run-summary";
 import { FactoryState, type StageRun } from "../src/state";
-import { readLive, resumeArgv, stopRunningStage } from "../src/takeover";
+import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "../src/takeover";
 import { defaultFixtureDir } from "../src/verify-agent";
 
 const scratch = mkdtempSync(join(tmpdir(), "factory-takeover-"));
@@ -108,7 +108,7 @@ describe("claude session id", () => {
 });
 
 describe("renderRunSummary", () => {
-  const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "claude", model: "opus", started_at: "", finished_at: "", duration_ms: 65_000, tool_calls: 4, tokens_in: 0, tokens_out: 0, tokens_cached: 0, cost_usd: 0.5, usage_complete: 1, exit_code: 0, killed_reason: null, session_id: null, ...over });
+  const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "claude", model: "opus", started_at: "", finished_at: "", duration_ms: 65_000, tool_calls: 4, tokens_in: 0, tokens_out: 0, tokens_cached: 0, cost_usd: 0.5, usage_complete: 1, exit_code: 0, killed_reason: null, session_id: null, verdict: null, ...over });
 
   test("a clean run lists every stage under went well and nothing under needed help", () => {
     const out = renderRunSummary([run({ stage: "triage" }), run({ stage: "verify" }), run({ stage: "retro" as StageRun["stage"] })], { rejectRounds: 0, retries: 0 });
@@ -118,6 +118,15 @@ describe("renderRunSummary", () => {
     expect(out).toContain("- triage, verify passed on the first attempt");
     expect(out).toContain("- verify approved on the first round");
     expect(out).toMatch(/\*\*Needed help\*\*\n\n- nothing$/);
+  });
+
+  test("a verify row shows its verdict, and an uncertain one is help, not a first-try pass", () => {
+    const out = renderRunSummary([run({ stage: "triage" }), run({ stage: "verify", verdict: "uncertain" })], { rejectRounds: 0, retries: 0 });
+    expect(out).toContain("| verify | claude (opus) | 1m 5s | 4 | $0.50 | uncertain |");
+    expect(out).toContain("- triage passed on the first attempt");
+    expect(out).not.toContain("verify approved");
+    expect(out).toContain("- verify: uncertain");
+    expect(renderRunSummary([run({ stage: "verify", verdict: "pass" })], { rejectRounds: 0, retries: 0 })).toContain("- verify approved on the first round");
   });
 
   test("takeovers, reruns, rejections, retries and unknown cost are all named", () => {
@@ -143,6 +152,17 @@ describe("factory takeover helpers", () => {
     await until(() => existsSync(liveFile));
     expect(await stopRunningStage(liveFile, readLive(liveFile)!, 5000)).toBe(true);
     expect((await running).killedReason).toBe(OPERATOR_TAKEOVER);
+  });
+
+  test("the banner names the resume command and how to pass the folder-trust prompt", () => {
+    expect(takeoverBanner(["claude", "--resume", "s1"], "/w/issue-3")).toEqual([
+      "factory takeover: claude --resume s1  (in /w/issue-3; exit to hand back)",
+      "factory takeover: Claude will ask to trust this worktree: choose Yes",
+    ]);
+    // bin/factory prints it before it hands over the terminal.
+    const bin = readFileSync("bin/factory", "utf8");
+    expect(bin.indexOf("takeoverBanner(argv, worktree)")).toBeGreaterThan(-1);
+    expect(bin.indexOf("takeoverBanner(argv, worktree)")).toBeLessThan(bin.indexOf("Bun.spawn(argv, { cwd: worktree"));
   });
 
   test("only a claude session can be resumed; any other agent is refused by name", () => {
