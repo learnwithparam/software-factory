@@ -319,6 +319,25 @@ describe("artifacts", () => {
     }
   });
 
+  test("with no workspaces given, a repo's artifacts come from its own FACTORY_HOME dir", async () => {
+    const home = mkdtempSync(join(tmpdir(), "factory-home-"));
+    const before = process.env.FACTORY_HOME;
+    process.env.FACTORY_HOME = home;
+    try {
+      const runs = join(home, "acme", "widgets", "workspaces", "issue-4", ".factory", "runs", "issue-4");
+      mkdirSync(runs, { recursive: true });
+      writeFileSync(join(runs, "plan.md"), "the plan");
+      const mod = await import("../dashboard/server");
+      const dashboard = mod.createDashboard(new FactoryState(":memory:"), new GitHub(), "acme/widgets");
+      const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/4/artifacts"), "127.0.0.1");
+      expect(JSON.stringify(await res.json())).toContain("plan.md");
+    } finally {
+      if (before === undefined) delete process.env.FACTORY_HOME;
+      else process.env.FACTORY_HOME = before;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   test("an issue with no worktree lists nothing", async () => {
     const { dashboard } = await make("");
     const res = await dashboard.handle(new Request("http://localhost:4100/api/issues/77/artifacts"), "127.0.0.1");

@@ -82,7 +82,7 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
 
-export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
+export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();

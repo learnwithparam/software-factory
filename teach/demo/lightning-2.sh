@@ -2,6 +2,7 @@
 # The tmux layout, scene titles, screenshots and recording for the lightning-2 demo.
 # The steps to run inside it are in teach/lightning-2.md.
 # Usage: teach/demo/lightning-2.sh [--dry-run] [--record] [--tmux] up|attach|scene <n>|snap <name> [window]|down|scenes
+#        teach/demo/lightning-2.sh [--dry-run] snapshot [dir]|replay [dir]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -9,6 +10,7 @@ DEMO_DIR="${DEMO_DIR:-$(cd "$ROOT/.." && pwd)/splitbill-demo}"
 REPO="${DEMO_REPO:-learnwithparam/splitbill-demo}"
 SESSION="${DEMO_SESSION:-lightning-2}"
 PORT="${FACTORY_DASHBOARD_PORT:-4100}"
+REPLAY_PORT="${REPLAY_PORT:-4101}"
 VERSION="$(jq -r .version "$ROOT/package.json")"
 OUT="${FACTORY_HOME:-$HOME/.factory}/recordings/lightning-2/v$VERSION"
 WORKSPACES="${FACTORY_HOME:-$HOME/.factory}/$REPO/workspaces"
@@ -71,6 +73,34 @@ snap() {
   run bun "$ROOT/teach/demo/snap.ts" "$SESSION:$window" "$OUT/$name.png"
 }
 
+# A finished run as a mini FACTORY_HOME: the state DB plus each issue's stage artifacts.
+# replay serves the dashboard on it, so the run can be walked through after reset wipes the real one.
+snapshot() {
+  local dir="${1:-$OUT/snapshot}" db="${FACTORY_HOME:-$HOME/.factory}/$REPO/factory.db" runs n
+  if [ "$DRY" = 0 ] && [ -e "$dir" ]; then echo "$dir already exists; pass another dir or remove it" >&2; exit 1; fi
+  if [ "$DRY" = 0 ] && [ ! -f "$db" ]; then echo "no factory.db at $db: nothing has run yet, or reset already wiped it" >&2; exit 1; fi
+  run mkdir -p "$dir/$REPO/workspaces"
+  run sqlite3 "$db" ".backup '$dir/$REPO/factory.db'"
+  for runs in "$WORKSPACES"/issue-*/.factory/runs/issue-*; do
+    [ -d "$runs" ] || continue
+    n="$(basename "$runs")"
+    run mkdir -p "$dir/$REPO/workspaces/$n/.factory/runs"
+    run cp -R "$runs" "$dir/$REPO/workspaces/$n/.factory/runs/"
+  done
+  echo "snapshot in $dir; walk through it with: teach/demo/lightning-2.sh replay $dir"
+}
+
+replay() {
+  local dir="${1:-$OUT/snapshot}" holder
+  if [ "$DRY" = 0 ] && [ ! -f "$dir/$REPO/factory.db" ]; then echo "no snapshot at $dir (expected $dir/$REPO/factory.db)" >&2; exit 1; fi
+  holder="$(lsof -nP -iTCP:"$REPLAY_PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+  if [ "$DRY" = 0 ] && [ -n "$holder" ]; then echo "port $REPLAY_PORT is held by pid $holder; set REPLAY_PORT or stop it: kill $holder" >&2; exit 1; fi
+  echo "replaying $dir on http://127.0.0.1:$REPLAY_PORT (Inbox and threads are live GitHub; Act buttons post real comments)"
+  local cmd=(env FACTORY_HOME="$dir" bun "$ROOT/bin/factory" dashboard --repo "$REPO" --port "$REPLAY_PORT")
+  # exec, so stopping this script stops the dashboard too.
+  if [ "$DRY" = 1 ]; then run "${cmd[@]}"; else exec "${cmd[@]}"; fi
+}
+
 attach() {
   if [ "$RECORD" = 1 ]; then
     run mkdir -p "$OUT"
@@ -94,7 +124,9 @@ case "${1:-}" in
   attach) attach ;;
   scene) scene "${2:?scene number}" ;;
   snap) snap "${2:?shot name}" "${3:-}" ;;
+  snapshot) snapshot "${2:-}" ;;
+  replay) replay "${2:-}" ;;
   down) run tmux kill-session -t "$SESSION" ;;
   scenes) for row in "${SCENES[@]}"; do echo "$row"; done ;;
-  *) sed -n 2,4p "$0" | sed 's/^# //'; exit 2 ;;
+  *) sed -n 2,5p "$0" | sed 's/^# //'; exit 2 ;;
 esac

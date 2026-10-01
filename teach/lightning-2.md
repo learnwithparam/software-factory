@@ -1,6 +1,6 @@
 # Lightning-2 live walkthrough: Build Your First Software Factory Execution Harness
 
-This is the run sheet for a live demo on `splitbill-demo` with runner v2.12.2. It is organised around the four
+This is the run sheet for a live demo on `splitbill-demo` with runner v2.12.3. It is organised around the four
 outcomes the lesson promises: a worktree for every task, sandbox boundaries, one execution harness, and your
 own branch kept isolated. Every repo command runs from `factory/` unless a step says otherwise. Issues are
 named by title because `reset` reseeds them under new numbers; get the current numbers with:
@@ -201,7 +201,7 @@ session `factory`.
 | A stage runs long | it is killed at the stage timeout; meanwhile show the dashboard and move to the next scene |
 | An issue parks `factory:failed` or `factory:needs-human` | read the parking comment; `bin/factory inbox <N> retry --repo learnwithparam/splitbill-demo` |
 | A stage hits its budget | same as above: it parks, and the comment names the cap |
-| GitHub is slow | switch to the recorded run in `~/.factory/recordings/lightning-2/` |
+| GitHub is slow | switch to the recorded run: `teach/demo/lightning-2.sh replay` (section 8) |
 | `Failed to start server. Is port 4100 in use?` | an older dashboard holds the port: `lsof -ti :4100` and stop it, or read the dashboard on the port it is already serving |
 | Verify says `gate.json` tree differs from `HEAD^{tree}` | the runner predates #21: stop it, `git pull` in `factory/`, start it again, then `inbox <N> retry` |
 | An issue stops moving after a restart | stop the watcher with Ctrl-C in its pane, never by killing the pane: a killed pane can leave the old watcher running and holding the slots |
@@ -217,3 +217,29 @@ bin/factory reset --repo-dir ../splitbill-demo
 ```
 
 Then in `splitbill-demo/`: `git switch main && git branch -D my-feature`, and `tmux kill-session -t lightning-2`.
+
+## 8. Walk through a finished run without running it
+
+Before the reset in section 7 wipes the run, save it from `factory/`:
+
+```bash
+teach/demo/lightning-2.sh snapshot            # into ~/.factory/recordings/lightning-2/v<version>/snapshot
+teach/demo/lightning-2.sh snapshot ~/runs/r3  # or a dir you name; an existing dir is refused
+```
+
+The snapshot is a small `FACTORY_HOME`: a consistent copy of `factory.db` (`sqlite3 .backup`) and each
+issue's `.factory/runs/issue-N/` artifacts. Nothing is spent and no watcher runs. Any time later, even
+after the reset:
+
+```bash
+teach/demo/lightning-2.sh replay              # http://127.0.0.1:4101; REPLAY_PORT picks another port
+```
+
+| Page | Shows |
+|---|---|
+| Line | every issue of the run, block by block, with the park reasons |
+| Runs, Analytics | each stage's agent, duration, tool calls and cost, from the snapshot |
+| An issue's artifacts | `plan.md`, `triage.json`, `gate.json`, `verdict.json` as they were written |
+| Inbox, threads | live GitHub: the closed issues and PRs keep their comments, but the Act buttons post real comments |
+
+`tests/demo-script.test.ts` takes a snapshot, wipes the source, replays it and reads the Line, Runs and artifact routes.
