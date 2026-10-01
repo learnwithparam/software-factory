@@ -92,7 +92,6 @@ describe("claudeArgs", () => {
       stageSettings("build", 7),
       "--append-system-prompt",
       STAGE_GUIDANCE,
-      "--no-session-persistence",
       "--max-budget-usd",
       "5",
     ]);

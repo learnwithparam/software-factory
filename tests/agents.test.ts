@@ -27,7 +27,7 @@ const scratch = mkdtempSync(join(tmpdir(), "factory-agents-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
 describe("claude preset", () => {
-  test("the argv is what v2.4.0 sent, byte for byte", () => {
+  test("the argv is pinned byte for byte (v2.12.0 dropped --no-session-persistence for takeover)", () => {
     const opts = { stage: "build" as const, issue: 12, cwd: "/w", maxBudgetUsd: 5 };
     expect(claudeArgs(opts)).toEqual([
       "-p", "/factory-build 12",
@@ -36,7 +36,6 @@ describe("claude preset", () => {
       "--setting-sources", "project,local",
       "--settings", stageSettings("build", 12, undefined),
       "--append-system-prompt", STAGE_GUIDANCE,
-      "--no-session-persistence",
       "--max-budget-usd", "5",
     ]);
     expect(STAGE_GUIDANCE).toBe("Read files with the Read tool, one call per file. Run shell commands one at a time: no &&, ;, pipes or brace expansion.");

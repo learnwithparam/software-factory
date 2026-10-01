@@ -25,7 +25,7 @@ ARG MASTRACODE_VERSION=0.42.0
 ARG UV_VERSION=0.5.11
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git jq python3 ca-certificates curl gnupg xz-utils \
+      git jq python3 tmux ca-certificates curl gnupg xz-utils \
     && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && arch="$(dpkg --print-architecture)" \

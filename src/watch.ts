@@ -16,7 +16,9 @@ import { runHoldout, type HoldoutRunner } from "./holdout";
 import { writeRevision } from "./revision";
 import { TRUNCATION_KIND } from "./event-budget";
 import { costFor } from "./pricing";
-import type { Executor, StageName, StageRunResult } from "./executor";
+import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunResult } from "./executor";
+import { renderRunSummary } from "./run-summary";
+import type { IssueView } from "./tmux";
 import {
   clearStageArtifacts,
   stepStop,
@@ -91,6 +93,18 @@ export interface WatchDeps {
   // FACTORY_HOME) sharing this machine's slots is respected too (plan
   // v2.7.0 item 5).
   readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
+  // Where a stage streams its transcript and its pid/session (`factory takeover`). Absent: neither is written.
+  readonly runFiles?: { transcript(issue: number): string; live(issue: number): string };
+  // A live window per issue (tmux). Only a viewer: a failure here never fails a stage.
+  readonly view?: IssueView;
+}
+
+// Thrown by runStage when an operator stopped the agent to take it over;
+// runFromStage parks the issue instead of counting a failure.
+class OperatorTakeover extends Error {
+  constructor(readonly stage: Stage) {
+    super(`operator takeover during ${stage}`);
+  }
 }
 
 export interface PollResult {
@@ -206,6 +220,10 @@ function finish(
   reason?: string,
 ): void {
   deps.state.updateRun(config.repo, issueNumber, { status, reason: reason ?? null });
+  // Parked issues keep their window, so the operator can still read it.
+  if (deps.view && (status === "shipped" || status === "cancelled" || status === "failed")) {
+    deps.view.close(issueNumber).catch((e) => console.error(`[tmux] close #${issueNumber}: ${e}`));
+  }
 }
 
 // Skills never call `gh` (only the runner talks to GitHub), so the current
@@ -257,6 +275,7 @@ async function runStage(
 
   deps.state.upsertRun({ issue: issueNumber, repo: config.repo, title: issue.title, stage: stage as Stage, status: "running" });
   const run = deps.state.getRun(config.repo, issueNumber)!;
+  const files = await stageFiles(deps, issueNumber);
   const startedAt = new Date();
   const result = await deps.executor.runStage({
     stage,
@@ -267,6 +286,7 @@ async function runStage(
     maxToolCalls: config.maxToolCalls,
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
+    ...files,
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
@@ -288,6 +308,7 @@ async function runStage(
     usage_complete: usageComplete ? 1 : 0,
     exit_code: result.exitCode,
     killed_reason: result.killedReason ?? null,
+    session_id: result.sessionId ?? null,
   });
   if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
   deps.state.updateRun(config.repo, issueNumber, {
@@ -296,7 +317,19 @@ async function runStage(
     tokens_out: run.tokens_out + result.tokensOut,
     cost_usd: run.cost_usd + (costUsd ?? 0),
   });
+  if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
+}
+
+// The transcript and live-file paths for a stage, and the issue's window
+// opened on the transcript. Both are optional; a view error is only logged.
+async function stageFiles(deps: WatchDeps, issueNumber: number): Promise<{ transcriptFile?: string; liveFile?: string }> {
+  if (!deps.runFiles) return {};
+  const transcriptFile = deps.runFiles.transcript(issueNumber);
+  if (deps.view) {
+    await deps.view.show(issueNumber, transcriptFile).catch((e) => console.error(`[tmux] show #${issueNumber}: ${e}`));
+  }
+  return { transcriptFile, liveFile: deps.runFiles.live(issueNumber) };
 }
 
 // Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
@@ -325,6 +358,7 @@ async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, 
       timeoutMinutes: config.stageTimeoutMinutes,
       maxToolCalls: config.maxToolCalls,
       agentCommands: config.agentCommands,
+      ...(deps.runFiles ? { transcriptFile: deps.runFiles.transcript(issueNumber), liveFile: deps.runFiles.live(issueNumber) } : {}),
     });
     const finishedAt = new Date();
     const { cached, costUsd, usageComplete } = priceResult(result);
@@ -345,6 +379,7 @@ async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, 
       usage_complete: usageComplete ? 1 : 0,
       exit_code: result.exitCode,
       killed_reason: result.killedReason ?? null,
+      session_id: result.sessionId ?? null,
     });
     if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
     const art = await readStageArtifacts(worktree, issueNumber, "retro");
@@ -434,6 +469,33 @@ async function runFromStage(
   startStage: Stage,
   worktree: string,
   ctx: RunCtx = { rejectRound: 0, questionRound: 0 },
+): Promise<Outcome> {
+  try {
+    return await driveFromStage(deps, config, issue, startStage, worktree, ctx);
+  } catch (e) {
+    if (!(e instanceof OperatorTakeover)) throw e;
+    // Not a failure and not a retry: the operator owns the session now, and
+    // `/factory retry` (or `factory takeover`'s hand-back) re-enters this stage.
+    await moveLabel(deps, config, issue.number, STAGE_LABEL[e.stage], LABEL.needsHuman);
+    await postComment(
+      deps,
+      config,
+      issue.number,
+      `Taken over by an operator during ${e.stage}. Comment \`/factory retry\` to hand it back; the factory resumes at ${e.stage} with whatever is in the worktree.`,
+      { stage: "takeover", json: { stage: e.stage } },
+    );
+    finish(deps, config, issue.number, "needs-human", OPERATOR_TAKEOVER);
+    return "needs-human";
+  }
+}
+
+async function driveFromStage(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  startStage: Stage,
+  worktree: string,
+  ctx: RunCtx,
 ): Promise<Outcome> {
   const issueNumber = issue.number;
   let stage: Stage = startStage;
@@ -703,7 +765,7 @@ async function runFromStage(
         base: config.base,
         head,
         title: `${issue.title} (#${issueNumber})`,
-        body: art.comment ?? `Closes #${issueNumber}`,
+        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx),
         draft: true,
       }));
     // Opened as a draft while the factory works; ready is the hand-off to a human.
@@ -712,6 +774,14 @@ async function runFromStage(
     finish(deps, config, issueNumber, "shipped");
     return "shipped";
   }
+}
+
+// The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
+function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx): string {
+  if (!config.prRunSummary) return body;
+  const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
+  const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;
+  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries })}`;
 }
 
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {

@@ -7,7 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 DEMO_DIR="${DEMO_DIR:-$(cd "$ROOT/.." && pwd)/splitbill-demo}"
 REPO="${DEMO_REPO:-learnwithparam/splitbill-demo}"
-SESSION="lightning-2"
+SESSION="${DEMO_SESSION:-lightning-2}"
+PORT="${FACTORY_DASHBOARD_PORT:-4100}"
 VERSION="$(jq -r .version "$ROOT/package.json")"
 OUT="${FACTORY_HOME:-$HOME/.factory}/recordings/lightning-2/v$VERSION"
 WORKSPACES="${FACTORY_HOME:-$HOME/.factory}/$REPO/workspaces"
@@ -31,6 +32,13 @@ run() {
 
 up() {
   if [ "$DRY" = 0 ] && tmux has-session -t "$SESSION" 2>/dev/null; then echo "session $SESSION already up"; return; fi
+  # A second dashboard fails with "port in use" deep inside a pane; refuse here and name the holder.
+  local holder
+  holder="$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1 || true)"
+  if [ "$DRY" = 0 ] && [ -n "$holder" ]; then
+    echo "port $PORT is held by pid $holder ($(ps -o command= -p "$holder" | cut -c1-80)); stop it first: kill $holder" >&2
+    exit 1
+  fi
   run tmux new-session "${NOPAGER[@]}" -d -s "$SESSION" -n you -c "$DEMO_DIR" -x 200 -y 50
   run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n factory -c "$ROOT" "make up REPO_DIR=$DEMO_DIR"
   run tmux split-window "${NOPAGER[@]}" -t "$SESSION:factory" -v -c "$DEMO_DIR" \

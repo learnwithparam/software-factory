@@ -103,8 +103,13 @@ export function deriveIssueState(issue: GhIssue): DerivedIssueState {
     // data marker — that's the stage a `/factory retry` should re-enter.
     // A question marker names the stage that asked it, so a plan or build
     // that stopped to ask resumes there rather than at an earlier stage.
+    // A takeover marker names the stage the operator stopped, so retry re-enters it.
     const stageOf = (m: DataMarker): string | undefined =>
-      m.stage === "question" ? (m.json as { stage?: string } | undefined)?.stage : STAGE_MARKER_NAMES.has(m.stage) ? m.stage : undefined;
+      m.stage === "question" || m.stage === "takeover"
+        ? (m.json as { stage?: string } | undefined)?.stage
+        : STAGE_MARKER_NAMES.has(m.stage)
+          ? m.stage
+          : undefined;
     const last = [...markers].reverse().find((m) => stageOf(m));
     resumeStage = ((last && stageOf(last)) as Stage | undefined) ?? "triage";
   }

@@ -10,7 +10,7 @@ import { parseStreamJsonLine } from "./agents/presets/claude";
 export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
 export interface StageEvent {
-  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated";
+  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session";
   readonly toolName?: string;
   readonly text?: string;
   readonly tokensIn?: number;
@@ -26,6 +26,8 @@ export interface StageEvent {
   readonly denials?: string[];
   // The agent's own closing message (Claude `result.result`, Codex `agent_message`).
   readonly finalText?: string;
+  // On "session" events: the id `claude --resume` takes (factory takeover).
+  readonly sessionId?: string;
 }
 
 export interface StageRunOptions {
@@ -42,7 +44,15 @@ export interface StageRunOptions {
   // read from its GitHub labels. Unset on triage, which runs before the type
   // is known and so never routes on it (plan v2.7.0 item 1).
   readonly type?: string;
+  // Rendered events are appended here as they arrive (the live view and the
+  // local recording), and the live file names the running process for takeover.
+  readonly transcriptFile?: string;
+  readonly liveFile?: string;
 }
+
+// The killedReason a `factory takeover` stop gets. watch.ts parks on it
+// instead of counting it as a failure.
+export const OPERATOR_TAKEOVER = "operator takeover";
 
 export interface StageRunResult {
   readonly events: StageEvent[];
@@ -71,6 +81,8 @@ export interface StageRunResult {
   readonly usageComplete?: boolean;
   readonly agent?: string;
   readonly model?: string | null;
+  // The agent's session, when its CLI reports one and keeps it resumable.
+  readonly sessionId?: string;
 }
 
 export interface Executor {
@@ -86,9 +98,11 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
   let tokensCached = 0;
   const permissionDenials: string[] = [];
   let finalText: string | undefined;
+  let sessionId: string | undefined;
   let final: { in: number; out: number; cached: number } | "invalid" | undefined;
   for (const e of events) {
     if (e.finalText !== undefined) finalText = e.finalText;
+    if (e.sessionId !== undefined) sessionId = e.sessionId;
     if (e.kind === "tool_use") toolCalls += 1;
     if (e.kind === "usage") {
       if (e.invalid) final = "invalid";
@@ -117,7 +131,7 @@ export function aggregateStageEvents(events: StageEvent[], exitCode: number, std
     tokensCached = final.cached;
   }
   const finalMessage = finalText === undefined ? undefined : truncateFinalMessage(finalText);
-  const result = { events, toolCalls, tokensIn, tokensOut, tokensCached, costUsd, costReported, exitCode, permissionDenials, usageComplete: final !== "invalid", ...(finalMessage ? { finalMessage } : {}) };
+  const result = { events, toolCalls, tokensIn, tokensOut, tokensCached, costUsd, costReported, exitCode, permissionDenials, usageComplete: final !== "invalid", ...(finalMessage ? { finalMessage } : {}), ...(sessionId ? { sessionId } : {}) };
   return exitCode !== 0 && stderrTail ? { ...result, stderrTail } : result;
 }
 

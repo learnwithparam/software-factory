@@ -1,6 +1,7 @@
 // `factory verify-agent <name>` and `make agent-matrix`: how a participant proves a
 // preset against the seeded splitbill issue. It flips nothing; their PR flips `verified`.
 
+import { resolve } from "node:path";
 import { PRESETS } from "./agents/presets";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import type { StageRun } from "./state";
@@ -8,6 +9,12 @@ import type { StageRun } from "./state";
 export interface AgentRunConfig {
   readonly agents: Record<string, AgentConfig>;
   readonly stages: StageAgents;
+}
+
+// Fixtures belong to the runner, not the repo it was pointed at: resolved from
+// this file, so running verify-agent from a target repo never litters it.
+export function defaultFixtureDir(name: string): string {
+  return resolve(import.meta.dir, "..", "tests", "fixtures", "agents", name);
 }
 
 // Every stage runs on the named preset, whatever the repo's own config says.

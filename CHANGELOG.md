@@ -1,5 +1,50 @@
 # Changelog
 
+## v2.12.0
+
+Watch every task live and step in when one needs a human: each stage streams to a transcript, tmux
+shows one window per issue, `factory takeover` opens the agent's own session in the worktree and
+hands the issue back on exit, and every PR says how its run went. Also ships #18 to #21, which
+merged after v2.11.0 without a release.
+
+- **Live transcript (`src/agents/executor.ts`, `src/paths.ts`).** Every stage appends one line per
+  event to `$FACTORY_HOME/<owner>/<name>/transcripts/issue-N.log` while it runs (a preset-less agent
+  gets its raw output), and writes `live/issue-N.json` with its pid and session while it runs. Both
+  are best effort: a write error never fails a stage.
+- **tmux view (`src/tmux.ts`).** `"tmux": { "enabled": true, "session": "factory" }` or `--tmux` on
+  `watch`/`up` opens a window per issue tailing its transcript, and closes it when the run ships,
+  fails or is cancelled (a parked issue keeps its window). `watch` and `up` refuse to start when it
+  is enabled and `tmux -V` fails, and `doctor` checks the same. `factory up --tmux` puts the watcher
+  and the dashboard in windows of their own; `factory attach [N]` joins the session, locally, over
+  `ssh -t` or through `docker exec -it`. The Docker image and CI install tmux.
+- **`factory takeover N` (`src/takeover.ts`).** Stops the running stage with a marker so the
+  executor reports `operator takeover`; `runFromStage` parks it `needs-human` with a `takeover` data
+  marker, which is neither a failure nor a retry, and `deriveIssueState` resumes at that stage. It
+  then runs `claude --resume <session>` in the worktree and posts `/factory retry` on exit
+  (`--no-handback` skips that). With nothing running it opens the last recorded session.
+- **Behaviour change: Claude sessions persist.** `claudeArgs` no longer passes
+  `--no-session-persistence`, so each stage's session is kept in `~/.claude/projects` and its id is
+  stored in the new `stage_runs.session_id` column (forward-only add-column migration). The tool-free
+  re-check in `src/recheck.ts` still runs without persistence.
+- **PR "Factory run" section (`src/run-summary.ts`).** The PR body ends with a table of every stage
+  run (agent, duration, tool calls, cost, outcome) and two lists, "Went well" and "Needed help"
+  (reruns, takeovers, kills, verify rejections, retries), all read from `stage_runs` and the thread.
+  `"prRunSummary": false` turns it off.
+- **`doctor`: `templateOverrides`.** The installed-skills drift check skips the files or directories
+  a repo lists as customised on purpose, so a deliberate edit stops reading as drift.
+- **`verify-agent` writes fixtures to the runner's tree** (`defaultFixtureDir`), not the current
+  directory, which had left a stray fixture in splitbill-demo.
+- **`teach/demo/lightning-2.sh up` refuses when the dashboard port is taken** and names the process
+  holding it, instead of a "port in use" error inside a pane.
+- **Shipped from main:** a blocker gate, so ready issues wait on their "Blocked by" line (#18); a ui
+  route's visual verify (#19); the gate tree hash keeps hidden holdout files, so verify trusts fresh
+  evidence (#21); the lightning-2 walkthrough and `teach/demo/lightning-2.sh` (#20).
+
+Not in v2.12.0:
+- A free port per worktree for gates that bind one (`FACTORY_PORT`): no gate binds a port today.
+- Updating an open PR's run summary after a revise; the section is written when the PR opens.
+- Resuming a non-Claude agent's session, and uploading transcripts or recordings anywhere.
+
 ## v2.11.0
 
 Ready for "Build a Claude Code Verification Harness": holdout tests give the Doer-and-Tester

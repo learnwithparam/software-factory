@@ -224,6 +224,28 @@ describe("installed skills drift", () => {
   test("passes when the installed skills equal the template", async () => {
     expect((await drift("new text")).ok).toBe(true);
   });
+
+  test("skips files and directories listed in templateOverrides", async () => {
+    const d = { ...deps(), readFile: async (p: string) => (p.endsWith("SKILL.md") ? "customised" : "{}") };
+    const check = async (templateOverrides: string[]) =>
+      (await runDoctor(d, { ...ctx, templateSkills: shipped, templateOverrides })).find((c) => c.name === "installed skills match this runner")!.ok;
+    expect(await check([])).toBe(false);
+    expect(await check([".claude/skills/factory-build/SKILL.md"])).toBe(true);
+    expect(await check([".claude/skills/factory-build/"])).toBe(true);
+    expect(await check([".claude/skills/factory-build"])).toBe(true);
+    expect(await check([".claude/skills/factory-buil"])).toBe(false);
+  });
+});
+
+describe("tmux check", () => {
+  const tmuxCheck = async (installed: boolean, tmux?: boolean) =>
+    (await runDoctor({ ...deps(), which: async (b: string) => b !== "tmux" || installed }, { ...ctx, tmux })).find((c) => c.name.startsWith("tmux is installed"));
+
+  test("fails when tmux.enabled is set and tmux is missing, and is absent when tmux is off", async () => {
+    expect((await tmuxCheck(false, true))!.ok).toBe(false);
+    expect((await tmuxCheck(true, true))!.ok).toBe(true);
+    expect(await tmuxCheck(false)).toBeUndefined();
+  });
 });
 
 // Plan v2.11.0 item A: `factory install` calls this right after a real

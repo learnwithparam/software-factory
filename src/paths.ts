@@ -64,3 +64,20 @@ export function discoverRepos(env: NodeJS.ProcessEnv = process.env): string[] {
 export function worktreePath(issue: number, env: NodeJS.ProcessEnv = process.env, repo?: string): string {
   return `${workspacesDir(env, repo)}/issue-${issue}`;
 }
+
+// Per-issue run files outside the worktree: the transcript every stage appends
+// to (the live view and the local recording) and the live file naming the
+// running process, which `factory takeover` reads.
+export function transcriptPath(repo: string, issue: number, env: NodeJS.ProcessEnv = process.env): string {
+  return `${repoHome(repo, env)}/transcripts/issue-${issue}.log`;
+}
+
+export function livePath(repo: string, issue: number, env: NodeJS.ProcessEnv = process.env): string {
+  return `${repoHome(repo, env)}/live/issue-${issue}.json`;
+}
+
+// Written by `factory takeover` before it stops the stage, so the executor
+// can tell an operator's stop from a crash.
+export function takeoverMarker(liveFile: string): string {
+  return liveFile.replace(/\.json$/, "") + ".takeover";
+}

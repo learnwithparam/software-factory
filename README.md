@@ -110,6 +110,30 @@ Always through GitHub state, which the runner polls every `pollIntervalSeconds`.
 Every runner comment carries a hidden `<!-- factory:` marker, so the runner never mistakes its own
 comments for an answer.
 
+## Watch and take over
+
+Every stage streams to `$FACTORY_HOME/<owner>/<name>/transcripts/issue-N.log` as it runs, one
+file per issue across all its stages. With `"tmux": { "enabled": true }` in `.factory/config.json`
+(or `--tmux`), each issue in flight also gets a tmux window tailing that file. tmux only watches:
+the runner still owns the agent, and a tmux error never fails a stage.
+
+| Do | Command |
+|---|---|
+| Start watch and dashboard in tmux windows | `factory up --tmux --repo-dir ../repo` |
+| Join the session, or one issue's window | `factory attach [N] --repo owner/name` |
+| From another machine | `ssh -t vm factory attach N --repo owner/name` |
+| In the Docker image | `docker exec -it <container> factory attach N --repo owner/name` |
+| Take over an issue | `factory takeover N --repo-dir ../repo [--no-handback]` |
+
+`takeover` stops the issue's running stage (the issue parks as `needs-human` with "Taken over by an
+operator", which is neither a failure nor a retry), then opens that stage's session with
+`claude --resume` in the issue's worktree. With no stage running it opens the last recorded
+session. When you exit, it posts `/factory retry`, so the factory resumes at that stage with your
+changes in the worktree. Only Claude keeps a session; any other agent is refused by name. The PR
+body ends with a "Factory run" section (stage, agent, duration, tool calls, cost, what went well and
+what needed help, takeovers included); `"prRunSummary": false` leaves it out, for a public repo
+that should not show models and spend.
+
 ## Scripting the CLI
 
 `run`, `tick`, `watch --once` and `doctor` take `--json`: success is `{"ok":true,"data":...}` on
@@ -164,8 +188,9 @@ layer actually lives in this repo:
 | **Verification** | What proof exists before a human looks? | runner-run `gates.sh` (`src/gates.ts`), `factory-verifier` (reverts the fix, proves the new test actually catches it), `factory-reviewer`, the CI required check |
 | **Delivery** | How does work reach a person, and who ships it? | a PR from the target repo's own PR template, a human merges it, branch protection, `factory scan` feeding new issues into intake |
 
-Checkpoint branches in the example target repo (`learnwithparam/splitbill`) use these same names:
-`01-boundary`, `02-execution`, `03-context`, `04-skills`, `05-verification`, `06-delivery`.
+Teaching checkpoints are `checkpoint/<name>` tags in `learnwithparam/splitbill-demo`, one per
+session in `teach/sessions.json`, which is the single list of them. The older `01-boundary` to
+`06-delivery` branches in `learnwithparam/splitbill` are legacy and no longer move.
 
 ## Requirements
 
@@ -282,7 +307,9 @@ dependency bump), clone it to see the loop run against something real before wir
 |---|---|
 | `factory install <target-dir> [--dry-run] [--update] [--ci]` | install or update the template in a repo |
 | `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
-| `factory up [--repo-dir <path> \| --repo <owner/name>]` | watch + dashboard in one process, the Docker/VM entrypoint |
+| `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window |
+| `factory attach [N] [--repo <owner/name>]` | join the tmux session, or issue N's live window |
+| `factory takeover N [--repo-dir <path>] [--no-handback]` | stop N's stage, `claude --resume` its session in the worktree, hand back with `/factory retry` on exit |
 | `factory watch [--repo-dir <path> \| --repo <owner/name>] [--once]` | poll and drive the loop (local mode) |
 | `factory run [--repo-dir <path> \| --repo <owner/name>] --issue <N>` | advance one issue once, then exit (CI mode) |
 | `factory tick [--repo-dir <path> \| --repo <owner/name>]` | one poll pass across every open issue, then exit (cron) |

@@ -23,6 +23,9 @@ otherwise MEMORY_INSTRUCTIONS=no. Do not use any tools." \
 `--setting-sources project,local` deliberately excludes `user`; `--no-session-persistence`
 should mean no transcript is kept.
 
+Since v2.12.0 `claudeArgs` no longer passes `--no-session-persistence`: each stage's session is kept
+in `~/.claude/projects` so `factory takeover` can `claude --resume` it. The result below predates that.
+
 ## Result
 
 - The model answered `MEMORY_INSTRUCTIONS=yes`: it saw the invoking user's global

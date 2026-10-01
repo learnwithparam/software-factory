@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
-import type { StageName, StageRunResult } from "../src/executor";
+import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
@@ -316,6 +316,35 @@ describe("failure paths", () => {
     c.push("pr", pr());
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("shipped");
+    done(c);
+  });
+
+  test("10b. an operator takeover mid-build parks needs-human; retry resumes at build and the PR says so", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", {}, { exitCode: 143, killedReason: OPERATOR_TAKEOVER });
+    expect(await c.step()).toBe("needs-human");
+    expect(labels(c.github, 1)).toEqual([LABEL.needsHuman]);
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe(OPERATOR_TAKEOVER);
+    expect(c.github.issues.get(1)!.comments.at(-1)!.body).toContain("Taken over by an operator during build");
+    build_to_pr(c);
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("shipped");
+    const body = c.github.createdPrs[0]!.body;
+    expect(body).toContain("## Factory run");
+    expect(body).toContain("- build: taken over by an operator");
+    expect(body).toContain("- 1 `/factory retry`");
+    done(c);
+  });
+
+  test("10c. config prRunSummary false leaves the PR body as the agent wrote it", async () => {
+    const c = setup([LABEL.ready], { prRunSummary: false });
+    c.state.setToggle("auto_approve_low_risk", true);
+    happy(c);
+    expect(await c.step()).toBe("shipped");
+    expect(c.github.createdPrs[0]!.body).not.toContain("## Factory run");
     done(c);
   });
 
