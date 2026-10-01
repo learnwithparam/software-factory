@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.12.1
+
+Fixes a spend loop found in the Lightning-2 rehearsal on v2.12.0.
+
+- **A `/factory retry` runs once (`src/watch.ts`).** A parked issue resumed on its latest human
+  comment. When verify came back uncertain it parked without a comment, so the same retry stayed
+  latest and rebuilt the issue on every poll. The runner now acknowledges a retry with a
+  "Retrying from <stage>" comment, and a retry only counts when it is newer than the runner's last
+  comment. Scenario 10d covers it.
+- **An uncertain verdict is posted.** It used to be posted only after a re-check, so the issue
+  parked at `needs-human` with nothing on GitHub saying why.
+
 ## v2.12.0
 
 Watch every task live and step in when one needs a human: each stage streams to a transcript, tmux
