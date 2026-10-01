@@ -3,8 +3,9 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { COMMANDS } from "../src/help";
 
-interface Session { id: string; title: string; tag: string; planned: boolean; checkpoint: string | null; issue: string; demo: string[] }
+interface Session { id: string; title: string; tag: string; planned: boolean; checkpoint: string | null; issue: string; demo: string[]; walkthrough?: string }
 const root = join(import.meta.dir, "..");
 const { sessions } = JSON.parse(readFileSync(join(root, "teach/sessions.json"), "utf8")) as { sessions: Session[] };
 const changelog = readFileSync(join(root, "CHANGELOG.md"), "utf8");
@@ -21,6 +22,16 @@ describe("teach/sessions.json", () => {
 
   test("a shipped session's tag has a CHANGELOG entry, and a planned one does not", () => {
     for (const s of sessions) expect({ id: s.id, shipped: new RegExp(`^## ${s.tag.replace(/\./g, "\\.")}\\b`, "m").test(changelog) }).toEqual({ id: s.id, shipped: !s.planned });
+  });
+
+  test("a walkthrough exists and every bin/factory verb in it is a real command", () => {
+    const verbs = new Set(COMMANDS.map((c) => c.name));
+    for (const s of sessions.filter((x) => x.walkthrough)) {
+      const text = readFileSync(join(root, s.walkthrough as string), "utf8");
+      const used = [...text.matchAll(/bin\/factory ([a-z-]+)/g)].map((m) => m[1] as string);
+      expect(used.length).toBeGreaterThan(0);
+      expect({ id: s.id, unknown: used.filter((v) => !verbs.has(v)) }).toEqual({ id: s.id, unknown: [] });
+    }
   });
 
   test("every demo step is a section or a numbered step in splitbill's DEMO.md", () => {
