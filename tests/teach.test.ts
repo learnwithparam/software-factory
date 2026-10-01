@@ -34,9 +34,9 @@ describe("teach/sessions.json", () => {
     }
   });
 
-  test("every demo step is a section or a numbered step in splitbill's DEMO.md", () => {
+  test("every demo step is a section or a numbered step in splitbill's DEMO.md or docs/sessions.md", () => {
     if (!splitbill) return console.log("teach: no splitbill checkout, DEMO.md steps not checked");
-    const demo = readFileSync(join(splitbill, "DEMO.md"), "utf8");
+    const demo = ["DEMO.md", "docs/sessions.md"].map((f) => readFileSync(join(splitbill, f), "utf8")).join("\n");
     for (const s of sessions) for (const step of s.demo) {
       const num = /^Live sequence (\d+)$/.exec(step);
       expect({ id: s.id, step, found: num ? new RegExp(`^\\| ${num[1]} \\|`, "m").test(demo) : new RegExp(`^## ${step}$`, "m").test(demo) }).toEqual({ id: s.id, step, found: true });
