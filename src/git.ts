@@ -6,7 +6,7 @@
 // fast-forward and both exits 0, which is the bug this replaces (audit
 // finding #3).
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CommandResult, CommandRunner } from "./github";
@@ -152,11 +152,14 @@ export class Git {
   // The tree of the working directory, not of HEAD: uncommitted edits count,
   // so gate evidence cannot pass for a tree the agent has since changed. A
   // throwaway index keeps the real one untouched; `.factory/runs` is the
-  // handoff dir (gate.json lives there) and is left out.
+  // handoff dir (gate.json lives there) and is left out. The copy starts from
+  // the real index so skip-worktree (holdout) entries stay as committed.
   async treeHash(worktreeDir: string): Promise<string> {
     const dir = mkdtempSync(join(tmpdir(), "factory-index-"));
     try {
       const env = { GIT_INDEX_FILE: join(dir, "index") };
+      const index = (await this.runner.run(["rev-parse", "--path-format=absolute", "--git-path", "index"], { cwd: worktreeDir })).stdout.trim();
+      copyFileSync(index, env.GIT_INDEX_FILE);
       await this.runner.run(["add", "-A", "--", ".", ":!.factory/runs"], { cwd: worktreeDir, env });
       const result = await this.runner.run(["write-tree"], { cwd: worktreeDir, env });
       return result.stdout.trim();

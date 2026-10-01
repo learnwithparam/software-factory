@@ -216,6 +216,19 @@ describe("Git.excludeFromSparseCheckout", () => {
     expect(fromHistory).toBe("the answer is 42\n");
   });
 
+  test("hidden holdout paths still count as unchanged, so gate evidence matches HEAD's tree", async () => {
+    const root = tmpRoot();
+    await initSeededRepo(root);
+    mkdirSync(join(root, ".factory", "holdout"), { recursive: true });
+    writeFileSync(join(root, ".factory", "holdout", "secret.test.ts"), "the answer is 42\n");
+    await run(["git", "add", "-A"], root);
+    await run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-m", "add holdout"], root);
+
+    const git = new Git(new GitCommandRunner());
+    await git.excludeFromSparseCheckout(root, [".factory/holdout/**"]);
+    expect(await git.treeHash(root)).toBe((await run(["git", "rev-parse", "HEAD^{tree}"], root)).trim());
+  });
+
   test("is a no-op when there are no holdout paths configured", async () => {
     const root = tmpRoot();
     await initSeededRepo(root);
