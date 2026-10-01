@@ -54,7 +54,8 @@ the repo's current settings. If it ever fails on its first push, see "Deliver an
 
 ## 3. tmux layout
 
-Run these once from `software-factory/`; each `new-window` starts in the right directory.
+`make demo` in `factory/` builds this layout and attaches (`make demo RECORD=1` records it), and
+`teach/demo/lightning-2.sh snap <name> [window]` saves a deck screenshot. By hand, from `software-factory/`:
 
 ```bash
 tmux new-session -d -s lightning-2 -n you -c splitbill-demo
