@@ -21,8 +21,13 @@ function cell(text: string): string {
   return text.replace(/\|/g, "\\|").replace(/\s+/g, " ").slice(0, 120);
 }
 
-function outcome(run: Pick<StageRun, "exit_code" | "killed_reason">): string {
-  return run.killed_reason ?? (run.exit_code === 0 ? "ok" : `exit ${run.exit_code}`);
+// A verify row reports its verdict: a clean exit with an uncertain verdict is not "ok".
+function outcome(run: Pick<StageRun, "exit_code" | "killed_reason" | "verdict">): string {
+  return run.killed_reason ?? (run.exit_code !== 0 ? `exit ${run.exit_code}` : run.verdict ?? "ok");
+}
+
+function succeeded(run: StageRun): boolean {
+  return ["ok", "pass"].includes(outcome(run));
 }
 
 export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx): string {
@@ -44,7 +49,7 @@ export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx):
   const stages = [...new Set(rows.map((r) => r.stage))];
   const firstTry = stages.filter((s) => {
     const of = rows.filter((r) => r.stage === s);
-    return of.length === 1 && outcome(of[0]!) === "ok";
+    return of.length === 1 && succeeded(of[0]!);
   });
   const well: string[] = [];
   if (firstTry.length) well.push(`${firstTry.join(", ")} passed on the first attempt`);
@@ -57,7 +62,7 @@ export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx):
   }
   for (const r of rows) {
     if (r.killed_reason === OPERATOR_TAKEOVER) help.push(`${r.stage}: taken over by an operator`);
-    else if (outcome(r) !== "ok") help.push(`${r.stage}: ${cell(outcome(r))}`);
+    else if (!succeeded(r)) help.push(`${r.stage}: ${cell(outcome(r))}`);
   }
   if (ctx.rejectRounds) help.push(`${ctx.rejectRounds} verify rejection(s)`);
   if (ctx.retries) help.push(`${ctx.retries} \`/factory retry\``);

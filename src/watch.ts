@@ -713,6 +713,7 @@ async function driveFromStage(
         json = rechecked.verdict;
         recheckNote = rechecked.note;
       }
+      if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
       if (checked && !checked.ok) {
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(deps, config, issueNumber, "needs-human", checked.reason);

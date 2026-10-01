@@ -97,10 +97,12 @@ export interface StageRun {
   killed_reason: string | null;
   // The agent's resumable session (`factory takeover`); NULL when it reports none.
   session_id: string | null;
+  // Verify only: pass, reject or uncertain, set once verdict.json is read (setVerifyVerdict).
+  verdict: string | null;
 }
 
 // The two v2.5.1 columns default to 0 cached tokens and a complete count; session_id to NULL.
-export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
+export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id" | "verdict"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
 
 // Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
 // see paths.ts. A relative path here broke on any machine where the process
@@ -201,6 +203,7 @@ export class FactoryState {
       ["tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
       ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
       ["session_id", "TEXT"],
+      ["verdict", "TEXT"],
     ] as const) {
       if (have.has(col)) continue;
       try {
@@ -238,7 +241,8 @@ export class FactoryState {
         killed_reason TEXT,
         tokens_cached INTEGER NOT NULL DEFAULT 0,
         usage_complete INTEGER NOT NULL DEFAULT 1,
-        session_id TEXT
+        session_id TEXT,
+        verdict TEXT
       );
       INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
       UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
@@ -388,6 +392,13 @@ export class FactoryState {
         $killed_reason: input.killed_reason,
         $session_id: input.session_id ?? null,
       });
+  }
+
+  // The verify row was recorded before its verdict.json was read; stamp the newest one.
+  setVerifyVerdict(repo: string, issue: number, verdict: string): void {
+    this.db
+      .query("UPDATE stage_runs SET verdict = $verdict WHERE id = (SELECT MAX(id) FROM stage_runs WHERE repo = $repo AND issue = $issue AND stage = 'verify')")
+      .run({ $repo: repo, $issue: issue, $verdict: verdict });
   }
 
   // The newest resumable session for an issue, for `factory takeover`.

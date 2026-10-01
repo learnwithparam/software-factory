@@ -104,7 +104,7 @@ export const claudePreset: AgentPreset = {
   name: "claude",
   binary: "claude",
   verified: true,
-  version: "2.1.281",
+  version: "2.1.286",
   envKeys: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
   readOnlyBy: "the stage allow-list under `dontAsk`",
   skillsDir: ".claude/skills",

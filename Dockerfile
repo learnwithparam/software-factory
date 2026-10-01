@@ -16,7 +16,7 @@ ARG NODE_MAJOR=20
 # Which agent CLIs the image carries. Every version below equals its preset's `version`
 # (tests/agents-registry.test.ts). Cursor has no versioned download, so it is host-only.
 ARG AGENTS="claude codex gemini opencode"
-ARG CLAUDE_CODE_VERSION=2.1.281
+ARG CLAUDE_CODE_VERSION=2.1.286
 ARG CODEX_VERSION=0.156.1
 ARG GEMINI_VERSION=0.61.0
 ARG OPENCODE_VERSION=1.18.32

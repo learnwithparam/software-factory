@@ -8,7 +8,7 @@ backs them.
 <!-- agents-table:start -->
 | Agent | Binary | Pinned version | Verified live | Read-only stages held by | API keys it may see | Skills dir | Docker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `claude` | `claude` | `2.1.281` | yes | the stage allow-list under `dontAsk` | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | `.claude/skills` | pinned |
+| `claude` | `claude` | `2.1.286` | yes | the stage allow-list under `dontAsk` | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | `.claude/skills` | pinned |
 | `codex` | `codex` | `0.156.1` | not yet | `-s read-only` | `OPENAI_API_KEY` | `.codex/skills` | pinned |
 | `gemini` | `gemini` | `0.61.0` | not yet | `--approval-mode plan` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | `.gemini/skills` | pinned |
 | `opencode` | `opencode` | `1.18.32` | not yet | `--agent plan` | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `MISTRAL_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY` | `.opencode/skills` | pinned |

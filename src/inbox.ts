@@ -8,6 +8,7 @@ import { parseDataMarkers } from "./derive";
 import { plain } from "./display";
 import type { GhComment, GhIssue, GhPr, GitHub } from "./github";
 import { LABEL, PARKED_LABELS } from "./labels";
+import type { Run } from "./state";
 
 export type InboxKind = "approve-plan" | "answer-question" | "review-pr" | "merge-dry-run" | "parked" | "failed" | "budget" | "learning-pr";
 export type InboxAction = "approve" | "revise" | "answer" | "retry" | "cancel";
@@ -69,7 +70,15 @@ function isMergeDryRun(label: string, comment: GhComment | undefined): boolean {
   return label === LABEL.inReview && (comment?.body.includes("<!-- factory:merge-policy:") ?? false);
 }
 
-export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
+// Why the runner parked each issue (runs.reason). The latest factory comment can
+// be an older plan, so a parked item leads with this instead.
+export function parkReasons(runs: readonly Pick<Run, "issue" | "status" | "reason">[]): Map<number, string> {
+  return new Map(runs.filter((r) => (r.status === "needs-human" || r.status === "failed") && r.reason).map((r) => [r.issue, r.reason!]));
+}
+
+const PARKED_KINDS: ReadonlySet<InboxKind> = new Set(["parked", "failed", "budget"]);
+
+export function buildInbox(issues: readonly GhIssue[], reasons?: ReadonlyMap<number, string>): InboxItem[] {
   const items: InboxItem[] = [];
   for (const issue of issues) {
     const label = issue.labels.map((l) => l.name).find((n) => WAITING[n]);
@@ -77,6 +86,8 @@ export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
     const { kind: labelKind, actions } = WAITING[label]!;
     const comment = latestRunnerComment(issue.comments);
     const kind = isBudgetPark(label, issue) ? "budget" : isMergeDryRun(label, comment) ? "merge-dry-run" : labelKind;
+    const reason = PARKED_KINDS.has(kind) ? reasons?.get(issue.number) : undefined;
+    const thread = plain(stripMarkers(comment?.body ?? ""));
     items.push({
       id: `issue-${issue.number}`,
       kind,
@@ -84,7 +95,7 @@ export function buildInbox(issues: readonly GhIssue[]): InboxItem[] {
       title: plain(issue.title),
       label,
       waitingSince: comment?.createdAt,
-      ask: plain(stripMarkers(comment?.body ?? "")).slice(0, ASK_LIMIT),
+      ask: (reason ? `Parked: ${plain(reason)}\n\n${thread}` : thread).slice(0, ASK_LIMIT),
       actions,
     });
   }
