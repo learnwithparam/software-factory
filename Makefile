@@ -35,7 +35,7 @@ skills-check:
 # (make would run watch to completion first and never reach dashboard).
 up:
 	@trap 'kill 0' EXIT INT TERM; \
-	bun bin/factory watch --repo-dir "$${REPO_DIR:-.}" & \
+	bun bin/factory watch --repo-dir "$${REPO_DIR:-.}" $(WATCH_ARGS) & \
 	bun bin/factory dashboard --repo-dir "$${REPO_DIR:-.}" & \
 	wait
 
