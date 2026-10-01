@@ -24,6 +24,14 @@ describe("lightning-2 demo script", () => {
     for (const line of out.split("\n").filter((l) => /^tmux (new-session|new-window|split-window)/.test(l))) expect(line).toContain("GH_PAGER=cat");
   });
 
+  test("--tmux passes --tmux to the watcher through make up; without it the watcher is unchanged", () => {
+    expect(dry("--tmux", "up").out).toContain("WATCH_ARGS=--tmux");
+    expect(dry("up").out).not.toContain("WATCH_ARGS");
+    const makefile = readFileSync(join(root, "Makefile"), "utf8");
+    expect(makefile).toMatch(/factory watch --repo-dir "\$\$\{REPO_DIR:-\.\}" \$\(WATCH_ARGS\)/);
+    expect(dry("scene", "5").out).toContain("watch\\ and\\ take\\ over");
+  });
+
   test("up refuses, naming the holder, when the dashboard port is already taken", async () => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
     try {

@@ -1,6 +1,6 @@
 # Lightning-2 live walkthrough: Build Your First Software Factory Execution Harness
 
-This is the run sheet for a live demo on `splitbill-demo` with runner v2.11.0. It is organised around the four
+This is the run sheet for a live demo on `splitbill-demo` with runner v2.12.1. It is organised around the four
 outcomes the lesson promises: a worktree for every task, sandbox boundaries, one execution harness, and your
 own branch kept isolated. Every repo command runs from `factory/` unless a step says otherwise. Issues are
 named by title because `reset` reseeds them under new numbers; get the current numbers with:
@@ -172,6 +172,18 @@ You are still on `my-feature` with your one-line edit. Every agent worked in its
 `~/.factory/`, on its own branch, so your checkout, index and stash were never touched. `git worktree list`
 shows them side by side with yours.
 
+### Scene 5: watch and take over (about 5 min, v2.12)
+
+Start with `teach/demo/lightning-2.sh --tmux up`: the watcher opens a window per running issue in tmux
+session `factory`.
+
+1. Label **"CSV export shows raw cents instead of a formatted amount"** `factory:ready`.
+2. `bin/factory attach <N> --repo-dir ../splitbill-demo` jumps to its live window.
+3. Mid-build, `bin/factory takeover <N> --repo-dir ../splitbill-demo`. Accept Claude's folder-trust
+   prompt, steer it in one message, then `/exit`. The handback posts `/factory retry` and build resumes
+   with your edits.
+4. The PR's "Factory run" table lists the takeover as its own build row.
+
 ## 5. Consuming a ticket
 
 1. File it from the issue form (**New issue** on GitHub). The form sets the type label (`bug`, `feature`,
@@ -193,6 +205,8 @@ shows them side by side with yours.
 | `Failed to start server. Is port 4100 in use?` | an older dashboard holds the port: `lsof -ti :4100` and stop it, or read the dashboard on the port it is already serving |
 | Verify says `gate.json` tree differs from `HEAD^{tree}` | the runner predates #21: stop it, `git pull` in `factory/`, start it again, then `inbox <N> retry` |
 | An issue stops moving after a restart | stop the watcher with Ctrl-C in its pane, never by killing the pane: a killed pane can leave the old watcher running and holding the slots |
+| A `/factory` command is ignored | it must start the comment; post it on its own |
+| A PR `/factory revise` rebuilds with no change | the runner and skills predate v2.12.1: `bin/factory install ../splitbill-demo --update` |
 
 ## 7. Close: deliver and reset
 

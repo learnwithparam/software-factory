@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The tmux layout, scene titles, screenshots and recording for the lightning-2 demo.
 # The steps to run inside it are in teach/lightning-2.md.
-# Usage: teach/demo/lightning-2.sh [--dry-run] [--record] up|attach|scene <n>|snap <name> [window]|down|scenes
+# Usage: teach/demo/lightning-2.sh [--dry-run] [--record] [--tmux] up|attach|scene <n>|snap <name> [window]|down|scenes
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -14,6 +14,8 @@ OUT="${FACTORY_HOME:-$HOME/.factory}/recordings/lightning-2/v$VERSION"
 WORKSPACES="${FACTORY_HOME:-$HOME/.factory}/$REPO/workspaces"
 DRY=0
 RECORD=0
+# --tmux: the watcher opens a live window per issue in tmux session "factory" (v2.12.0).
+WATCH_ARGS=""
 # gh and git page their output on a TTY, which would freeze a refreshing pane.
 NOPAGER=(-e PAGER=cat -e GH_PAGER=cat -e GIT_PAGER=cat)
 
@@ -23,7 +25,8 @@ SCENES=(
   "2|sandbox boundaries|protected paths, allowed commands, budgets"
   "3|execution harness|label to claim to PR"
   "4|your branch isolated|my-feature untouched"
-  "5|close|deliver and reset"
+  "5|watch and take over|live issue window, takeover, hand back"
+  "6|close|deliver and reset"
 )
 
 run() {
@@ -40,7 +43,7 @@ up() {
     exit 1
   fi
   run tmux new-session "${NOPAGER[@]}" -d -s "$SESSION" -n you -c "$DEMO_DIR" -x 200 -y 50
-  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n factory -c "$ROOT" "make up REPO_DIR=$DEMO_DIR"
+  run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n factory -c "$ROOT" "make up REPO_DIR=$DEMO_DIR${WATCH_ARGS:+ WATCH_ARGS=$WATCH_ARGS}"
   run tmux split-window "${NOPAGER[@]}" -t "$SESSION:factory" -v -c "$DEMO_DIR" \
     "while :; do clear; git worktree list; ls $WORKSPACES 2>/dev/null; sleep 2; done"
   run tmux new-window "${NOPAGER[@]}" -t "$SESSION" -n logs -c "$ROOT"
@@ -81,6 +84,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1; shift ;;
     --record) RECORD=1; shift ;;
+    --tmux) WATCH_ARGS="--tmux"; shift ;;
     *) break ;;
   esac
 done
