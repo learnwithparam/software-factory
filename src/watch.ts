@@ -721,8 +721,8 @@ async function driveFromStage(
       const verifyStop = stepStop(json);
       if (verifyStop) return stopStep(deps, config, issueNumber, LABEL.verifying, verifyStop);
       if (result.exitCode !== 0 || !json || json.result === "uncertain") {
-        // The human needs to see why the re-check left nothing to act on.
-        if (recheckNote && art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
+        // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
+        if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
         await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
         finish(
           deps,
@@ -898,6 +898,9 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const verb = parseChatOps(latest.body).type;
   if (verb === "cancel") return cancelRun(issue, deps, config);
   if (verb !== "retry") return undefined;
+  // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
+  const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
+  if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;
 
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
@@ -905,6 +908,7 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const derived = deriveIssueState(issue);
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
+  await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`);
   await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], STAGE_LABEL[derived.resumeStage]);
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
     rejectRound: derived.rejectRounds,

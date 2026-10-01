@@ -120,3 +120,13 @@ describe("skills-ref validate (the authority make check calls)", () => {
     }
   }, 60_000);
 });
+
+// A revise writes revise.md and reruns a stage (src/watch.ts). A stage whose skill never reads it reruns blind:
+// on v2.12.0 a PR's `/factory revise add a curl example` rebuilt with no change.
+describe("every stage a revise reruns reads revise.md", () => {
+  const watch = readFileSync(join(import.meta.dir, "..", "src", "watch.ts"), "utf8");
+  const stages = [...watch.matchAll(/writeRevision\([\s\S]*?runFromStage\([^)]*?"(\w+)"/g)].map((m) => m[1]!);
+  test("watch.ts reruns plan and build on a revise", () => expect([...new Set(stages)].sort()).toEqual(["build", "plan"]));
+  for (const stage of new Set(stages))
+    test(`factory-${stage}`, () => expect(readFileSync(join(SKILLS_DIR, `factory-${stage}`, "SKILL.md"), "utf8")).toContain("revise.md"));
+});

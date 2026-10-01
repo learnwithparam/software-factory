@@ -14,6 +14,10 @@ files inside this worktree and write the artifact files below.
 - `.factory/runs/issue-<N>/issue.json`, `triage.json`, `plan.json`,
   `plan-comment.md` — the approved plan: AC-n, NG-n, files, tests, repo
   skills to apply, gate level.
+- `.factory/runs/issue-<N>/revise.md`, present only when a human sent
+  `/factory revise <text>` on the PR: a change to make this round, even if
+  the plan is already built. `revision.md` beside it holds every earlier
+  round; honour all of it, and stop at step 5 if it crosses a non-goal.
 - `AGENTS.md`, `.factory/charter.md`.
 - The repo skills named in the plan (`.claude/skills/<name>/SKILL.md`) —
   read and follow them; they encode repo-specific rules you don't know.

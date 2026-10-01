@@ -56,7 +56,7 @@ const build = () => ({
   "status-comment.md": "<!-- factory:status v1 -->\nbuilding",
   "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }),
 });
-const verdict = (result: "pass" | "reject") => ({
+const verdict = (result: "pass" | "reject" | "uncertain") => ({
   "verdict-comment.md": "<!-- factory:verdict v1 -->\nverdict",
   "verdict.json": JSON.stringify({ result, rounds: 1, findings: [] }),
 });
@@ -336,6 +336,26 @@ describe("failure paths", () => {
     expect(body).toContain("## Factory run");
     expect(body).toContain("- build: taken over by an operator");
     expect(body).toContain("- 1 `/factory retry`");
+    done(c);
+  });
+
+  test("10d. a retry that parks again is not replayed: one retry runs once, and an uncertain verdict is posted", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build());
+    c.push("verify", verdict("uncertain"));
+    expect(await c.step()).toBe("needs-human");
+    expect(c.github.issues.get(1)!.comments.at(-1)!.body).toContain("<!-- factory:verdict");
+    c.push("verify", verdict("uncertain"));
+    c.github.say(1, "/factory retry");
+    expect(await c.step()).toBe("needs-human");
+    const runs = c.state.listStageRuns("acme/widgets", { issue: 1 }).length;
+    await c.step();
+    expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).length).toBe(runs);
+    expect(labels(c.github, 1)).toEqual([LABEL.needsHuman]);
+    expect(c.github.issues.get(1)!.comments.some((x) => x.body.includes("Retrying from verify"))).toBe(true);
     done(c);
   });
 
