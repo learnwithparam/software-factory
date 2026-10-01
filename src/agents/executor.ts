@@ -3,13 +3,15 @@
 // through the preset's line parser, and kill the whole process group on a
 // timeout or a runaway tool-call count.
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { runDir } from "../artifacts";
 import type { RouteConfig } from "../config";
 import { buildContextPack } from "../context";
-import { aggregateStageEvents, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
+import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
+import { plain } from "../display";
+import { takeoverMarker } from "../paths";
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -26,6 +28,23 @@ export const MAX_ARG_BYTES = 120 * 1024;
 
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
+
+// One transcript line per event, the same text `factory logs` prints.
+export function renderEvent(e: StageEvent): string | undefined {
+  if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}`;
+  if (e.kind === "text" || e.kind === "truncated") return e.text ? plain(e.text) : undefined;
+  if (e.kind === "session") return `session ${e.sessionId}`;
+  if (e.kind === "result") return `result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim();
+  return undefined;
+}
+
+// Best effort: a full disk or a removed directory never fails a stage.
+function append(file: string | undefined, text: string): void {
+  if (!file) return;
+  try {
+    appendFileSync(file, text);
+  } catch {}
+}
 
 export interface ResolvedAgent {
   readonly name: string;
@@ -90,6 +109,7 @@ export class CommandExecutor implements Executor {
       return await this.spawnStage(opts, agent, scratch);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
+      if (opts.liveFile) rmSync(opts.liveFile, { force: true });
     }
   }
 
@@ -130,6 +150,11 @@ export class CommandExecutor implements Executor {
     const big = argv.find((a) => Buffer.byteLength(a) > MAX_ARG_BYTES);
     if (big !== undefined) throw new Error(`${agent.name}: the prompt is passed as an argument and is ${Buffer.byteLength(big)} bytes, over the ${MAX_ARG_BYTES} byte limit; configure a stdin agent or shorten the issue`);
 
+    if (opts.transcriptFile) mkdirSync(dirname(opts.transcriptFile), { recursive: true });
+    append(opts.transcriptFile, `\n=== ${opts.stage} #${opts.issue} ${new Date().toISOString()} (${agent.name}) ===\n`);
+    const marker = opts.liveFile ? takeoverMarker(opts.liveFile) : undefined;
+    if (marker) rmSync(marker, { force: true });
+
     const proc = Bun.spawn([...argv], {
       cwd: opts.cwd,
       stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
@@ -144,6 +169,13 @@ export class CommandExecutor implements Executor {
         FACTORY_SCRATCH_DIR: scratch,
       },
     });
+    let sessionId: string | undefined;
+    const writeLive = () => {
+      if (!opts.liveFile) return;
+      mkdirSync(dirname(opts.liveFile), { recursive: true });
+      writeFileSync(opts.liveFile, JSON.stringify({ pid: proc.pid, issue: opts.issue, stage: opts.stage, agent: agent.name, sessionId, transcriptFile: opts.transcriptFile }));
+    };
+    writeLive();
     let cancelRead: (() => void) | undefined;
     const killGroup = () => {
       // ESRCH means it already exited; that is the goal.
@@ -184,17 +216,33 @@ export class CommandExecutor implements Executor {
     const parseLine = agent.preset?.newParser?.() ?? agent.preset?.parseLine;
     const handle = (line: string) => {
       this.recorder?.line(opts.stage, line);
-      if (!agent.preset || !parseLine) return;
+      if (!agent.preset || !parseLine) {
+        // No parser means no events: the window shows the raw output instead, under the same cap.
+        recorded += Buffer.byteLength(line);
+        if (recorded <= MAX_RECORDED_OUTPUT_BYTES) append(opts.transcriptFile, `${plain(line)}\n`);
+        return;
+      }
       if (Buffer.byteLength(line) > MAX_EVENT_LINE_BYTES) {
         // Dropped, not parsed; if it was the terminal usage event the count is gone.
         if (agent.preset.isUsageCandidate(line.slice(0, 4096))) usageComplete = false;
         return;
       }
       for (const e of parseLine(line)) {
+        if (e.sessionId && e.sessionId !== sessionId) {
+          sessionId = e.sessionId;
+          writeLive();
+        }
         recorded += Buffer.byteLength(e.text ?? "");
         if (recorded > MAX_RECORDED_OUTPUT_BYTES) {
-          if (events.at(-1)?.kind !== "truncated") events.push({ kind: "truncated", text: `recording stopped after ${MAX_RECORDED_OUTPUT_BYTES} output bytes; the agent keeps running` });
-        } else events.push(e);
+          if (events.at(-1)?.kind !== "truncated") {
+            events.push({ kind: "truncated", text: `recording stopped after ${MAX_RECORDED_OUTPUT_BYTES} output bytes; the agent keeps running` });
+            append(opts.transcriptFile, `${events.at(-1)!.text}\n`);
+          }
+        } else {
+          events.push(e);
+          const line = renderEvent(e);
+          if (line !== undefined) append(opts.transcriptFile, `${line}\n`);
+        }
         if (e.kind !== "tool_use") continue;
         toolCalls += 1;
         if (opts.maxToolCalls && toolCalls > opts.maxToolCalls && !killedReason) {
@@ -231,6 +279,12 @@ export class CommandExecutor implements Executor {
     }
 
     const [exitCode, stderr] = await Promise.all([proc.exited, stderrPromise]);
+    if (opts.liveFile) rmSync(opts.liveFile, { force: true });
+    if (marker && existsSync(marker)) {
+      killedReason = OPERATOR_TAKEOVER;
+      rmSync(marker, { force: true });
+    }
+    append(opts.transcriptFile, `=== ${opts.stage} exit ${exitCode}${killedReason ? ` (${killedReason})` : ""} ===\n`);
     const stderrTail = stderr.trim().slice(-4000) || undefined;
     const base0 = aggregateStageEvents(events, exitCode, stderrTail);
     const base = { ...base0, agent: agent.name, model: agent.config.model ?? null, usageComplete: usageComplete && base0.usageComplete !== false };

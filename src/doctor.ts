@@ -38,6 +38,10 @@ export interface DoctorContext {
   readonly routes?: Readonly<Record<string, RouteConfig>>;
   // Shipped skill files (path relative to the repo root -> content), to spot an install that predates this runner.
   readonly templateSkills?: Record<string, string>;
+  // config.templateOverrides: files or directories this repo customised on purpose; the drift check skips them.
+  readonly templateOverrides?: readonly string[];
+  // config.tmux.enabled: the watcher refuses to start without tmux, so doctor says so first.
+  readonly tmux?: boolean;
   // The pre-v2.6.2 shared paths (`defaultStatePath`/`workspacesDir` called
   // with no `repo`), passed in so doctor can warn when they still exist.
   // Never auto-migrated: that was an explicit design decision (a shared DB
@@ -180,7 +184,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   }
   if (ctx.templateSkills) {
     const stale: string[] = [];
+    const overridden = (path: string) => (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
     for (const [path, want] of Object.entries(ctx.templateSkills)) {
+      if (overridden(path)) continue;
       if ((await deps.readFile(`${ctx.cloneDir}/${path}`)) !== want) stale.push(path);
     }
     checks.push({
@@ -190,6 +196,9 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       fixable: false,
       warn: true,
     });
+  }
+  if (ctx.tmux) {
+    checks.push({ name: "tmux is installed (tmux.enabled)", ok: await deps.which("tmux"), detail: "install tmux, or set tmux.enabled to false", fixable: false });
   }
   if (ctx.factoryMode === "actions") {
     checks.push({

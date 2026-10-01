@@ -9,7 +9,7 @@ import { runDoctor } from "../src/doctor";
 import { configFor, formatReport, matrixPlan, reportFor } from "../src/verify-agent";
 import type { StageRun } from "../src/state";
 
-const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "codex", model: null, started_at: "", finished_at: "", duration_ms: 1500, tool_calls: 2, tokens_in: 10, tokens_out: 5, tokens_cached: 0, cost_usd: 0.25, usage_complete: 1, exit_code: 0, killed_reason: null, ...over });
+const run = (over: Partial<StageRun>): StageRun => ({ id: 1, repo: "a/b", issue: 1, stage: "build", agent: "codex", model: null, started_at: "", finished_at: "", duration_ms: 1500, tool_calls: 2, tokens_in: 10, tokens_out: 5, tokens_cached: 0, cost_usd: 0.25, usage_complete: 1, exit_code: 0, killed_reason: null, session_id: null, ...over });
 
 describe("verify-agent", () => {
   test("configFor runs every stage on the preset and rejects an unknown name", () => {

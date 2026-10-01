@@ -16,6 +16,9 @@
   "maxOpenFactoryPrs": 3,
   "concurrency": 3,
   "pollIntervalSeconds": 15,
+  "tmux": { "enabled": false, "session": "factory" },
+  "prRunSummary": true,
+  "templateOverrides": [],
   "agents": {
     "opus": { "preset": "claude", "model": "claude-opus-5-5" },
     "sonnet": { "preset": "claude", "model": "claude-sonnet-5" },

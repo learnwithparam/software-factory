@@ -13,6 +13,7 @@ import { isUsageResultCandidate, readUsage } from "../usage";
 interface StreamJsonLine {
   type?: string;
   subtype?: string;
+  session_id?: string;
   result?: string;
   cost_usd?: number;
   total_cost_usd?: number;
@@ -36,7 +37,9 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
   }
   const events: StageEvent[] = [];
 
-  if (parsed.type === "assistant" && parsed.message?.content) {
+  if (parsed.type === "system" && parsed.subtype === "init" && parsed.session_id) {
+    events.push({ kind: "session", sessionId: parsed.session_id, text: parsed.session_id });
+  } else if (parsed.type === "assistant" && parsed.message?.content) {
     for (const block of parsed.message.content) {
       if (block.type === "text" && block.text) {
         events.push({ kind: "text", text: block.text });
@@ -92,7 +95,6 @@ export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
     stageSettings(opts.stage, opts.issue, opts.agentCommands),
     "--append-system-prompt",
     contextPack ? `${STAGE_GUIDANCE}\n\n${contextPack}` : STAGE_GUIDANCE,
-    "--no-session-persistence",
     "--max-budget-usd",
     String(opts.maxBudgetUsd),
   ];

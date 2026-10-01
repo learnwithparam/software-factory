@@ -95,10 +95,12 @@ export interface StageRun {
   usage_complete: number;
   exit_code: number;
   killed_reason: string | null;
+  // The agent's resumable session (`factory takeover`); NULL when it reports none.
+  session_id: string | null;
 }
 
-// The two v2.5.1 columns default to 0 cached tokens and a complete count.
-export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete">>;
+// The two v2.5.1 columns default to 0 cached tokens and a complete count; session_id to NULL.
+export type StageRunInput = Omit<StageRun, "id" | "tokens_cached" | "usage_complete" | "session_id"> & Partial<Pick<StageRun, "tokens_cached" | "usage_complete" | "session_id">>;
 
 // Absolute, rooted at FACTORY_HOME (~/.factory by default, /data in Docker) —
 // see paths.ts. A relative path here broke on any machine where the process
@@ -198,6 +200,7 @@ export class FactoryState {
     for (const [col, ddl] of [
       ["tokens_cached", "INTEGER NOT NULL DEFAULT 0"],
       ["usage_complete", "INTEGER NOT NULL DEFAULT 1"],
+      ["session_id", "TEXT"],
     ] as const) {
       if (have.has(col)) continue;
       try {
@@ -234,7 +237,8 @@ export class FactoryState {
         exit_code INTEGER NOT NULL,
         killed_reason TEXT,
         tokens_cached INTEGER NOT NULL DEFAULT 0,
-        usage_complete INTEGER NOT NULL DEFAULT 1
+        usage_complete INTEGER NOT NULL DEFAULT 1,
+        session_id TEXT
       );
       INSERT INTO stage_runs_new (${names}) SELECT ${names} FROM stage_runs;
       UPDATE stage_runs_new SET cost_usd = NULL WHERE usage_complete = 0;
@@ -362,8 +366,8 @@ export class FactoryState {
   recordStageRun(input: StageRunInput): void {
     this.db
       .query(
-        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code, killed_reason)
-         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason)`,
+        `INSERT INTO stage_runs (repo, issue, stage, agent, model, started_at, finished_at, duration_ms, tool_calls, tokens_in, tokens_out, tokens_cached, cost_usd, usage_complete, exit_code, killed_reason, session_id)
+         VALUES ($repo, $issue, $stage, $agent, $model, $started_at, $finished_at, $duration_ms, $tool_calls, $tokens_in, $tokens_out, $tokens_cached, $cost_usd, $usage_complete, $exit_code, $killed_reason, $session_id)`,
       )
       .run({
         $repo: input.repo,
@@ -382,7 +386,15 @@ export class FactoryState {
         $usage_complete: input.usage_complete ?? 1,
         $exit_code: input.exit_code,
         $killed_reason: input.killed_reason,
+        $session_id: input.session_id ?? null,
       });
+  }
+
+  // The newest resumable session for an issue, for `factory takeover`.
+  lastSession(repo: string, issue: number): Pick<StageRun, "stage" | "agent"> & { session_id: string } | undefined {
+    return (this.db
+      .query("SELECT stage, agent, session_id FROM stage_runs WHERE repo = $repo AND issue = $issue AND session_id IS NOT NULL ORDER BY id DESC LIMIT 1")
+      .get({ $repo: repo, $issue: issue }) ?? undefined) as (Pick<StageRun, "stage" | "agent"> & { session_id: string }) | undefined;
   }
 
   // Keyset pagination on id, like listEvents: pass the last id seen.

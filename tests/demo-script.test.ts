@@ -24,6 +24,17 @@ describe("lightning-2 demo script", () => {
     for (const line of out.split("\n").filter((l) => /^tmux (new-session|new-window|split-window)/.test(l))) expect(line).toContain("GH_PAGER=cat");
   });
 
+  test("up refuses, naming the holder, when the dashboard port is already taken", async () => {
+    const server = Bun.serve({ port: 0, fetch: () => new Response("x") });
+    try {
+      const p = Bun.spawnSync([script, "up"], { env: { ...process.env, FACTORY_HOME: "/tmp/fh", DEMO_SESSION: `port-guard-${process.pid}`, FACTORY_DASHBOARD_PORT: String(server.port) } });
+      expect(p.exitCode).toBe(1);
+      expect(p.stderr.toString()).toContain(`port ${server.port} is held by pid ${process.pid}`);
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("snap writes html and png under the runner version's recording dir", () => {
     const version = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string }).version;
     const { code, out } = dry("snap", "01-two-worktrees", "factory");

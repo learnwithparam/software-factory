@@ -111,6 +111,15 @@ describe("config validation at boot", () => {
     expect(problems.join("\n")).toMatch(/holdout\.extra: unknown key/);
   });
 
+  test("tmux, prRunSummary and templateOverrides are accepted, and wrong types are named", () => {
+    expect(configProblems({ repo: "a/b", tmux: { enabled: true, session: "demo" }, prRunSummary: false, templateOverrides: [".claude/skills/x/"] })).toEqual([]);
+    const problems = configProblems({ repo: "a/b", tmux: { enabled: "yes", window: 1 }, prRunSummary: "no", templateOverrides: "x" }).join("\n");
+    expect(problems).toMatch(/tmux\.enabled: expected boolean/);
+    expect(problems).toMatch(/tmux\.window: unknown key/);
+    expect(problems).toMatch(/prRunSummary: expected boolean/);
+    expect(problems).toMatch(/templateOverrides: expected strings/);
+  });
+
   test("every key of DEFAULT_CONFIG validates, and the shipped example config passes", () => {
     expect(configProblems({ ...DEFAULT_CONFIG, repo: "a/b" })).toEqual([]);
     const example = JSON.parse(readFileSync(join(import.meta.dir, "../template/.factory/config.example.json"), "utf8"));

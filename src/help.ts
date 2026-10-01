@@ -2,12 +2,14 @@
 // dispatcher in bin/factory so a new command can't ship undocumented.
 
 export const COMMANDS: { name: string; usage: string; does: string }[] = [
-  { name: "up", usage: "up (--repo-dir <path> | --repo <owner/name>)", does: "watch + dashboard in one process (Docker/VM)" },
+  { name: "up", usage: "up (--repo-dir <path> | --repo <owner/name>) [--tmux]", does: "watch + dashboard in one process (Docker/VM); --tmux: each in a tmux window, plus one per issue" },
   { name: "watch", usage: "watch (--repo-dir <path> | --repo <owner/name>) [--once]", does: "poll and drive the loop; --once = one pass" },
   { name: "run", usage: "run (--repo-dir <path> | --repo <owner/name>) --issue <N>", does: "advance one issue once, then exit (CI)" },
   { name: "tick", usage: "tick (--repo-dir <path> | --repo <owner/name>)", does: "one poll pass over every open issue, then exit (cron)" },
   { name: "park", usage: "park --repo-dir <path> --issue <N> [--reason <text>]", does: "park an issue as needs-human from outside the loop" },
   { name: "dashboard", usage: "dashboard [--repo <owner/name> | --repo-dir <path>] [--port <n>]", does: "serve the board (default :4100, loopback)" },
+  { name: "attach", usage: "attach [<N>] (--repo <owner/name> | --repo-dir <path>) [--session <name>]", does: "join the tmux session; with <N>, open that issue's live window (works over ssh -t and docker exec -it)" },
+  { name: "takeover", usage: "takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]", does: "stop #N's running stage, open its Claude session in the worktree, and /factory retry when you exit" },
   { name: "logs", usage: "logs <N> [--repo <owner/name>] [--stage <name>] [--follow] [--json]", does: "print (or follow) a run's events; --json is one object per line" },
   { name: "inbox", usage: "inbox [<N> <action> [--text <words>]] --repo <owner/name> [--json]", does: "list what waits for a human; with <N> <action>, post the same /factory comment a human would" },
   { name: "scan", usage: "scan --repo-dir <path>", does: "file issues from `bun audit` (Bun/npm projects only)" },
@@ -23,6 +25,7 @@ export const OPTIONS: [string, string][] = [
   ["--db <path>", "SQLite telemetry cache (default ~/.factory/state.db)"],
   ["--workspaces <dir>", "worktree root (default ~/.factory/workspaces)"],
   ["--json", "run, tick, watch --once and doctor: print {ok,data} on stdout, and errors as {ok:false,error} on stderr"],
+  ["--tmux", "watch and up: show each issue's live transcript in a tmux window (config tmux.enabled does the same)"],
   ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
 ];
 

@@ -89,6 +89,17 @@ export interface FactoryConfig {
   readonly spend: SpendConfig;
   readonly merge: MergeConfig;
   readonly holdout: HoldoutConfig;
+  // One tmux window per issue in flight, tailing its transcript (`factory attach`).
+  readonly tmux: TmuxConfig;
+  // Append the "Factory run" section (stages, agents, cost, what needed help) to the PR body.
+  readonly prRunSummary: boolean;
+  // Installed template files this repo changed on purpose; doctor's drift check skips them.
+  readonly templateOverrides: readonly string[];
+}
+
+export interface TmuxConfig {
+  readonly enabled: boolean;
+  readonly session: string;
 }
 
 export interface SpendConfig {
@@ -150,6 +161,9 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   spend: {},
   merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 },
   holdout: { paths: [], cmd: "" },
+  tmux: { enabled: false, session: "factory" },
+  prRunSummary: true,
+  templateOverrides: [],
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -165,6 +179,7 @@ export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
     merge: { ...DEFAULT_CONFIG.merge, ...partial.merge },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
+    tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
   };
 }
 
@@ -195,6 +210,9 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   spend: "object",
   merge: "object",
   holdout: "object",
+  tmux: "object",
+  prRunSummary: "boolean",
+  templateOverrides: "strings",
   riskCriteria: "object",
 };
 
@@ -239,6 +257,7 @@ export function configProblems(raw: unknown): string[] {
     }
   }
   nested("agentCommands", { read: "strings", build: "strings", verify: "strings" });
+  nested("tmux", { enabled: "boolean", session: "string" });
   if (cfg.holdout !== undefined && kindOk(cfg.holdout, "object")) {
     const holdout = cfg.holdout as Record<string, unknown>;
     for (const [key, value] of Object.entries(holdout)) {
