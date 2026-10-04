@@ -49,9 +49,9 @@ in the status comment. Do not paraphrase or summarize a failure as "some
 tests failed"; show the line that failed.
 
 If the gate fails and you can see why, fix it and re-run. Stop after 3
-failed gate runs: write `"outcome": "blocked"` and say so in the status
-comment. If you can't get it green, say so in the status comment and stop — `factory-verify` will catch a red gate anyway, but a
-build that knows it's broken shouldn't pretend otherwise.
+failed gate runs: write `"status": "red"` and `"outcome": "blocked"` with the
+reason in `summary`, and quote the failing gate line in the status comment.
+A human looks at a blocked build; don't leave it for `factory-verify` to find.
 
 ## 4. UI route: capture screenshots
 
@@ -97,7 +97,7 @@ Add `"screenshots": [...]` (step 4) only on the `ui` route.
 `outcome` is optional: `complete` (the default), `blocked` (you cannot go on and a human must
 look; put the reason in `summary`), or `failed`. No other fields are allowed.
 
-`status` is one of `green`, `red` (gate never went green after reasonable
-effort), or `needs-info` (see step 5). Write `"rounds": 1`: the runner counts
+`status` is one of `green`, `red` (gate still red after 3 runs, see step 3),
+or `needs-info` (see step 5). Write `"rounds": 1`: the runner counts
 build attempts itself and replaces the value. Leave the worktree exactly as you want
 it committed — the runner commits and pushes it verbatim.
