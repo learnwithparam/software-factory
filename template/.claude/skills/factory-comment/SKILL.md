@@ -21,8 +21,8 @@ reads like a triage comment on issue #40.
    missing or altered marker means the comment is invisible to the loop.
 4. Write the finished comment to the file the calling skill tells you to
    (normally `.factory/runs/issue-<N>/<stage>-comment.md`). You do not call
-   `gh` yourself — the runner posts what you write (see `factory-build`'s
-   note on why: settings.json denies `gh` and `git push` to every stage).
+   `gh` yourself: settings.json denies `gh` and `git push` to every stage,
+   and the runner posts what you write.
 5. Plain language, short sentences. No em dashes. A person reading only this
    comment, with no other context, should understand the decision and why.
 
