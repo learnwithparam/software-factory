@@ -132,6 +132,10 @@ describe("guard-paths.sh", () => {
     "gh -R me/git pr merge 3",
     "git push --mirror",
     "git --super-prefix x/ merge y",
+    "git submodule foreach sh -c 'git push -f origin HEAD'",
+    "git bisect run sh -c 'git merge x'",
+    "git submodule foreach bash -c \"git merge origin/main\"",
+    "git -C git push -f",
   ];
   for (const command of mergeOrForce) {
     test(`blocks a merge or force-push: ${command}`, async () => {
@@ -339,8 +343,8 @@ describe("guard-paths.sh shell shapes inside a stage", () => {
     const nested = ["bash -c", "bash -c", "bash -c"].reduce((c, w) => `${w} '${c.replaceAll("'", "'\\''")}'`, pushes);
     const started = Date.now();
     const codes = [];
-    for (const command of [nested, `echo ${"1".repeat(99000)}`, `{${".".repeat(99000)}`]) codes.push((await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "build" })).code);
-    expect(codes).toEqual([0, 0, 0]);
+    for (const command of [nested, `echo ${"1".repeat(99000)}`, `{${".".repeat(99000)}`, "! ".repeat(100000)]) codes.push((await runHook({ tool_name: "Bash", tool_input: { command } }, { FACTORY_STAGE: "build" })).code);
+    expect(codes).toEqual([0, 0, 0, 0]);
     expect(Date.now() - started).toBeLessThan(4000);
   });
 

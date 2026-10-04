@@ -60,6 +60,8 @@ Two other findings from the same runs:
    (one that is the value of `-C` or `-R` is not a start). `push --mirror` counts as a force. So
    `git merge-base` and `--grep='git merge'` pass, while `grep "git merge" f` and
    `echo git push -f` are refused. `gh api .../merge` passes the hook; settings deny `Bash(gh *)`.
+   A hidden git word (`$(which git) merge`, `${GIT:-git} merge`) and `git pull` also pass; inside
+   a stage dontAsk refuses the first two, and `git pull` is not on any stage allow-list.
    The verifier also stays on the verify allow-list: it reads `gate.json`, never runs the gates.
 4. `factory-verify` re-dispatches the verifier once after a refused command.
 5. The claude preset passes `--strict-mcp-config` and `--disallowedTools STAGE_DISALLOWED_TOOLS`.

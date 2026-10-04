@@ -149,13 +149,14 @@ def shell_shape_problems(command):
         problems.append("brace expansion (list each path in full)")
     for segment in re.split(SEPARATORS, text):
         words = segment.replace("(", " ").replace("{", " ", 1).split()
-        while words and (words[0] in PREFIX_WORDS or words[0].startswith("-") and len(words) > 1):
-            words = words[1:]
-        if not words:
+        first = 0
+        while first < len(words) and (words[first] in PREFIX_WORDS or words[first].startswith("-") and first + 1 < len(words)):
+            first += 1
+        if first == len(words):
             continue
-        if words[0] == "cd":
+        if words[first] == "cd":
             problems.append("cd (commands already run in the repo root; give paths from there, or git -C <dir> for git)")
-        elif re.match(r"[A-Za-z_][A-Za-z0-9_]*\+?=", words[0]):
+        elif re.match(r"[A-Za-z_][A-Za-z0-9_]*\+?=", words[first]):
             problems.append("a VAR=value prefix (run the command without it)")
     return list(dict.fromkeys(problems))
 
@@ -173,11 +174,16 @@ def merges_or_force_pushes(command):
         text = re.sub(r"(?<!\d)\d*(?:<<<|<<-?|<>|>>|>\||&>>?|[<>]&?)\s*[^\s;&|<>()]*", " ", text)  # drop redirects
         for segment in re.split(r"[\n;&|()`]", text):
             words = segment.split()
-            # A git or gh word starts a command unless it is the value of an earlier one's option.
-            starts = []
+            # A git or gh word starts a command unless it is the value of the previous start's
+            # own global option (git -C git ...); after a positional word, -c is sh's, not git's.
+            starts, in_globals = [], False
             for k, w in enumerate(words):
-                if os.path.basename(w) in ("git", "gh") and not w.startswith("-") and not (starts and words[k - 1] in GIT_VALUE_OPTS | GH_VALUE_OPTS):
+                value = in_globals and words[k - 1] in GIT_VALUE_OPTS | GH_VALUE_OPTS
+                if os.path.basename(w) in ("git", "gh") and not w.startswith("-") and not value:
                     starts.append(k)
+                    in_globals = True
+                elif not w.startswith("-") and not value:
+                    in_globals = False
             for k, end in zip(starts, starts[1:] + [len(words)]):
                 name, rest = os.path.basename(words[k]), words[k + 1 : end]
                 value_opts = GIT_VALUE_OPTS if name == "git" else GH_VALUE_OPTS
