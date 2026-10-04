@@ -1,4 +1,4 @@
-.PHONY: agent-matrix demo install check typecheck test skills-check up watch dashboard reset doctor scan
+.PHONY: agent-matrix demo install check check-mutations typecheck test skills-check up watch dashboard reset doctor scan
 
 install:
 	bun install
@@ -16,6 +16,11 @@ typecheck:
 # that needs the developer's own identity fails here and not only on GitHub.
 test:
 	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true bun test
+
+# Each entry in tests/mutations.json breaks one thing; its test must go red.
+# Proves the checks bite. Its own CI job, since it copies the repo per mutation.
+check-mutations:
+	GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null bun scripts/check-mutations.ts
 
 skills-check:
 	@command -v uvx >/dev/null 2>&1 || { \

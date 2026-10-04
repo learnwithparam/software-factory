@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { STAGE_GUIDANCE, stageAllowRules } from "../src/stage-permissions";
 
 const SKILLS_DIR = join(import.meta.dir, "..", "template", ".claude", "skills");
 
@@ -129,4 +130,54 @@ describe("every stage a revise reruns reads revise.md", () => {
   test("watch.ts reruns plan and build on a revise", () => expect([...new Set(stages)].sort()).toEqual(["build", "plan"]));
   for (const stage of new Set(stages))
     test(`factory-${stage}`, () => expect(readFileSync(join(SKILLS_DIR, `factory-${stage}`, "SKILL.md"), "utf8")).toContain("revise.md"));
+});
+
+// Subagents never see --append-system-prompt, so each template agent carries the
+// stage's shell rules itself. In all 7 splitbill-demo issues that reached verify, a verify
+// command broke a shell rule and the verifier read the refusal as "Bash denied".
+describe("every template agent carries STAGE_GUIDANCE verbatim", () => {
+  const agentsDir = join(import.meta.dir, "..", "template", ".claude", "agents");
+  for (const file of readdirSync(agentsDir).filter((f) => f.endsWith(".md")))
+    test(file, () => expect(readFileSync(join(agentsDir, file), "utf8")).toContain(STAGE_GUIDANCE));
+});
+
+// A command the template tells a stage to run must survive the stage's own
+// guard (the hook is the one definition of a refused shape). `<base>` style
+// placeholders become a plain word first.
+describe("every inline shell command in the template passes the stage shell rules", () => {
+  const root = join(import.meta.dir, "..", "template", ".claude");
+  const HOOK = join(root, "hooks", "guard-paths.sh");
+  const COMMAND = /^(git|bun|make|npm|npx|pnpm|bash|cat|ls|grep|find|echo|head|tail|cd|\.factory\/gates\.sh)\b/;
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"]).stdout.toString().trim().split("\n");
+  const commands = new Map<string, string>();
+  for (const file of files)
+    for (const [, span] of readFileSync(file, "utf8").matchAll(/`([^`\n]+)`/g))
+      if (COMMAND.test(span!)) commands.set(span!.replace(/<[^<>]+>/g, "X"), file.slice(root.length + 1));
+  test("found the commands to check", () => expect(commands.size).toBeGreaterThan(5));
+  for (const [command, file] of commands)
+    test(`${file}: ${command}`, () => {
+      const run = Bun.spawnSync([HOOK], {
+        stdin: new TextEncoder().encode(JSON.stringify({ tool_name: "Bash", tool_input: { command } })),
+        env: { ...process.env, FACTORY_STAGE: "verify" },
+      });
+      expect(run.stderr.toString()).toBe("");
+      expect(run.exitCode).toBe(0);
+    });
+});
+
+// Shape is not enough: dontAsk also refuses a command off the stage allow-list.
+// The verifier was told to run .factory/gates.sh, which only build may run.
+describe("every inline command in factory-verifier is on the verify allow-list", () => {
+  const body = readFileSync(join(import.meta.dir, "..", "template", ".claude", "agents", "factory-verifier.md"), "utf8");
+  const allowed = stageAllowRules("verify", 1)
+    .map((rule) => /^Bash\((.*)\)$/.exec(rule)?.[1])
+    .filter((p): p is string => p !== undefined)
+    .map((p) => new RegExp(`^${p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`));
+  const commands = [...body.matchAll(/`([^`\n]+)`/g)]
+    .map(([, span]) => span!.replace(/<[^<>]+>/g, "X"))
+    .filter((span) => /^(git|bun|make|npm|bash) |^\.factory\/\S+\.sh/.test(span));
+  test("found the commands to check", () => expect(commands.length).toBeGreaterThan(3));
+  // The executor creates .factory/runs/issue-N/ untracked, so a bare "prints nothing" never holds.
+  test("the clean-restore check allows the untracked run dir", () => expect(body).toContain("must list nothing outside `.factory/`"));
+  for (const command of commands) test(command, () => expect(allowed.some((r) => r.test(command))).toBe(true));
 });
