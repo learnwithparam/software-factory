@@ -25,11 +25,12 @@ the runner posts the verdict and moves the issue's label.
 ## 2. UI route: the visual check
 
 Skip unless `triage.json`'s `type` is `ui`. Read `build.json`'s `screenshots`
-array against `.claude/skills/lwp-design/SKILL.md`'s state list and rubric.
+array against the repo design skill's state list (`.claude/skills/*-design/SKILL.md`,
+if it has one; otherwise the states the AC-n list names).
 Every state x viewport (390, 1440) x theme (light, dark) combination the
 plan's AC-n list covers needs an entry; a gap is a `must` finding at
 confidence 5, and the verdict cannot be `pass`. Read each screenshot (a
-worktree file, not a URL) against lwp-design's five-criterion rubric
+worktree file, not a URL) against the five-criterion rubric
 (hierarchy, 390px thumb reach, AA contrast, token use, restraint, each
 1-5); any criterion under 4 is a `should` finding naming the screenshot,
 the criterion and the score, and three or more such findings become a

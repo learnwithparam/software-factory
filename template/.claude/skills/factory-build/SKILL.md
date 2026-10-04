@@ -55,8 +55,9 @@ build that knows it's broken shouldn't pretend otherwise.
 
 ## 4. UI route: capture screenshots
 
-Skip unless `triage.json`'s `type` is `ui`. `.claude/skills/lwp-design/SKILL.md`
-names the state list, rubric and playwright-cli commands; follow it. For
+Skip unless `triage.json`'s `type` is `ui`. The repo's design skill
+(`.claude/skills/*-design/SKILL.md`, if it has one) names the state list,
+rubric and playwright-cli commands; follow it. For
 every state x viewport (390, 1440) x theme (light, dark) the plan's AC-n
 list covers, run the real built page through real auth and data (no mocked
 render), save the PNG at `docs/design/reviews/issue-<N>/<state>-<viewport>-<theme>.png`
