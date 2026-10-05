@@ -134,7 +134,7 @@ export class CommandExecutor implements Executor {
     const spec = readOnly ? undefined : stopArtifactSpec(opts.stage, types);
     if (spec) writeFileSync(join(scratch, "artifact.schema.json"), JSON.stringify(spec));
     const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
-    const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, skills);
+    const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
     if (agent.preset?.ownsPrompt) {
       ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack));
     } else {

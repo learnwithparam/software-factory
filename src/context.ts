@@ -1,13 +1,14 @@
-// Plan v2.7.0 item 3: what an agent would otherwise spend tool calls
-// discovering, assembled once, up front. Held pack: AGENTS.md, the skills its
-// route adds for the issue's type, ARCHITECTURE.md if the repo has one, and
-// the files the plan named. Capped at 64 KiB; whatever does not fit is named
+// Plan v2.7.0 item 3, narrowed in v3.0: what an agent would otherwise spend
+// tool calls discovering, assembled once, up front, and only what its stage
+// uses (STAGE_PACK). AGENTS.md is held only when the agent's own context file
+// does not already load it. Capped at 64 KiB; whatever does not fit is named
 // in the pack, never silently truncated mid-file.
 
 import type { PlanArtifact } from "./artifacts";
 import { readStageArtifacts } from "./artifacts";
 import type { StageName } from "./executor";
 import { stripFrontmatter } from "./agents/prompt";
+import { readdirSync } from "node:fs";
 
 export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 
@@ -17,6 +18,31 @@ export const MAX_CONTEXT_PACK_BYTES = 64 * 1024;
 // the same cap when it appends, so reading here should rarely need to trim.
 export const LESSONS_PATH = ".factory/memory/lessons.md";
 export const MAX_LESSONS_BYTES = 8 * 1024;
+export const CHARTER_PATH = ".factory/charter.md";
+
+type SectionKey = "conventions" | "charter" | "lessons" | "skillsIndex" | "routeSkills" | "architecture" | "planFiles";
+
+// v3.0 token diet: every stage used to get every section. pr gets nothing
+// (its inputs are the run's own artifacts), retro only the lessons it must
+// not repeat, and the plan stage a one-line-per-skill index instead of
+// reading every SKILL.md in full.
+export const STAGE_PACK: Record<StageName, readonly SectionKey[]> = {
+  triage: ["conventions", "charter", "lessons"],
+  plan: ["conventions", "charter", "lessons", "skillsIndex", "architecture"],
+  build: ["conventions", "charter", "lessons", "routeSkills", "architecture", "planFiles"],
+  verify: ["conventions", "routeSkills"],
+  pr: [],
+  retro: ["lessons"],
+};
+
+export interface PackOptions {
+  // Skills the issue's route adds (config routes[type].skills).
+  readonly skills?: readonly string[];
+  // The agent's context file (CLAUDE.md, AGENTS.md, ...). When it is AGENTS.md
+  // or imports it with `@AGENTS.md`, the agent already has it: holding it here
+  // too sent the same text twice per stage.
+  readonly contextFile?: string;
+}
 
 interface Section {
   readonly label: string;
@@ -54,26 +80,74 @@ async function planFiles(cwd: string, issue: number): Promise<readonly string[]>
   return Array.isArray(files) ? files.filter((f): f is string => typeof f === "string") : [];
 }
 
-async function sections(issue: number, cwd: string, skills: readonly string[]): Promise<Section[]> {
+export async function contextFileLoadsAgentsMd(cwd: string, contextFile: string | undefined): Promise<boolean> {
+  if (!contextFile) return false;
+  if (contextFile === "AGENTS.md") return true;
+  const text = await readOptional(`${cwd}/${contextFile}`);
+  return text !== undefined && /^@AGENTS\.md\s*$/m.test(text);
+}
+
+// `- name: description` per repo skill (factory-* excluded), from frontmatter only.
+export async function skillsIndex(cwd: string): Promise<string> {
+  let names: string[];
+  try {
+    names = readdirSync(`${cwd}/.claude/skills`).filter((n) => !n.startsWith("factory-")).sort();
+  } catch {
+    return "";
+  }
+  const lines: string[] = [];
+  for (const name of names) {
+    const text = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);
+    if (!text?.startsWith("---\n")) continue;
+    const front = text.slice(4, text.indexOf("\n---", 3));
+    const description = /^description:\s*(.+)$/m.exec(front)?.[1]?.trim();
+    if (description) lines.push(`- ${name}: ${description}`);
+  }
+  return lines.join("\n");
+}
+
+async function sections(stage: StageName, issue: number, cwd: string, opts: PackOptions): Promise<Section[]> {
   const out: Section[] = [];
-  const agentsMd = await readOptional(`${cwd}/AGENTS.md`);
-  if (agentsMd) out.push({ label: "AGENTS.md", body: agentsMd.trim() });
+  const want = new Set(STAGE_PACK[stage]);
 
-  const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
-  if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
-
-  for (const name of skills) {
-    const body = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);
-    if (body) out.push({ label: `skill: ${name}`, body: stripFrontmatter(body).trim() });
+  if (want.has("conventions") && !(await contextFileLoadsAgentsMd(cwd, opts.contextFile))) {
+    const agentsMd = await readOptional(`${cwd}/AGENTS.md`);
+    if (agentsMd) out.push({ label: "AGENTS.md", body: agentsMd.trim() });
   }
 
-  const architectureMd = await readOptional(`${cwd}/ARCHITECTURE.md`);
-  if (architectureMd) out.push({ label: "ARCHITECTURE.md", body: architectureMd.trim() });
+  if (want.has("charter")) {
+    const charter = await readOptional(`${cwd}/${CHARTER_PATH}`);
+    if (charter) out.push({ label: CHARTER_PATH, body: charter.trim() });
+  }
 
-  // Triage runs before a plan exists, so this is empty until plan and later.
-  for (const path of await planFiles(cwd, issue)) {
-    const body = await readOptional(`${cwd}/${path}`);
-    if (body) out.push({ label: `file: ${path}`, body: body.trim() });
+  if (want.has("lessons")) {
+    const lessons = await readOptional(`${cwd}/${LESSONS_PATH}`);
+    if (lessons) out.push({ label: "lessons learned", body: capLessons(lessons).trim() });
+  }
+
+  if (want.has("skillsIndex")) {
+    const index = await skillsIndex(cwd);
+    if (index) out.push({ label: "repo skills index", body: index });
+  }
+
+  if (want.has("routeSkills")) {
+    for (const name of opts.skills ?? []) {
+      const body = await readOptional(`${cwd}/.claude/skills/${name}/SKILL.md`);
+      if (body) out.push({ label: `skill: ${name}`, body: stripFrontmatter(body).trim() });
+    }
+  }
+
+  if (want.has("architecture")) {
+    const architectureMd = await readOptional(`${cwd}/ARCHITECTURE.md`);
+    if (architectureMd) out.push({ label: "ARCHITECTURE.md", body: architectureMd.trim() });
+  }
+
+  // Empty until a plan exists.
+  if (want.has("planFiles")) {
+    for (const path of await planFiles(cwd, issue)) {
+      const body = await readOptional(`${cwd}/${path}`);
+      if (body) out.push({ label: `file: ${path}`, body: body.trim() });
+    }
   }
 
   return out;
@@ -104,10 +178,7 @@ function assemble(built: readonly Section[]): string {
 }
 
 // "" means there is nothing to add: callers skip injecting it rather than
-// appending an empty "## Context pack" header. `stage` is part of the
-// signature (plan v2.7.0 item 3) for a future stage-specific pack; every
-// stage gets the same sections today.
-export async function buildContextPack(stage: StageName, issue: number, cwd: string, skills: readonly string[] = []): Promise<string> {
-  void stage;
-  return assemble(await sections(issue, cwd, skills));
+// appending an empty "## Context pack" header.
+export async function buildContextPack(stage: StageName, issue: number, cwd: string, opts: PackOptions = {}): Promise<string> {
+  return assemble(await sections(stage, issue, cwd, opts));
 }

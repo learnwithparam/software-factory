@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { claudeArgs } from "../src/agents/presets/claude";
 import { renderPrompt } from "../src/agents/prompt";
 import { runDir } from "../src/artifacts";
-import { buildContextPack, MAX_CONTEXT_PACK_BYTES, MAX_LESSONS_BYTES } from "../src/context";
+import { buildContextPack, MAX_CONTEXT_PACK_BYTES, MAX_LESSONS_BYTES, STAGE_PACK } from "../src/context";
 import { STAGE_GUIDANCE } from "../src/stage-permissions";
 
 function worktree(): string {
@@ -22,7 +22,7 @@ function worktree(): string {
 describe("buildContextPack", () => {
   test("is empty when the repo has nothing for it to hold", async () => {
     const cwd = worktree();
-    expect(await buildContextPack("build", 1, cwd, [])).toBe("");
+    expect(await buildContextPack("build", 1, cwd)).toBe("");
     rmSync(cwd, { recursive: true, force: true });
   });
 
@@ -37,7 +37,7 @@ describe("buildContextPack", () => {
     mkdirSync(`${cwd}/src`, { recursive: true });
     writeFileSync(`${cwd}/src/foo.ts`, "export const foo = 1;");
 
-    const pack = await buildContextPack("build", 1, cwd, ["writing"]);
+    const pack = await buildContextPack("build", 1, cwd, { skills: ["writing"] });
 
     expect(pack).toContain("Use tabs, not spaces.");
     expect(pack).toContain("Write in plain language.");
@@ -57,7 +57,7 @@ describe("buildContextPack", () => {
     mkdirSync(`${cwd}/src`, { recursive: true });
     writeFileSync(`${cwd}/src/big.ts`, "x".repeat(MAX_CONTEXT_PACK_BYTES));
 
-    const pack = await buildContextPack("build", 1, cwd, []);
+    const pack = await buildContextPack("build", 1, cwd);
 
     expect(pack).toContain("Small and essential.");
     expect(pack).not.toContain("x".repeat(1000)); // the big file's content never made it in
@@ -73,7 +73,7 @@ describe("buildContextPack", () => {
     mkdirSync(`${cwd}/${runDir(1)}`, { recursive: true });
     writeFileSync(`${cwd}/${runDir(1)}/plan.json`, JSON.stringify({ risk: "low", revision: 1, files: ["src/missing.ts"], autoApproveEligible: true }));
 
-    const pack = await buildContextPack("build", 1, cwd, []);
+    const pack = await buildContextPack("build", 1, cwd);
 
     expect(pack).toBe(""); // nothing else to hold, and a missing file is not a "drop"
     rmSync(cwd, { recursive: true, force: true });
@@ -84,7 +84,7 @@ describe("buildContextPack", () => {
     mkdirSync(`${cwd}/.factory/memory`, { recursive: true });
     writeFileSync(`${cwd}/.factory/memory/lessons.md`, "- 2026-09-01: the checkout API needs a 30s timeout, not the default.");
 
-    const pack = await buildContextPack("build", 1, cwd, []);
+    const pack = await buildContextPack("build", 1, cwd);
 
     expect(pack).toContain("lessons learned");
     expect(pack).toContain("the checkout API needs a 30s timeout");
@@ -98,12 +98,65 @@ describe("buildContextPack", () => {
     const newLine = "- a recent lesson that must survive the cap";
     writeFileSync(`${cwd}/.factory/memory/lessons.md`, `${oldLine}\n${newLine}\n`);
 
-    const pack = await buildContextPack("build", 1, cwd, []);
+    const pack = await buildContextPack("build", 1, cwd);
 
     expect(pack).toContain("a recent lesson that must survive the cap");
     expect(pack).not.toContain("an old lesson that should drop");
     expect(pack).toContain("lessons-file cap");
     rmSync(cwd, { recursive: true, force: true });
+  });
+});
+
+describe("v3.0: each stage gets only what it uses", () => {
+  function fullRepo(): string {
+    const cwd = worktree();
+    writeFileSync(`${cwd}/AGENTS.md`, "Use tabs, not spaces.");
+    mkdirSync(`${cwd}/.factory/memory`, { recursive: true });
+    writeFileSync(`${cwd}/.factory/charter.md`, "Never touch src/auth.");
+    writeFileSync(`${cwd}/.factory/memory/lessons.md`, "- a lesson");
+    mkdirSync(`${cwd}/.claude/skills/handling-money`, { recursive: true });
+    writeFileSync(`${cwd}/.claude/skills/handling-money/SKILL.md`, "---\nname: handling-money\ndescription: Integer cents only.\n---\nLong body that the index must not carry.");
+    return cwd;
+  }
+
+  test("pr gets nothing, retro only lessons", async () => {
+    const cwd = fullRepo();
+    expect(await buildContextPack("pr", 1, cwd)).toBe("");
+    const retro = await buildContextPack("retro", 1, cwd);
+    expect(retro).toContain("a lesson");
+    expect(retro).not.toContain("Use tabs");
+    expect(retro).not.toContain("Never touch src/auth");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("triage and plan carry the charter, so the skills no longer Read it", async () => {
+    const cwd = fullRepo();
+    for (const stage of ["triage", "plan"] as const) expect(await buildContextPack(stage, 1, cwd)).toContain("Never touch src/auth.");
+    expect(await buildContextPack("verify", 1, cwd)).not.toContain("Never touch src/auth.");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("plan gets a frontmatter-only skills index, never a skill body", async () => {
+    const cwd = fullRepo();
+    const pack = await buildContextPack("plan", 1, cwd);
+    expect(pack).toContain("- handling-money: Integer cents only.");
+    expect(pack).not.toContain("Long body");
+    expect(pack).not.toContain("factory-build"); // factory-* skills are the stages, not repo skills
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("AGENTS.md is left out when the agent's context file already loads it", async () => {
+    const cwd = fullRepo();
+    writeFileSync(`${cwd}/CLAUDE.md`, "@AGENTS.md\n\n# Compact instructions\n");
+    expect(await buildContextPack("build", 1, cwd, { contextFile: "CLAUDE.md" })).not.toContain("Use tabs");
+    expect(await buildContextPack("build", 1, cwd, { contextFile: "AGENTS.md" })).not.toContain("Use tabs");
+    writeFileSync(`${cwd}/CLAUDE.md`, "# no import here\n");
+    expect(await buildContextPack("build", 1, cwd, { contextFile: "CLAUDE.md" })).toContain("Use tabs");
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  test("every stage has an entry", () => {
+    expect(Object.keys(STAGE_PACK).sort()).toEqual(["build", "plan", "pr", "retro", "triage", "verify"]);
   });
 });
 
