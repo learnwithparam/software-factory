@@ -145,6 +145,22 @@ while IFS= read -r -d '' file; do
   wrote=$((wrote + 1))
 done < <(find "$SRC" -type f -print0 | sort -z)
 
+# Files an earlier release installed and this one no longer ships. --update removes them,
+# so a retired agent stops costing every stage the tokens of its description.
+RETIRED=(.claude/agents/factory-verifier.md .claude/agents/factory-explorer.md)
+if [[ "$UPDATE" -eq 1 ]]; then
+  for rel in "${RETIRED[@]}"; do
+    [[ -e "$TARGET/$rel" || -L "$TARGET/$rel" ]] || continue
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "would remove (retired): $rel"
+    else
+      rm "$TARGET/$rel"
+      echo "removed (retired): $rel"
+    fi
+    wrote=$((wrote + 1))
+  done
+fi
+
 LINK_REL=".agents/skills"
 LINK="$TARGET/$LINK_REL"
 if [[ -e "$LINK" || -L "$LINK" ]]; then

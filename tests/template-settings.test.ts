@@ -31,14 +31,14 @@ test("every hook file is registered, and every registration is an executable hoo
 test("guard-paths.sh is registered for every tool it guards", () => {
   const guard = registered.find((r) => r.command.endsWith("guard-paths.sh"))!;
   expect(guard.event).toBe("PreToolUse");
-  expect(guard.matcher.split("|").sort()).toEqual(["Bash", "Edit", "MultiEdit", "NotebookEdit", "Write"]);
+  expect(guard.matcher.split("|").sort()).toEqual(["Agent", "Bash", "Edit", "MultiEdit", "NotebookEdit", "Write"]);
 });
 
 test("settings name their schema, and each stop hook is on its event", () => {
   expect(settings.$schema).toBe("https://json.schemastore.org/claude-code-settings.json");
   expect(registered.filter((r) => r.event.endsWith("Stop")).map((r) => `${r.event} ${r.command}`).sort()).toEqual([
     "Stop .claude/hooks/stop-artifact.sh",
-    "SubagentStop .claude/hooks/stop-verifier-evidence.sh",
+    "Stop .claude/hooks/stop-verifier-evidence.sh",
   ]);
 });
 

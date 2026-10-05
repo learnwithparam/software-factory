@@ -16,7 +16,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|Agent",
         "hooks": [
           {
             "type": "command",
@@ -33,13 +33,7 @@
             "type": "command",
             "command": ".claude/hooks/stop-artifact.sh",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": ".claude/hooks/stop-verifier-evidence.sh",

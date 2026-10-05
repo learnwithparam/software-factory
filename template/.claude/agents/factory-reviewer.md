@@ -1,6 +1,6 @@
 ---
 name: factory-reviewer
-description: Use this agent alongside factory-verifier, in a fresh read-only context, to review a build's diff for correctness, security (injection, authz, secrets), and non-goal violations that a passing test suite would not catch. It reports findings; it does not fix anything.
+description: Use this agent during factory-verify, in a fresh read-only context, to review a build's diff for correctness, security (injection, authz, secrets), and non-goal violations that a passing test suite would not catch. It reports findings; it does not fix anything.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 color: purple

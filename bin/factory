@@ -15,7 +15,7 @@ import { advanceIssue, pollOnce, recoverInFlight, startWatch, type WatchDeps } f
 import { ShellGateRunner } from "../src/gates";
 import { ShellHoldoutRunner } from "../src/holdout";
 import { ShellSetupRunner } from "../src/setup";
-import { BinaryRunner, ClaudeRechecker } from "../src/recheck";
+import { DiffAnchorRechecker } from "../src/recheck";
 import { scan } from "../src/scan";
 import { streamLogs } from "../src/logs";
 import { plain } from "../src/display";
@@ -33,6 +33,7 @@ import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
 import { FixtureRecorder } from "../src/agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "../src/verify-agent";
+import { ShellProofGit } from "../src/proof";
 import { runLearn } from "../src/learn";
 
 const args = process.argv.slice(2);
@@ -68,15 +69,6 @@ async function resolveCloneDir(): Promise<string> {
   throw new UsageError("--repo-dir <path-to-clone> or --repo <owner/name> is required");
 }
 
-// Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
-// step, cron tick) resolve the exact same paths and construct the exact same
-// gate runner — one place, not three copies to drift (audit finding #1).
-// The tool-free re-check calls `claude` directly, so it runs only when Claude does the verify stage.
-function verifierIsClaude(config: FactoryConfig): boolean {
-  const name = config.stages.verify ?? config.stages.default ?? "claude";
-  return config.agents[name]?.preset === "claude";
-}
-
 // tmux is on for this process when the config says so or `--tmux` was passed.
 function tmuxFor(config: FactoryConfig): Tmux | undefined {
   return config.tmux.enabled || has("tmux") ? new Tmux(new ShellTmuxRunner(), config.tmux.session) : undefined;
@@ -93,6 +85,9 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
   }
 }
 
+// Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
+// step, cron tick) resolve the exact same paths and construct the exact same
+// gate runner — one place, not three copies to drift (audit finding #1).
 function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
   const tmux = tmuxFor(config);
   return {
@@ -104,7 +99,8 @@ function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
     gateRunner: new ShellGateRunner(),
     holdoutRunner: new ShellHoldoutRunner(),
-    rechecker: verifierIsClaude(config) ? new ClaudeRechecker(new BinaryRunner("claude"), cloneDir) : undefined,
+    rechecker: new DiffAnchorRechecker(),
+    proofGit: new ShellProofGit(),
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),

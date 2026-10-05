@@ -9,12 +9,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { CLAUDE_STAGE_DEFAULTS, claudeArgs } from "../src/agents/presets/claude";
 import { PRESETS } from "../src/agents/presets";
 import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import type { StageName } from "../src/executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../src/stage-permissions";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
@@ -36,6 +36,7 @@ describe("claude preset", () => {
       "--setting-sources", "project,local",
       "--strict-mcp-config",
       "--disallowedTools", STAGE_DISALLOWED_TOOLS.join(","),
+      "--tools", "Bash,Read,Write,Skill,Edit",
       "--settings", stageSettings("build", 12, undefined),
       "--append-system-prompt", STAGE_GUIDANCE,
       "--max-budget-usd", "5",
@@ -43,6 +44,12 @@ describe("claude preset", () => {
     // Each shape dontAsk refused in the 2.1.289 repro; guard-paths.sh refuses the same set.
     for (const shape of ["> or >>", "$(...)", "backticks", "$?", "brace expansion", "cd", "VAR=value", "git restore --source="]) expect(STAGE_GUIDANCE).toContain(shape);
     expect(STAGE_DISALLOWED_TOOLS).toContain("ScheduleWakeup");
+    // Only plan and verify dispatch a subagent; only build and verify edit beyond their own artifacts.
+    for (const stage of STAGES) {
+      expect(STAGE_TOOLS[stage].includes("Agent"), stage).toBe(stage === "plan" || stage === "verify");
+      expect(STAGE_TOOLS[stage].includes("Edit"), stage).toBe(stage === "build" || stage === "verify");
+      for (const t of ["Bash", "Read", "Write", "Skill"]) expect(STAGE_TOOLS[stage], stage).toContain(t);
+    }
     expect(PRESETS.claude!.command(opts, { preset: "claude" }, "").argv).toEqual(["claude", ...claudeArgs(opts)]);
   });
 
@@ -51,6 +58,19 @@ describe("claude preset", () => {
     const argv = PRESETS.claude!.command(opts, { preset: "claude", model: "opus" }, "").argv;
     expect(argv.slice(0, -2)).toEqual(["claude", ...claudeArgs(opts)]);
     expect(argv.slice(-2)).toEqual(["--model", "opus"]);
+  });
+
+  // v3.0: the stages that classify or fill a template run cheap; plan, build and verify
+  // keep the CLI default. A configured model replaces the stage model, never the effort.
+  test("each stage gets its default model and effort, and a configured model wins", () => {
+    const tail = (stage: StageName, model?: string) => {
+      const opts = { stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 };
+      return PRESETS.claude!.command(opts, { preset: "claude", ...(model ? { model } : {}) }, "").argv.slice(claudeArgs(opts).length + 1);
+    };
+    expect(Object.keys(CLAUDE_STAGE_DEFAULTS).sort()).toEqual([...STAGES].sort());
+    for (const stage of ["triage", "pr", "retro"] as const) expect(tail(stage)).toEqual(["--model", "sonnet", "--effort", "low"]);
+    for (const stage of ["plan", "build", "verify"] as const) expect(tail(stage)).toEqual([]);
+    expect(tail("triage", "opus")).toEqual(["--model", "opus", "--effort", "low"]);
   });
 });
 
@@ -307,7 +327,9 @@ describe("verdict rules", () => {
 
   test("the verify skill and reviewer teach the same schema the runner enforces", () => {
     const skill = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/SKILL.md"), "utf8");
-    for (const word of ["gate.json", "HEAD^{tree}", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    for (const word of ["gate.json", "proof.json", "passes-without", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    // The tree check moved with the hand proof into prove.md, read when the runner could not run it.
+    expect(readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/references/prove.md"), "utf8")).toContain("HEAD^{tree}");
     expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain("confidence 0-5");
   });
 });

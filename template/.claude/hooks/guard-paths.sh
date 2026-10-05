@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Bash. Refuses writes to
+# PreToolUse guard for Edit|Write|MultiEdit|NotebookEdit|Bash|Agent. Refuses writes to
 # protected paths (.factory/config.json's protectedPaths, plus .claude/** and
 # .factory/** always), merges and force-pushes, and inside a factory stage the
-# shell shapes the stage's permission mode refuses, naming the fix. Writes to
+# shell shapes the stage's permission mode refuses, naming the fix, and a
+# backgrounded subagent. Writes to
 # `.factory/runs/**` always pass: that is where a stage hands back its output.
 # Exit 2 + stderr blocks.
 set -euo pipefail
@@ -209,6 +210,14 @@ if tool_name == "Bash":
         if problems:
             block("guard-paths: this one command was refused; Bash still works. Rewrite it and carry on. "
                   f"It uses: {'; '.join(problems)}. Command: {command}")
+    sys.exit(0)
+
+# A stage that backgrounds a subagent ends its turn before the answer arrives: verify on
+# #95 wrote an uncertain verdict, then spent four Opus edits turning it into a pass.
+if tool_name == "Agent":
+    if os.environ.get("FACTORY_STAGE") and tool_input.get("run_in_background"):
+        block("guard-paths: blocked, run this subagent in the foreground (run_in_background: false) "
+              "and wait for its answer: a stage must not end its turn before the result is in.")
     sys.exit(0)
 
 if tool_name not in ("Edit", "Write", "MultiEdit", "NotebookEdit"):

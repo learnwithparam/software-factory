@@ -263,6 +263,19 @@ describe("guard-paths.sh", () => {
 // The shapes `--permission-mode dontAsk` refused in the 2.1.289 repro
 // (docs/decisions/stage-shell-shapes.md). In a stage the hook names the shape and
 // the fix; the CLI's own message read "Bash denied" and verifiers gave up.
+describe("guard-paths.sh subagent dispatch", () => {
+  const agent = (run_in_background: boolean) => ({ tool_name: "Agent", tool_input: { subagent_type: "factory-reviewer", prompt: "review", run_in_background } });
+  test("inside a stage a backgrounded subagent is refused, a foreground one passes", async () => {
+    const bg = await runHook(agent(true), { FACTORY_STAGE: "verify" });
+    expect(bg.code).toBe(2);
+    expect(bg.stderr).toContain("foreground");
+    expect((await runHook(agent(false), { FACTORY_STAGE: "verify" })).code).toBe(0);
+  });
+  test("outside a stage a backgrounded subagent passes", async () => {
+    expect((await runHook(agent(true))).code).toBe(0);
+  });
+});
+
 describe("guard-paths.sh shell shapes inside a stage", () => {
   const refused: Array<[string, string]> = [
     ["git show main:README.md > README.md && git status --short", "git restore --source="],

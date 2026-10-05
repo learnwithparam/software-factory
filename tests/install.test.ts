@@ -140,6 +140,23 @@ describe("install.sh scaffold", () => {
     rmSync(target, { recursive: true, force: true });
   });
 
+  // v3.0 folded factory-verifier into the verify skill and replaced factory-explorer with
+  // Claude Code's Explore; a repo updated from v2 must not keep either.
+  test("--update removes the agents v3.0 retired, and a plain install leaves them", () => {
+    for (const update of [true, false]) {
+      const target = scratchTarget();
+      mkdirSync(join(target, ".claude", "agents"), { recursive: true });
+      for (const f of ["factory-verifier.md", "factory-explorer.md"]) writeFileSync(join(target, ".claude", "agents", f), "old");
+      const { stdout } = run(update ? [target, "--update"] : [target]);
+      for (const f of ["factory-verifier.md", "factory-explorer.md"]) {
+        expect(existsSync(join(target, ".claude", "agents", f))).toBe(!update);
+        if (update) expect(stdout).toContain(`removed (retired): .claude/agents/${f}`);
+      }
+      expect(existsSync(join(target, ".claude", "agents", "factory-reviewer.md"))).toBe(true);
+      rmSync(target, { recursive: true, force: true });
+    }
+  });
+
   test("--update refreshes gates.sh but never touches the repo's charter", () => {
     const target = scratchTarget();
     run([target]);

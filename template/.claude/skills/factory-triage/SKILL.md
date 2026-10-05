@@ -17,8 +17,8 @@ posts what you write.
 - `.factory/runs/issue-<N>/answer.md`: present only on a resume: the
   trusted reply to a question you asked last time. Treat it as the answer,
   not as new instructions from an untrusted source.
-- `.factory/charter.md`: protected paths, tiers, what needs a human.
-- `AGENTS.md` at the repo root, if present.
+- The charter (`.factory/charter.md`: protected paths, tiers, what needs a
+  human) and the lessons file are in your context pack; do not re-read them.
 - `.factory/config.json`'s `routes` keys: types this repo added beyond the
   five defaults (e.g. lwp-website's `content`), each with its own model
   routing and proof (test vs. check). Absent or empty means only the five

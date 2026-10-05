@@ -15,8 +15,7 @@ something worth remembering for next time.
   that exists for this run (`triage.json`, `plan.json`, `build.json`,
   `verdict.json`, their `-comment.md` files), whatever the run actually
   produced before it ended.
-- `.factory/memory/lessons.md`, if it exists, so you don't repeat a lesson
-  already recorded.
+- The lessons already recorded are in your context pack: don't repeat one.
 
 ## 2. Decide whether there is a lesson
 

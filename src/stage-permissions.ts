@@ -59,6 +59,20 @@ export const STAGE_DISALLOWED_TOOLS = [
   "ExitWorktree",
 ] as const;
 
+// The built-in tools each stage loads (`claude --tools`). Every tool definition rides every
+// turn's input; on #95 the 13 default tools included WebSearch, NotebookEdit and DesignSync,
+// which no stage used. Agent only where a skill dispatches one: plan's Explore and verify's
+// factory-reviewer. Skill stays because the stage skills name factory-comment.
+const BASE_TOOLS = ["Bash", "Read", "Write", "Skill"] as const;
+export const STAGE_TOOLS: Record<StageName, readonly string[]> = {
+  triage: BASE_TOOLS,
+  plan: [...BASE_TOOLS, "Agent"],
+  build: [...BASE_TOOLS, "Edit"],
+  verify: [...BASE_TOOLS, "Edit", "Agent"],
+  pr: BASE_TOOLS,
+  retro: BASE_TOOLS,
+};
+
 const bash = (patterns: readonly string[]): string[] => patterns.map((p) => `Bash(${p})`);
 
 // The repo's own commands (its test runner, its make targets) come from

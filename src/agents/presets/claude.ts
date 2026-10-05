@@ -1,10 +1,10 @@
 // Claude Code: `claude -p /factory-<stage> N` with stream-json output. The argv
 // is pinned byte for byte by tests/agents.test.ts; the repo's own skill is the
 // prompt, so this preset ignores the rendered one.
-// Flags checked against `claude --help` on 2026-10-04 (2.1.289).
+// Flags checked against `claude --help` on 2026-10-05 (2.1.289), --effort and --tools included.
 
-import type { StageEvent, StageRunOptions } from "../../executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../../stage-permissions";
+import type { StageEvent, StageName, StageRunOptions } from "../../executor";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../../stage-permissions";
 import type { AgentPreset } from "../types";
 import { isUsageResultCandidate, readUsage } from "../usage";
 
@@ -95,6 +95,8 @@ export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
     "--strict-mcp-config",
     "--disallowedTools",
     STAGE_DISALLOWED_TOOLS.join(","),
+    "--tools",
+    STAGE_TOOLS[opts.stage].join(","),
     "--settings",
     stageSettings(opts.stage, opts.issue, opts.agentCommands),
     "--append-system-prompt",
@@ -102,6 +104,24 @@ export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
     "--max-budget-usd",
     String(opts.maxBudgetUsd),
   ];
+}
+
+// The one place a stage's model and effort default. The stages that only classify or
+// fill a template run on sonnet at low effort; plan, build and verify keep the CLI's
+// default model and effort. A configured `model` replaces the stage's model.
+export const CLAUDE_STAGE_DEFAULTS: Record<StageName, { model?: string; effort?: "low" | "medium" | "high" }> = {
+  triage: { model: "sonnet", effort: "low" },
+  plan: {},
+  build: {},
+  verify: {},
+  pr: { model: "sonnet", effort: "low" },
+  retro: { model: "sonnet", effort: "low" },
+};
+
+export function claudeModelArgs(stage: StageName, configured?: string): string[] {
+  const { model, effort } = CLAUDE_STAGE_DEFAULTS[stage];
+  const chosen = configured ?? model;
+  return [...(chosen ? ["--model", chosen] : []), ...(effort ? ["--effort", effort] : [])];
 }
 
 export const claudePreset: AgentPreset = {
@@ -116,7 +136,7 @@ export const claudePreset: AgentPreset = {
   ownsPrompt: true,
   // `prompt` is the context pack for an ownsPrompt agent: Claude runs its own
   // skill and ignores everything else spawnStage would otherwise put there.
-  command: (opts, agent, prompt) => ({ argv: ["claude", ...claudeArgs(opts, prompt), ...(agent.model ? ["--model", agent.model] : [])] }),
+  command: (opts, agent, prompt) => ({ argv: ["claude", ...claudeArgs(opts, prompt), ...claudeModelArgs(opts.stage, agent.model)] }),
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };
