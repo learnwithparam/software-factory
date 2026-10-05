@@ -6,7 +6,7 @@
       "Bash(make typecheck)",
       "Bash(make test)",
       "Bash(make skills-check)",
-      "Bash(bun test *)",
+      "Bash(bun test)",
       "Bash(bun x tsc --noEmit)",
       "Bash(git status *)"
     ],
