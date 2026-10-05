@@ -97,6 +97,11 @@ describe("config validation at boot", () => {
     expect(problems.join("\n")).toMatch(/gates\[0\]\.required: expected boolean/);
   });
 
+  test("postEditCommand must be an argv list, so the hook never gets a shell string", () => {
+    expect(configProblems({ repo: "a/b", postEditCommand: ["biome", "check", "{file}"] })).toEqual([]);
+    expect(configProblems({ repo: "a/b", postEditCommand: "biome check {file}" })).toEqual(['postEditCommand: expected strings, got "biome check {file}"']);
+  });
+
   test("agent-facing riskCriteria and _comment keys are allowed", () => {
     expect(configProblems({ repo: "a/b", _comment: "hi", riskCriteria: { low: {} } })).toEqual([]);
   });

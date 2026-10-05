@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor } from "../../../src/agents/executor";
 import { sanitizeEnv } from "../../../src/agents/env";
+import { stageSchema } from "../../../src/schemas";
 
 const roots: string[] = [];
 afterAll(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
@@ -38,6 +39,13 @@ describe("environment", () => {
     expect([stage, issue, dir, gh, dash]).toEqual(["plan", "7", join(cwd, ".factory/runs/issue-7"), "none", "none"]);
     expect(scratch).toContain("factory-scratch-7-");
     expect(existsSync(scratch!)).toBe(false); // removed when the stage ends
+  });
+
+  test("the stage's schema is in the scratch dir for the stop-artifact hook", async () => {
+    const cwd = repo();
+    await run(cwd, 'cat >/dev/null; cp "$FACTORY_SCRATCH_DIR/artifact.schema.json" "$FACTORY_ARTIFACT_DIR/"');
+    const spec = JSON.parse(readFileSync(join(cwd, ".factory/runs/issue-7/artifact.schema.json"), "utf8"));
+    expect(spec).toEqual({ file: "plan.json", schema: stageSchema("plan"), stoppedOwesOnlyOutcome: false });
   });
 
   test("an inherited GIT_DIR or GIT_WORK_TREE does not redirect the agent's git", async () => {

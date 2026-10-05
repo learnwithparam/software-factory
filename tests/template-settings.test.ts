@@ -16,7 +16,7 @@ const registered: Array<{ event: string; matcher: string; command: string }> = O
 const hookFiles = readdirSync(join(CLAUDE_DIR, "hooks"));
 
 test("template denies reading gh and ssh credentials, and pushing", () => {
-  for (const rule of ["Read(~/.config/gh/**)", "Read(~/.ssh/**)", "Bash(gh *)", "Bash(git push*)"]) {
+  for (const rule of ["Read(~/.config/gh/**)", "Read(~/.ssh/**)", "Read(./.env*)", "Bash(gh *)", "Bash(git push*)"]) {
     expect(settings.permissions.deny).toContain(rule);
   }
 });
@@ -32,6 +32,21 @@ test("guard-paths.sh is registered for every tool it guards", () => {
   const guard = registered.find((r) => r.command.endsWith("guard-paths.sh"))!;
   expect(guard.event).toBe("PreToolUse");
   expect(guard.matcher.split("|").sort()).toEqual(["Bash", "Edit", "MultiEdit", "NotebookEdit", "Write"]);
+});
+
+test("settings name their schema, and each stop hook is on its event", () => {
+  expect(settings.$schema).toBe("https://json.schemastore.org/claude-code-settings.json");
+  expect(registered.filter((r) => r.event.endsWith("Stop")).map((r) => `${r.event} ${r.command}`).sort()).toEqual([
+    "Stop .claude/hooks/stop-artifact.sh",
+    "SubagentStop .claude/hooks/stop-verifier-evidence.sh",
+  ]);
+});
+
+test("post-edit-check.sh runs after every file edit, with time for its 60s check", () => {
+  const hook = registered.find((r) => r.command.endsWith("post-edit-check.sh"))!;
+  expect(hook.event).toBe("PostToolUse");
+  expect(hook.matcher.split("|").sort()).toEqual(["Edit", "MultiEdit", "Write"]);
+  expect(settings.hooks.PostToolUse[0].hooks[0].timeout).toBeGreaterThan(60);
 });
 
 test("every hook file has a test that runs it", () => {
