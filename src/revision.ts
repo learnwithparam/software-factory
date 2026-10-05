@@ -25,7 +25,7 @@ export function revisionPrompt(r: Revision | undefined, inputs: Record<string, s
     out += `Previous output ${JSON.stringify(r.artifacts[alias])} is available at ${JSON.stringify(inputs[alias])}\n`;
   }
   out +=
-    "Use the original task requirements and the review feedback. Revise the existing work, preserve unrelated changes, and publish the revised deliverables to your output directory. Report what changed.\n";
+    "Use the original task requirements and the review feedback. Revise the existing work in this worktree, preserve unrelated changes, and write this stage's outputs to its usual run files. Report what changed.\n";
   return out;
 }
 

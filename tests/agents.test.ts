@@ -14,7 +14,7 @@ import { PRESETS } from "../src/agents/presets";
 import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import type { StageName } from "../src/executor";
-import { STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
@@ -34,11 +34,15 @@ describe("claude preset", () => {
       "--output-format", "stream-json", "--verbose",
       "--permission-mode", "dontAsk", "--permission-prompts", "none",
       "--setting-sources", "project,local",
+      "--strict-mcp-config",
+      "--disallowedTools", STAGE_DISALLOWED_TOOLS.join(","),
       "--settings", stageSettings("build", 12, undefined),
       "--append-system-prompt", STAGE_GUIDANCE,
       "--max-budget-usd", "5",
     ]);
-    expect(STAGE_GUIDANCE).toBe("Read files with the Read tool, one call per file. Run shell commands one at a time: no &&, ;, pipes or brace expansion.");
+    // Each shape dontAsk refused in the 2.1.289 repro; guard-paths.sh refuses the same set.
+    for (const shape of ["> or >>", "$(...)", "backticks", "$?", "brace expansion", "cd", "VAR=value", "git restore --source="]) expect(STAGE_GUIDANCE).toContain(shape);
+    expect(STAGE_DISALLOWED_TOOLS).toContain("ScheduleWakeup");
     expect(PRESETS.claude!.command(opts, { preset: "claude" }, "").argv).toEqual(["claude", ...claudeArgs(opts)]);
   });
 

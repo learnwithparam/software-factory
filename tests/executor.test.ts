@@ -6,7 +6,7 @@
 // type — subclassing and overriding every public method is the honest way
 // to fake them without touching `gh` or `git`).
 
-import { STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -88,6 +88,9 @@ describe("claudeArgs", () => {
       "none",
       "--setting-sources",
       "project,local",
+      "--strict-mcp-config",
+      "--disallowedTools",
+      STAGE_DISALLOWED_TOOLS.join(","),
       "--settings",
       stageSettings("build", 7),
       "--append-system-prompt",

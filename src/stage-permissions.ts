@@ -36,10 +36,28 @@ const BUILD_EXTRA = [
 // them, then restores; the repo's deny list still blocks reset --hard and push.
 const VERIFY_EXTRA = ["Bash(git stash *)", "Bash(git checkout *)", "Bash(git restore *)"];
 
-// Allow rules match one simple command each; a compound or brace-expanded
-// one (`cat a/{b,c} && ls`) is refused whole, so steer the agent off them.
+// What dontAsk refuses, measured on claude 2.1.289 (docs/decisions/stage-shell-shapes.md):
+// &&, ; and pipes pass when every part is allowed. Subagents never see this
+// text, so the template agents carry it verbatim (tests/skills.test.ts) and guard-paths.sh enforces it.
 export const STAGE_GUIDANCE =
-  "Read files with the Read tool, one call per file. Run shell commands one at a time: no &&, ;, pipes or brace expansion.";
+  "Shell rules for this stage: a command is refused if it writes a file with > or >> (>/dev/null and 2>&1 are fine), uses $(...), backticks or $?, uses brace expansion, or has cd or VAR=value at the start of the command or of any part after &&, ; or |. Commands already run in the repo root and the tool result shows the exit code. A refusal is about that one command, not Bash: rewrite it and carry on. To revert files use git restore --source=<ref> -- <files>.";
+
+// Tools a stage never needs: they wait (ScheduleWakeup stalled #46), schedule,
+// reach the operator's other sessions, or move the session off its worktree.
+export const STAGE_DISALLOWED_TOOLS = [
+  "ScheduleWakeup",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "Monitor",
+  "RemoteTrigger",
+  "PushNotification",
+  "SendMessage",
+  "ListAgents",
+  "Workflow",
+  "EnterWorktree",
+  "ExitWorktree",
+] as const;
 
 const bash = (patterns: readonly string[]): string[] => patterns.map((p) => `Bash(${p})`);
 

@@ -34,7 +34,9 @@ export function renderEvent(e: StageEvent): string | undefined {
   if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}`;
   if (e.kind === "text" || e.kind === "truncated") return e.text ? plain(e.text) : undefined;
   if (e.kind === "session") return `session ${e.sessionId}`;
-  if (e.kind === "result") return `result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim();
+  // One "denied" line per refused call, so scripts/e2e-score.ts can count them.
+  if (e.kind === "result")
+    return [`result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim(), ...(e.denials ?? []).map((d) => `denied ${plain(d)}`)].join("\n");
   return undefined;
 }
 
