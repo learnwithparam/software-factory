@@ -34,9 +34,9 @@ change yourself. Read `.claude/skills/factory-verify/references/prove.md`
 and follow it for the plan's `proof`, AC-n and NG-n. When uncertain, the
 verdict is `uncertain`; a refused command is not uncertainty.
 
-Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
-security (injection, authz, secrets), and whether the diff crosses any
-NG-n. Collect its findings verbatim, do not soften them. Drop only one the
+Dispatch to `factory-reviewer` in the foreground and wait for it
+[enforced: guard-paths.sh] (fresh context, read-only): correctness, security
+(injection, authz, secrets), and whether the diff crosses any NG-n. Collect its findings verbatim, do not soften them. Drop only one the
 diff did not introduce (the base branch has it too): name it in the comment
 as a separate issue, never as a reason to reject. The runner drops any
 finding whose `where` is not on a line the diff changed, so give every
