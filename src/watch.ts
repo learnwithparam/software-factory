@@ -185,7 +185,7 @@ async function recheckFindings(
   if (dropped.length === 0) return { verdict, note: "" };
   const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
   const list = dropped.map((f) => `- ${f.what}`).join("\n");
-  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nA second check found the diff does not support ${dropped.length} finding(s), so they were dropped:\n${list}` };
+  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}` };
 }
 
 // Build's status-comment.md is the one comment the runner keeps and edits in

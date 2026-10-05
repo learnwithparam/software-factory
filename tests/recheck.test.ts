@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import type { Finding } from "../src/artifacts";
-import type { CommandResult, CommandRunner } from "../src/github";
-import { ClaudeRechecker, hasBlocking, keepSupported, recheckPrompt } from "../src/recheck";
+import { changedLines, DiffAnchorRechecker, hasBlocking, keepSupported } from "../src/recheck";
 
 const f = (severity: Finding["severity"], what: string, confidence = 4): Finding => ({ severity, confidence, what });
 
@@ -17,32 +16,50 @@ test("hasBlocking needs a must/should finding at blocking confidence", () => {
   expect(hasBlocking([f("should", "x", 3)])).toBe(true);
 });
 
-test("the prompt carries indexed findings and the diff, and truncates a huge diff", () => {
-  const p = recheckPrompt([f("must", "a")], "D".repeat(300_000));
-  expect(p).toContain('"index":0');
-  expect(p.length).toBeLessThan(210_000);
+// A two-file diff: a.ts changes lines 10-14 (new side), b.ts is new (1-3), gone.ts is deleted.
+const DIFF = [
+  "diff --git a/src/a.ts b/src/a.ts",
+  "--- a/src/a.ts",
+  "+++ b/src/a.ts",
+  "@@ -10,4 +10,5 @@ export function a() {",
+  " ctx",
+  "-old",
+  "+++ looks like a header but is an added line",
+  "+new",
+  " ctx",
+  " ctx",
+  "diff --git a/src/b.ts b/src/b.ts",
+  "new file mode 100644",
+  "--- /dev/null",
+  "+++ b/src/b.ts",
+  "@@ -0,0 +1,3 @@",
+  "+one",
+  "+two",
+  "+three",
+  "diff --git a/src/gone.ts b/src/gone.ts",
+  "--- a/src/gone.ts",
+  "+++ /dev/null",
+  "@@ -1,2 +0,0 @@",
+  "-x",
+  "-y",
+].join("\n");
+
+const at = (where?: string): Finding => ({ severity: "must", confidence: 4, what: "w", ...(where ? { where } : {}) });
+
+test("changedLines reads each file's new-side hunk ranges and skips deleted files", () => {
+  expect([...changedLines(DIFF)]).toEqual([["src/a.ts", [[10, 14]]], ["src/b.ts", [[1, 3]]]]);
 });
 
-class Runner implements CommandRunner {
-  args: string[] = [];
-  constructor(private readonly result: CommandResult | Error) {}
-  async run(args: string[]): Promise<CommandResult> {
-    this.args = args;
-    if (this.result instanceof Error) throw this.result;
-    return this.result;
-  }
-}
-const ok = (stdout: string): CommandResult => ({ stdout, stderr: "", code: 0 });
-
-test("ClaudeRechecker runs with every tool off and returns the supported indexes", async () => {
-  const runner = new Runner(ok(JSON.stringify({ structured_output: { supported: [0] } })));
-  expect(await new ClaudeRechecker(runner, "/x").supported([f("must", "a")], "diff")).toEqual([0]);
-  expect(runner.args[runner.args.indexOf("--tools") + 1]).toBe("");
-  expect(runner.args).toContain("--json-schema");
-});
-
-test("any failure means the check could not run, so no finding is dropped", async () => {
-  for (const r of [new Error("boom"), { stdout: "", stderr: "x", code: 1 }, ok("not json"), ok(JSON.stringify({ structured_output: { supported: ["a"] } })), ok("{}")]) {
-    expect(await new ClaudeRechecker(new Runner(r), "/x").supported([f("must", "a")], "d")).toBeUndefined();
-  }
+test("a finding is supported only when its where overlaps a changed hunk", async () => {
+  const findings = [
+    at("src/a.ts:12"), // inside the hunk
+    at("./src/b.ts:3 (new file)"), // leading ./ and trailing prose
+    at("src/a.ts:5-11"), // a range that overlaps
+    at("src/a.ts:40"), // same file, outside every hunk
+    at("src/c.ts:1"), // a file the diff never touched
+    at("src/a.ts"), // no line
+    at(), // no where at all
+    at("src/gone.ts:1"), // a deleted file has no new side
+  ];
+  expect(await new DiffAnchorRechecker().supported(findings, DIFF)).toEqual([0, 1, 2]);
 });
