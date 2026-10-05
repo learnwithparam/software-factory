@@ -168,6 +168,14 @@ describe("every template agent carries STAGE_GUIDANCE verbatim", () => {
     test(file, () => expect(readFileSync(join(agentsDir, file), "utf8")).toContain(STAGE_GUIDANCE));
 });
 
+// Verify must drop what the reviewer is told to leave out. splitbill-demo #87: verify kept a
+// finding it called "not new", rejected on it, then rejected the build's fix for it.
+test("factory-verify drops a finding the diff did not introduce, as the reviewer is told to", () => {
+  const read = (p: string) => readFileSync(join(import.meta.dir, "..", "template", ".claude", p), "utf8").replace(/\s+/g, " ");
+  expect(read("agents/factory-reviewer.md")).toContain("an issue the diff did not introduce");
+  expect(read("skills/factory-verify/SKILL.md")).toContain("one the diff did not introduce");
+});
+
 // A command the template tells a stage to run must survive the stage's own
 // guard (the hook is the one definition of a refused shape). `<base>` style
 // placeholders become a plain word first.

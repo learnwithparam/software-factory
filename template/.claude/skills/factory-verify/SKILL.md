@@ -43,7 +43,9 @@ Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
 security (injection, authz, secrets), and whether the diff crosses any
 NG-n. Collect its findings verbatim, do not soften or drop one, then
 re-check each yourself against the diff at the current head. Drop one the
-code does not support (confidence 0-2); never keep a finding you could not
+code does not support (confidence 0-2), and one the diff did not introduce
+(the base branch has it too): name that one in the comment as a separate
+issue, never as a reason to reject. Never keep a finding you could not
 reproduce from the diff.
 
 ## 4. Decide the verdict

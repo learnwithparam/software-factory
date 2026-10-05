@@ -103,5 +103,6 @@
   {"name": "repo setup: AGENTS.md paths exist", "file": "AGENTS.md", "find": "`tests/release.test.ts`", "replace": "`tests/release-pin.test.ts`", "test": "tests/repo-setup.test.ts"},
   {"name": "repo setup: rule globs match a file", "file": ".claude/rules/template.md", "find": "\"template-ci/**\"", "replace": "\"template-cli/**\"", "test": "tests/repo-setup.test.ts"},
   {"name": "repo setup: settings deny .env reads", "file": ".claude/settings.json", "find": "\"Read(./.env*)\",\n", "replace": "", "test": "tests/repo-setup.test.ts"},
-  {"name": "repo setup: CI gate runs with an empty HOME", "file": ".github/workflows/ci.yml", "find": "HOME=\"$(mktemp -d)\" make check", "replace": "make check", "test": "tests/repo-setup.test.ts"}
+  {"name": "repo setup: CI gate runs with an empty HOME", "file": ".github/workflows/ci.yml", "find": "HOME=\"$(mktemp -d)\" make check", "replace": "make check", "test": "tests/repo-setup.test.ts"},
+  {"name": "skills: verify drops pre-existing findings", "file": "template/.claude/skills/factory-verify/SKILL.md", "find": "and one the diff did not introduce", "replace": "and one the diff did introduce", "test": "tests/skills.test.ts"}
 ]
