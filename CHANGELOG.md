@@ -8,15 +8,40 @@ moved from SubagentStop to Stop).
 
 Prompt bytes per stage on the splitbill-demo fixture (`--append-system-prompt` plus the stage skill
 and the references it always reads), v2.12.3 to v3.0.0: triage 10,164 to 5,971, plan 10,611 to
-7,330, build 10,739 to 10,566, verify 14,519 to 9,044, pr 9,175 to 3,198, retro 8,721 to 2,724.
-Total 63,929 to 38,833 (39% fewer). `tests/token-budget.test.ts` pins each stage about 10% above.
+7,330, build 10,739 to 10,566, verify 14,519 to 6,769, pr 9,175 to 3,198, retro 8,721 to 2,724.
+Total 63,929 to 36,558 (43% fewer). `tests/token-budget.test.ts` pins each stage about 10% above.
+
+Live, on the same splitbill-demo bug (Claude only, all five stages, shipped): v2.12.3 on #88 against
+v3.0.0 on #97. Input tokens here count cache reads and writes and every subagent (`modelUsage`).
+
+| stage | v2.12.3 | v3.0.0 |
+|---|---|---|
+| triage | 80k, $0.216 | 60k, $0.086 |
+| plan | 106k, $0.197 | 115k, $0.249 |
+| build | 252k, $0.306 | 307k, $0.364 |
+| verify | 245k, $0.360 | 169k, $0.330 |
+| pr | 87k, $0.162 | 79k, $0.091 |
+| total | 770,241, $1.2412 | 729,722, $1.1206 |
+
+That is 5% fewer input tokens and 10% less spend, short of the 40% target. Prompt bytes are a small
+share of a stage's input: each turn re-reads the whole context, so turns times context size drives
+it, and about 20k tokens per session is Claude Code's own system prompt. Build ran 18 turns against
+13 and is the next target (v3.1's resumed retries and `--json-schema` both cut turns).
 
 - **AGENTS.md loads once.** CLAUDE.md already imports it, so the context pack no longer copies it in.
   pr and retro get the artifacts only (`STAGE_PACK` in `src/context.ts`), and the skills index is
   frontmatter only.
-- **Verify proves the build in its own session.** The `factory-verifier` subagent is gone: the
-  revert-and-restore check lives in `factory-verify/references/prove.md`, and verify dispatches only
-  `factory-reviewer`. `stop-verifier-evidence.sh` now runs on the verify stage's Stop.
+- **The runner proves the build, not a model.** The `factory-verifier` subagent is gone. Under
+  `proof: test`, `src/proof.ts` restores every non-test file from the merge base, runs the `test`
+  gate, restores HEAD and writes `proof.json` (`bites`, `passes-without`, `no-tests` or `skipped`,
+  with the output tail) before verify starts. Verify judges the tail and proves by hand from
+  `references/prove.md` only when the runner could not. On #97 it recorded `bites`: two new CSV
+  tests failed with `src/csv.ts` reverted. `stop-verifier-evidence.sh` now runs on the verify Stop.
+- **Verify waits for its reviewer.** `guard-paths.sh` refuses a backgrounded subagent inside a
+  stage. On #95 verify backgrounded `factory-reviewer`, waited, and ran 17 turns; on #97, 8.
+- **Each stage loads only the tools it uses** (`STAGE_TOOLS`, passed as `--tools`): Bash, Read,
+  Write and Skill, plus Edit for build and verify and Agent for plan and verify. Before, every stage
+  loaded 13, including WebSearch, NotebookEdit and DesignSync.
 - **Plan researches through the built-in Explore agent.** `factory-explorer` is gone.
 - **Recheck without a model call.** `DiffAnchorRechecker` drops a finding whose `where` is not on a
   line the diff changed. The `claude -p` pass over the whole diff is gone.
