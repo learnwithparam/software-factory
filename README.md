@@ -281,7 +281,7 @@ A preset agent sees only its own provider API keys. Setting both `preset` and `c
 where `{{prompt}}` / `{{promptFile}}` appears, and writes its results as files under
 `$FACTORY_ARTIFACT_DIR`. It runs with no event parser: tokens show as "not reported" and the tool-call cap
 cannot be enforced, so the timeout is the backstop and `factory doctor` says so. A shell as the executable may not take `{{prompt}}` as an argument. The guard hook and
-`--settings` rules are Claude-only. A preset-less agent inherits your environment, every provider key included (minus `GH_TOKEN`, `GITHUB_TOKEN`, `FACTORY_*`, repo `GIT_*`), including model API keys and `~/.config/gh`: run it in a sandbox until v3.0. The runner's diff check, gates and commit apply to every agent.
+`--settings` rules are Claude-only. A preset-less agent inherits your environment, every provider key included (minus `GH_TOKEN`, `GITHUB_TOKEN`, `FACTORY_*`, repo `GIT_*`), including model API keys and `~/.config/gh`: run it in a sandbox: the runner ships none. The runner's diff check, gates and commit apply to every agent.
 
 Then bring the target repo up to speed and start the loop:
 

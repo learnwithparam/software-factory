@@ -11,7 +11,7 @@
     { "id": "module-2", "title": "Isolate Agent Work with an Execution Harness", "tag": "v2.6.1", "planned": false, "checkpoint": "module-2", "issue": "01-readme-missing-run-steps.md", "demo": ["Setup", "By release"] },
     { "id": "module-3", "title": "Route the Right Context to Every Task", "tag": "v2.7.0", "planned": false, "checkpoint": "module-3", "issue": "04-search-sql-injection.md", "demo": ["Live sequence 3"] },
     { "id": "module-4", "title": "Make Agents Prove Their Work", "tag": "v2.5.2", "planned": false, "checkpoint": "module-4", "issue": "02-split-remainder-bug.md", "demo": ["Live sequence 1", "By release"] },
-    { "id": "module-5", "title": "Build Self-Healing Engineering Loops", "tag": "v3.0.0", "planned": true, "checkpoint": "module-5", "issue": "01-readme-missing-run-steps.md", "demo": ["Paths you cannot force live"] },
+    { "id": "module-5", "title": "Build Self-Healing Engineering Loops", "tag": "v3.1.0", "planned": true, "checkpoint": "module-5", "issue": "01-readme-missing-run-steps.md", "demo": ["Paths you cannot force live"] },
     { "id": "module-6", "title": "Orchestrate and Ship Verified PRs", "tag": "v2.8.0", "planned": false, "checkpoint": "module-6", "issue": "03-csv-raw-cents.md", "demo": ["Live sequence 1", "Deliver and reset"] }
   ]
 }

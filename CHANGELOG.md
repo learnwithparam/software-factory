@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.0.0
+
+The token diet: each stage gets only what it reads. Breaking for upgraders: re-run
+`install.sh --update`, then reconcile `.claude/settings.json.factory-new` (the verifier evidence hook
+moved from SubagentStop to Stop).
+
+Prompt bytes per stage on the splitbill-demo fixture (`--append-system-prompt` plus the stage skill
+and the references it always reads), v2.12.3 to v3.0.0: triage 10,164 to 5,971, plan 10,611 to
+7,330, build 10,739 to 10,566, verify 14,519 to 9,044, pr 9,175 to 3,198, retro 8,721 to 2,724.
+Total 63,929 to 38,833 (39% fewer). `tests/token-budget.test.ts` pins each stage about 10% above.
+
+- **AGENTS.md loads once.** CLAUDE.md already imports it, so the context pack no longer copies it in.
+  pr and retro get the artifacts only (`STAGE_PACK` in `src/context.ts`), and the skills index is
+  frontmatter only.
+- **Verify proves the build in its own session.** The `factory-verifier` subagent is gone: the
+  revert-and-restore check lives in `factory-verify/references/prove.md`, and verify dispatches only
+  `factory-reviewer`. `stop-verifier-evidence.sh` now runs on the verify stage's Stop.
+- **Plan researches through the built-in Explore agent.** `factory-explorer` is gone.
+- **Recheck without a model call.** `DiffAnchorRechecker` drops a finding whose `where` is not on a
+  line the diff changed. The `claude -p` pass over the whole diff is gone.
+- **Per-stage model and effort.** triage, pr and retro run `--model sonnet --effort low` unless the
+  agent config names a model. plan, build and verify keep the CLI default.
+- **`install.sh --update` removes retired files** (`factory-verifier.md`, `factory-explorer.md`), so a
+  retired agent stops costing every stage its description.
+
+Moved to v3.1: build retries that `--resume` the session (a CI runner cannot resume a machine-local
+session, so it needs the engine's `on_fail` fallback), and `--json-schema` in place of the
+stop-artifact hook.
+
 ## v2.12.3
 
 Walk through a finished run without running it.
