@@ -45,6 +45,7 @@ test("passes a verify report with evidence", async () => {
 
 test("ignores other stages, sessions outside a stage, and bad input", async () => {
   expect((await stop({ last_assistant_message: REFUSED[0] }, "build")).reason).toBeUndefined();
+  expect((await stop({ hook_event_name: "SubagentStop", last_assistant_message: REFUSED[0] })).reason).toBeUndefined();
   expect((await stop({ last_assistant_message: REFUSED[0] }, null)).reason).toBeUndefined();
   expect((await stop({ last_assistant_message: 42 })).code).toBe(0);
 });

@@ -71,7 +71,7 @@
   {"name": "stop-artifact: number range", "file": "template/.claude/hooks/stop-artifact.sh", "find": "prop.get(\"minimum\", float(\"-inf\")) <= v <= prop.get(\"maximum\", float(\"inf\"))", "replace": "True", "test": "tests/stop-artifact.test.ts"},
   {"name": "stop-artifact: missing file", "file": "template/.claude/hooks/stop-artifact.sh", "find": "    if not os.path.isfile(path):\n", "replace": "    if False:\n", "test": "tests/stop-artifact.test.ts"},
   {"name": "runner writes the stage schema", "file": "src/agents/executor.ts", "find": "if (spec) writeFileSync(join(scratch, \"artifact.schema.json\")", "replace": "if (false) writeFileSync(join(scratch, \"artifact.schema.json\")", "test": "tests/ported/machinist/runner.test.ts"},
-  {"name": "stop-verifier-evidence: once only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": "if event.get(\"stop_hook_active\"):", "replace": "if False:", "test": "tests/stop-verifier-evidence.test.ts"},
+  {"name": "stop-verifier-evidence: once only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": " or event.get(\"stop_hook_active\"):", "replace": ":", "test": "tests/stop-verifier-evidence.test.ts"},
   {"name": "stop-verifier-evidence: verify stage only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": "[ \"${FACTORY_STAGE:-}\" = \"verify\" ] || exit 0", "replace": "[ -n \"${FACTORY_STAGE:-}\" ] || exit 0", "test": "tests/stop-verifier-evidence.test.ts"},
   {"name": "stop-verifier-evidence: stage only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": "[ \"${FACTORY_STAGE:-}\" = \"verify\" ] || exit 0", "replace": "true", "test": "tests/stop-verifier-evidence.test.ts"},
   {"name": "settings: deny reading .env", "file": "template/.claude/settings.json", "find": "\"Read(./.env*)\"", "replace": "\"Read(./.nothing)\"", "test": "tests/template-settings.test.ts"},
@@ -111,5 +111,7 @@
   {"name": "claude preset: triage runs cheap", "file": "src/agents/presets/claude.ts", "find": "triage: { model: \"sonnet\", effort: \"low\" },", "replace": "triage: {},", "test": "tests/agents.test.ts"},
   {"name": "claude preset: a configured model wins", "file": "src/agents/presets/claude.ts", "find": "configured ?? model", "replace": "model ?? configured", "test": "tests/agents.test.ts"},
   {"name": "token budget: pr gets the full pack", "file": "src/context.ts", "find": "  pr: [],", "replace": "  pr: [\"conventions\", \"charter\", \"lessons\", \"routeSkills\", \"architecture\", \"planFiles\"],", "test": "tests/token-budget.test.ts"},
-  {"name": "token budget: AGENTS.md loaded twice", "file": "src/context.ts", "find": "  if (!contextFile) return false;\n", "replace": "  return false;\n", "test": "tests/token-budget.test.ts"}
+  {"name": "token budget: AGENTS.md loaded twice", "file": "src/context.ts", "find": "  if (!contextFile) return false;\n", "replace": "  return false;\n", "test": "tests/token-budget.test.ts"},
+  {"name": "stop-verifier-evidence: Stop only", "file": "template/.claude/hooks/stop-verifier-evidence.sh", "find": "event.get(\"hook_event_name\") != \"Stop\" or ", "replace": "", "test": "tests/stop-verifier-evidence.test.ts"},
+  {"name": "install: --update removes retired agents", "file": "install.sh", "find": "      rm \"$TARGET/$rel\"\n", "replace": "", "test": "tests/install.test.ts"}
 ]

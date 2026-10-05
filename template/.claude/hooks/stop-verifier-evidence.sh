@@ -10,7 +10,8 @@ command -v python3 >/dev/null 2>&1 || exit 0
 out="$(python3 -c '
 import json, re, sys
 event = json.load(sys.stdin)
-if event.get("stop_hook_active"):
+# A repo updated from v2 may still register this on SubagentStop; only the session counts.
+if event.get("hook_event_name") != "Stop" or event.get("stop_hook_active"):
     sys.exit(0)
 text = event.get("last_assistant_message") or ""
 # A refusal names the command or tool refused, so "GET /admin is denied with 403" and a
