@@ -221,7 +221,7 @@ Install the template into the target repo (never overwrites a file that's alread
 ```
 
 `--update` overwrites every factory-owned file except `.claude/settings.json`, which it diffs
-instead (writing `.settings.json.factory-new` for you to reconcile), and skips the repo-owned
+instead (writing `.claude/settings.json.factory-new` for you to reconcile), and skips the repo-owned
 `.factory/` files. `--ci` also writes the inert `.github/workflows/factory.yml.example`.
 
 Then make three repo-owned files yours:

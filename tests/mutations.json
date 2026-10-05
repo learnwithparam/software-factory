@@ -97,5 +97,11 @@
   {"name": "skills lint: no machine path", "file": "template/.factory/config.example.json", "find": "\"postEditCommand\": [],", "replace": "\"postEditCommand\": [\"~/.claude/x\"],", "test": "tests/skills.test.ts"},
   {"name": "skills lint: references are reachable", "file": "template/.claude/skills/factory-verify/SKILL.md", "find": "`.claude/skills/factory-verify/references/ui-route.md` and", "replace": "read the UI reference and", "test": "tests/skills.test.ts"},
   {"name": "skills lint: enforced tags name a shipped hook", "file": "template/.claude/skills/factory-verify/SKILL.md", "find": "[enforced: stop-artifact.sh]", "replace": "[enforced: stop-schema.sh]", "test": "tests/skills.test.ts"},
-  {"name": "skills lint: description has no YAML comment", "file": "template/.claude/skills/factory-plan/SKILL.md", "find": "marked proceed, with", "replace": "marked proceed #with", "test": "tests/skills.test.ts"}
+  {"name": "skills lint: description has no YAML comment", "file": "template/.claude/skills/factory-plan/SKILL.md", "find": "marked proceed, with", "replace": "marked proceed #with", "test": "tests/skills.test.ts"},
+  {"name": "repo setup: CLAUDE.md imports AGENTS.md", "file": "CLAUDE.md", "find": "@AGENTS.md", "replace": "AGENTS.md", "test": "tests/repo-setup.test.ts"},
+  {"name": "repo setup: AGENTS.md is short", "file": "AGENTS.md", "find": "## The template", "replace": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n## The template", "test": "tests/repo-setup.test.ts"},
+  {"name": "repo setup: AGENTS.md paths exist", "file": "AGENTS.md", "find": "`tests/release.test.ts`", "replace": "`tests/release-pin.test.ts`", "test": "tests/repo-setup.test.ts"},
+  {"name": "repo setup: rule globs match a file", "file": ".claude/rules/template.md", "find": "\"template-ci/**\"", "replace": "\"template-cli/**\"", "test": "tests/repo-setup.test.ts"},
+  {"name": "repo setup: settings deny .env reads", "file": ".claude/settings.json", "find": "\"Read(./.env*)\",\n", "replace": "", "test": "tests/repo-setup.test.ts"},
+  {"name": "repo setup: CI gate runs with an empty HOME", "file": ".github/workflows/ci.yml", "find": "HOME=\"$(mktemp -d)\" make check", "replace": "make check", "test": "tests/repo-setup.test.ts"}
 ]

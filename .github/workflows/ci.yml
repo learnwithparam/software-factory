@@ -24,8 +24,9 @@ jobs:
       - name: Install dependencies
         run: make install
 
+      # An empty HOME, so a check that passes only with one machine's ~/.claude or caches fails here.
       - name: make check
-        run: make check
+        run: HOME="$(mktemp -d)" make check
 
   # Every check must bite: each mutation in tests/mutations.json turns its test red.
   check-mutations:
