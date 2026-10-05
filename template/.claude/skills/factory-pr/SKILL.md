@@ -5,18 +5,18 @@ description: Fills the PR body from the plan and the passing verdict's evidence,
 
 # factory-pr
 
-Invoked as `/factory-pr <N>`. No push, no `gh` access — you write the PR
+Invoked as `/factory-pr <N>`. No push, no `gh` access; you write the PR
 body to a file; the runner runs `git push` and `gh pr create --draft` with
 it. Only reachable after `factory-verify` wrote `result: "pass"`.
 
 ## 1. Read the inputs
 
 - `.factory/runs/issue-<N>/issue.json`, `plan.json`, `plan-comment.md`,
-  `verdict.json`, `verdict-comment.md` — the goal, AC-n, and the evidence
+  `verdict.json`, `verdict-comment.md`: the goal, AC-n, and the evidence
   that each one passed.
 - `.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE.md`
   in the target repo, if present. It belongs to that repo, not to this
-  skill — never create or edit it here.
+  skill; never create or edit it here.
 
 ## 2. Fill the body
 

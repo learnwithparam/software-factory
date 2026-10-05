@@ -1,6 +1,6 @@
 // agentskills.io spec, checked structurally rather than trusted by eye:
 // frontmatter is exactly `name` + `description`, `name` matches the folder,
-// the body is under 100 lines, and references/scripts/assets are one level
+// the body is under 90 lines, and references/scripts/assets are one level
 // deep. Also runs the real `skills-ref validate` CLI via uvx when available,
 // since that is the authority `make check` calls — this file is the part of
 // that check bun test can run without a network fetch of the tool itself.
@@ -51,9 +51,20 @@ describe("every template skill conforms to the agentskills.io spec", () => {
         expect(name).toBe(dir);
       });
 
-      test("body is under 100 lines", () => {
+      // Under 90 leaves room below the spec's 100 for one more step; detail goes in references/.
+      test("body is under 90 lines", () => {
         const lineCount = body.split("\n").length;
-        expect(lineCount).toBeLessThan(100);
+        expect(lineCount).toBeLessThan(90);
+      });
+
+      test("description is 300 characters or fewer and a plain YAML scalar", () => expect(descriptionProblem(text)).toBeUndefined());
+
+      test("every references/ file is named in the body, so the skill can reach it", () => {
+        let refs: string[] = [];
+        try {
+          refs = readdirSync(join(SKILLS_DIR, dir, "references"));
+        } catch {}
+        for (const ref of refs) expect(body).toContain(`references/${ref}`);
       });
 
       test("references, scripts, and assets are one level deep", () => {
@@ -73,6 +84,17 @@ describe("every template skill conforms to the agentskills.io spec", () => {
   }
 });
 
+// Claude reads every description on every turn to pick a skill or agent; a long one costs
+// context in all stages; an angle bracket or a colon-space breaks the YAML loaders parse.
+function descriptionProblem(text: string): string | undefined {
+  const description = /^description: (.*)$/m.exec(text)?.[1] ?? "";
+  if (!description) return "no description";
+  if (description.length > 300) return `description is ${description.length} characters`;
+  if (/[<>]/.test(description)) return "description has < or >";
+  if (/: | #|:$|^[-?:,[\]{}#&*!|>'"%@`]/.test(description)) return "description is not a plain YAML scalar (a colon-space, a comment, or a leading indicator)";
+  return undefined;
+}
+
 describe("every template subagent has name + description + tools", () => {
   const agentsDir = join(import.meta.dir, "..", "template", ".claude", "agents");
   const files = readdirSync(agentsDir).filter((f) => f.endsWith(".md"));
@@ -86,6 +108,11 @@ describe("every template subagent has name + description + tools", () => {
       expect(keys).toContain("description");
       expect(keys).toContain("tools");
       expect(name).toBe(file.replace(/\.md$/, ""));
+      expect(descriptionProblem(text)).toBeUndefined();
+      for (const key of keys) expect(["name", "description", "tools", "model", "color"]).toContain(key);
+      // The template agents explore, review and verify; a writing tool would let a checker edit what it checks.
+      const tools = /^tools: (.*)$/m.exec(text)?.[1]?.split(/,\s*/) ?? [];
+      for (const tool of ["Edit", "Write", "MultiEdit", "NotebookEdit"]) expect(tools).not.toContain(tool);
     });
   }
 });
@@ -180,4 +207,28 @@ describe("every inline command in factory-verifier is on the verify allow-list",
   // The executor creates .factory/runs/issue-N/ untracked, so a bare "prints nothing" never holds.
   test("the clean-restore check allows the untracked run dir", () => expect(body).toContain("must list nothing outside `.factory/`"));
   for (const command of commands) test(command, () => expect(allowed.some((r) => r.test(command))).toBe(true));
+});
+
+// factory-comment tells every stage "no em dashes" in what it posts, and the stages copy the
+// style of their own instructions. The template ships to other machines, so it names none of ours.
+describe("template prose and paths", () => {
+  const root = join(import.meta.dir, "..");
+  const files = Bun.spawnSync(["find", join(root, "template"), join(root, "template-ci"), "-type", "f"]).stdout.toString().trim().split("\n");
+  test("found the template files", () => expect(files.length).toBeGreaterThan(20));
+  for (const file of files) {
+    const rel = file.slice(root.length + 1);
+    const text = readFileSync(file, "utf8");
+    if (/\.claude\/(skills|agents)\//.test(rel)) test(`${rel} has no em dash`, () => expect(text).not.toContain("\u2014"));
+    test(`${rel} names no machine path`, () => expect(text).not.toMatch(/\/Users\/|~\/\.claude|\$HOME\/\.claude/));
+  }
+});
+
+// A line tagged [enforced: <hook>] tells the stage a hook backs it; the tag must name a hook
+// the template ships, so it never claims a check that is not there.
+describe("every [enforced:] tag names a shipped hook", () => {
+  const root = join(import.meta.dir, "..", "template", ".claude");
+  const files = Bun.spawnSync(["find", join(root, "skills"), join(root, "agents"), "-name", "*.md"]).stdout.toString().trim().split("\n");
+  const tags = files.flatMap((file) => [...readFileSync(file, "utf8").matchAll(/\[enforced: ([^\]]+)\]/g)].map((m) => ({ file: file.slice(root.length + 1), hook: m[1]! })));
+  test("found the tags", () => expect(tags.length).toBeGreaterThan(3));
+  for (const { file, hook } of tags) test(`${file}: ${hook}`, () => expect(statSync(join(root, "hooks", hook)).isFile()).toBe(true));
 });

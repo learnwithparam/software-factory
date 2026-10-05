@@ -5,13 +5,13 @@ description: Verifies a build against its plan by running the factory-verifier a
 
 # factory-verify
 
-Invoked as `/factory-verify <N>`. No push, no `gh` access — write files,
+Invoked as `/factory-verify <N>`. No push, no `gh` access; write files,
 the runner posts the verdict and moves the issue's label.
 
 ## 1. Read the inputs
 
 - `.factory/runs/issue-<N>/issue.json`, `plan.json`, `plan-comment.md`,
-  `build.json` — the plan's AC-n and NG-n, and what build reports it did.
+  `build.json`: the plan's AC-n and NG-n, and what build reports it did.
 - `.factory/runs/issue-<N>/gate.json`: what the runner measured after build
   (`line`, `status`, `tree`). If its `tree` equals `git rev-parse HEAD^{tree}`,
   the gate result is current: use it and do not re-run the gates. If the tree
@@ -24,18 +24,8 @@ the runner posts the verdict and moves the issue's label.
 
 ## 2. UI route: the visual check
 
-Skip unless `triage.json`'s `type` is `ui`. Read `build.json`'s `screenshots`
-array against the repo design skill's state list (`.claude/skills/*-design/SKILL.md`,
-if it has one; otherwise the states the AC-n list names).
-Every state x viewport (390, 1440) x theme (light, dark) combination the
-plan's AC-n list covers needs an entry; a gap is a `must` finding at
-confidence 5, and the verdict cannot be `pass`. Read each screenshot (a
-worktree file, not a URL) against the five-criterion rubric
-(hierarchy, 390px thumb reach, AA contrast, token use, restraint, each
-1-5); any criterion under 4 is a `should` finding naming the screenshot,
-the criterion and the score, and three or more such findings become a
-`must`. This runs alongside, not instead of, step 3: a `ui`-typed issue
-still needs a green gate and every AC proven.
+Only when `triage.json`'s `type` is `ui`: read
+`.claude/skills/factory-verify/references/ui-route.md` and follow it alongside step 3, not instead of it.
 
 ## 3. Run the subagents
 
@@ -58,14 +48,14 @@ reproduce from the diff.
 
 ## 4. Decide the verdict
 
-- **pass** — every AC has evidence, the gate is green, no NG-n crossed, no
+- **pass**: every AC has evidence, the gate is green, no NG-n crossed, no
   blocking reviewer finding, and (on the `ui` route) no blocking step 2
   finding. A `must`/`should` finding at confidence 3 or more, or a
   non-`pass` criterion, refuses the verdict and routes to a human.
-- **reject** — any AC unproven, gate red, an NG-n crossed, or a blocking
+- **reject**: any AC unproven, gate red, an NG-n crossed, or a blocking
   finding. The runner retries `factory-build` up to twice, then routes to
   a human automatically; just report `reject` honestly each time.
-- **uncertain** — the verifier or reviewer could not reach a confident
+- **uncertain**: the verifier or reviewer could not reach a confident
   answer, or round limit hit. Route to a human, don't guess.
 
 ## 5. Write the outputs
@@ -74,7 +64,7 @@ Use `factory-comment`'s `verdict.md` template for
 `.factory/runs/issue-<N>/verdict-comment.md`: per-AC pass/fail with the
 evidence command and result, the test-that-bites (name, failing output on
 the base branch, passing output here), reviewer findings verbatim, a summary of
-non-goals respected, and — on reject — which round this is.
+non-goals respected, and (on reject) which round this is.
 
 Then write `.factory/runs/issue-<N>/verdict.json`:
 
@@ -90,10 +80,11 @@ Then write `.factory/runs/issue-<N>/verdict.json`:
 A finding is `{ "severity": "must|should|could", "confidence": 0-5, "what": "...",
 "where": "file:line", "why": "...", "fix": "..." }` (`what` is required). A
 criterion is `pass`, `fail`, or `unverified` (with a `gap`); AC ids come from the
-plan and are never renumbered. No other fields are allowed, and the file must be
-one JSON object under 16 KiB.
+plan and are never renumbered. No other top-level fields are allowed [enforced: stop-artifact.sh];
+the runner also refuses an unknown finding or criterion field. The file must be one JSON object
+under 16 KiB.
 
 Set `outcome` to `blocked` (with a `summary`) only if you could not review at
 all. `result` is `pass`, `reject`, or `uncertain`; `findings` is the
-reviewer's list verbatim plus any from step 2 (empty array if none) — the
+reviewer's list verbatim plus any from step 2 (empty array if none); the
 retry and escalation rules are step 4's, not repeated here.
