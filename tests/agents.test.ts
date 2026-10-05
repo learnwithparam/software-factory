@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CommandExecutor, renderCommand, resolveAgent } from "../src/agents/executor";
 import { artifactContract, renderPrompt, stripFrontmatter } from "../src/agents/prompt";
-import { claudeArgs } from "../src/agents/presets/claude";
+import { CLAUDE_STAGE_DEFAULTS, claudeArgs } from "../src/agents/presets/claude";
 import { PRESETS } from "../src/agents/presets";
 import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
@@ -51,6 +51,19 @@ describe("claude preset", () => {
     const argv = PRESETS.claude!.command(opts, { preset: "claude", model: "opus" }, "").argv;
     expect(argv.slice(0, -2)).toEqual(["claude", ...claudeArgs(opts)]);
     expect(argv.slice(-2)).toEqual(["--model", "opus"]);
+  });
+
+  // v3.0: the stages that classify or fill a template run cheap; plan, build and verify
+  // keep the CLI default. A configured model replaces the stage model, never the effort.
+  test("each stage gets its default model and effort, and a configured model wins", () => {
+    const tail = (stage: StageName, model?: string) => {
+      const opts = { stage, issue: 1, cwd: "/w", maxBudgetUsd: 2 };
+      return PRESETS.claude!.command(opts, { preset: "claude", ...(model ? { model } : {}) }, "").argv.slice(claudeArgs(opts).length + 1);
+    };
+    expect(Object.keys(CLAUDE_STAGE_DEFAULTS).sort()).toEqual([...STAGES].sort());
+    for (const stage of ["triage", "pr", "retro"] as const) expect(tail(stage)).toEqual(["--model", "sonnet", "--effort", "low"]);
+    for (const stage of ["plan", "build", "verify"] as const) expect(tail(stage)).toEqual([]);
+    expect(tail("triage", "opus")).toEqual(["--model", "opus", "--effort", "low"]);
   });
 });
 
