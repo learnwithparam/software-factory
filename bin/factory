@@ -33,6 +33,7 @@ import { ensureRepoClone } from "../src/repo";
 import { helpText } from "../src/help";
 import { FixtureRecorder } from "../src/agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "../src/verify-agent";
+import { ShellProofGit } from "../src/proof";
 import { runLearn } from "../src/learn";
 
 const args = process.argv.slice(2);
@@ -99,6 +100,7 @@ function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
     gateRunner: new ShellGateRunner(),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
+    proofGit: new ShellProofGit(),
     cloneDir,
     workspacesDir: flag("workspaces") ?? defaultWorkspacesDir(process.env, config.repo),
     setupRunner: new ShellSetupRunner(),

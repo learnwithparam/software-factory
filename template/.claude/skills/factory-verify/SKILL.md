@@ -12,15 +12,11 @@ the runner posts the verdict and moves the issue's label.
 
 - `.factory/runs/issue-<N>/issue.json`, `plan.json`, `plan-comment.md`,
   `build.json`: the plan's AC-n and NG-n, and what build reports it did.
-- `.factory/runs/issue-<N>/gate.json`: what the runner measured after build
-  (`line`, `status`, `tree`). If its `tree` equals `git rev-parse HEAD^{tree}`,
-  the gate result is current: use it and do not re-run the gates. If the tree
-  differs, or the file is missing, the evidence is stale: report `uncertain`.
-- The worktree at its current state (build's commits, uncommitted or not).
-  Write `"rounds": 1`; the runner counts verify rounds itself and replaces
-  the value. Holdout results are the runner's too: it runs them and posts a
-  reject comment on failure before this skill is ever invoked again, so the
-  skill never reads the holdout paths.
+- `gate.json` and `proof.json` in the same directory: what the runner
+  measured on this tree. Do not re-run the gates; the runner refuses a red one
+  before verify. Holdout tests are the runner's too: never read their paths.
+- The worktree at its current state. Write `"rounds": 1`; the runner
+  counts verify rounds itself and replaces the value.
 
 ## 2. UI route: the visual check
 
@@ -29,16 +25,24 @@ Only when `triage.json`'s `type` is `ui`: read
 
 ## 3. Prove it, then review it
 
-This session is already a fresh context, separate from build: prove the
-change yourself. Read `.claude/skills/factory-verify/references/prove.md`
-and follow it for the plan's `proof`, AC-n and NG-n. When uncertain, the
-verdict is `uncertain`; a refused command is not uncertainty.
+The runner has run the revert check and the gate on this tree. Read
+`.factory/runs/issue-<N>/proof.json` and quote `gate.json`'s `line`:
+- `bites`: the new tests failed with the change reverted. Confirm from
+  `tail` that they failed for the stated reason, not a compile error.
+- `passes-without`: the tests pass without the change, so prove nothing: reject.
+- `no-tests`, `skipped`, or no file: read
+  `.claude/skills/factory-verify/references/prove.md` and prove it yourself.
+
+Every AC needs a command you ran or the proof's output as evidence; a
+crossed NG-n is a reject. When uncertain, the verdict is `uncertain`; a
+refused command is not uncertainty.
 
 Dispatch to `factory-reviewer` in the foreground and wait for it
 [enforced: guard-paths.sh] (fresh context, read-only): correctness, security
-(injection, authz, secrets), and whether the diff crosses any NG-n. Collect its findings verbatim, do not soften them. Drop only one the
-diff did not introduce (the base branch has it too): name it in the comment
-as a separate issue, never as a reason to reject. The runner drops any
+(injection, authz, secrets), and whether the diff crosses any NG-n. Collect
+its findings verbatim, do not soften them. Drop only
+one the diff did not introduce (the base branch has it too): name it in the
+comment as a separate issue, never as a reason to reject. The runner drops any
 finding whose `where` is not on a line the diff changed, so give every
 `must`/`should` finding a `file:line`.
 

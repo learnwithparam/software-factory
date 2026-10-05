@@ -22,13 +22,14 @@ const CAP: Record<StageName, number> = {
   triage: 6_600, // 5,971 (10,164)
   plan: 8_100, // 7,330 (10,611)
   build: 11_700, // 10,566 (10,739)
-  verify: 10_000, // 9,044 (14,519)
+  verify: 7_500, // 6,769 (14,519)
   pr: 3_600, // 3,198 (9,175)
   retro: 3_000, // 2,724 (8,721)
 };
 
-// References a stage reads on every run, not only on one route.
-const ALWAYS_READ: Partial<Record<StageName, string[]>> = { verify: ["references/prove.md"] };
+// References a stage reads on every run, not only on one route. verify reads prove.md only
+// when the runner could not run the proof itself (src/proof.ts).
+const ALWAYS_READ: Partial<Record<StageName, string[]>> = {};
 
 const repo = mkdtempSync(join(tmpdir(), "factory-budget-"));
 afterAll(() => rmSync(repo, { recursive: true, force: true }));

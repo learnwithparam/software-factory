@@ -320,7 +320,9 @@ describe("verdict rules", () => {
 
   test("the verify skill and reviewer teach the same schema the runner enforces", () => {
     const skill = readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/SKILL.md"), "utf8");
-    for (const word of ["gate.json", "HEAD^{tree}", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    for (const word of ["gate.json", "proof.json", "passes-without", "unverified", "must|should|could", "16 KiB", "AC-1"]) expect(skill).toContain(word);
+    // The tree check moved with the hand proof into prove.md, read when the runner could not run it.
+    expect(readFileSync(join(import.meta.dir, "../template/.claude/skills/factory-verify/references/prove.md"), "utf8")).toContain("HEAD^{tree}");
     expect(readFileSync(join(import.meta.dir, "../template/.claude/agents/factory-reviewer.md"), "utf8")).toContain("confidence 0-5");
   });
 });

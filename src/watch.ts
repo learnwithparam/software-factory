@@ -40,6 +40,7 @@ import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState } from "./derive";
 import { rehydrate } from "./rehydrate";
 import { runGates, type GateRunner } from "./gates";
+import { runProof, type ProofGit, type ProofResult } from "./proof";
 import { touchesProtectedPath } from "./boundary";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
@@ -82,6 +83,8 @@ export interface WatchDeps {
   readonly holdoutRunner: HoldoutRunner;
   // A tool-free second look at must/should findings; absent means findings stand as written.
   readonly rechecker?: Rechecker;
+  // Runs the proof:test revert check before verify and writes proof.json; absent means verify does it by hand.
+  readonly proofGit?: ProofGit;
   readonly cloneDir: string;
   readonly workspacesDir: string;
   // Runs config.setup once per worktree; defaults to a real shell so tests
@@ -702,6 +705,17 @@ async function driveFromStage(
           stage = "build";
           continue;
         }
+      }
+      if (deps.proofGit) {
+        const plan = (await readStageArtifacts(worktree, issueNumber, "plan")).json as { proof?: "test" | "check" } | undefined;
+        const testCmd = config.gates.find((g) => g.name === "test")?.cmd;
+        let proof: ProofResult;
+        try {
+          proof = await runProof(deps.proofGit, worktree, config.base, plan?.proof, testCmd);
+        } catch (err) {
+          proof = { status: "skipped", reverted: [], tests: [], cmd: testCmd ?? "", tail: `the runner could not run the proof: ${(err as Error).message}` };
+        }
+        await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
       }
       const result = await runStage(deps, config, issue, "verify", worktree);
       const art = await readStageArtifacts(worktree, issueNumber, "verify");
