@@ -1,10 +1,10 @@
 // Claude Code: `claude -p /factory-<stage> N` with stream-json output. The argv
 // is pinned byte for byte by tests/agents.test.ts; the repo's own skill is the
 // prompt, so this preset ignores the rendered one.
-// Flags checked against `claude --help` on 2026-10-05 (2.1.289), --effort included.
+// Flags checked against `claude --help` on 2026-10-05 (2.1.289), --effort and --tools included.
 
 import type { StageEvent, StageName, StageRunOptions } from "../../executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../../stage-permissions";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../../stage-permissions";
 import type { AgentPreset } from "../types";
 import { isUsageResultCandidate, readUsage } from "../usage";
 
@@ -95,6 +95,8 @@ export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
     "--strict-mcp-config",
     "--disallowedTools",
     STAGE_DISALLOWED_TOOLS.join(","),
+    "--tools",
+    STAGE_TOOLS[opts.stage].join(","),
     "--settings",
     stageSettings(opts.stage, opts.issue, opts.agentCommands),
     "--append-system-prompt",

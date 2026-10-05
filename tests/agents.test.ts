@@ -14,7 +14,7 @@ import { PRESETS } from "../src/agents/presets";
 import { COMMENT_FILENAMES, JSON_FILENAMES, MAX_STEP_JSON_BYTES, readStageArtifacts, validateVerdict, writeGateEvidence } from "../src/artifacts";
 import { configProblems, DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import type { StageName } from "../src/executor";
-import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, stageSettings } from "../src/stage-permissions";
+import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } from "../src/stage-permissions";
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
@@ -36,6 +36,7 @@ describe("claude preset", () => {
       "--setting-sources", "project,local",
       "--strict-mcp-config",
       "--disallowedTools", STAGE_DISALLOWED_TOOLS.join(","),
+      "--tools", "Bash,Read,Write,Skill,Edit",
       "--settings", stageSettings("build", 12, undefined),
       "--append-system-prompt", STAGE_GUIDANCE,
       "--max-budget-usd", "5",
@@ -43,6 +44,12 @@ describe("claude preset", () => {
     // Each shape dontAsk refused in the 2.1.289 repro; guard-paths.sh refuses the same set.
     for (const shape of ["> or >>", "$(...)", "backticks", "$?", "brace expansion", "cd", "VAR=value", "git restore --source="]) expect(STAGE_GUIDANCE).toContain(shape);
     expect(STAGE_DISALLOWED_TOOLS).toContain("ScheduleWakeup");
+    // Only plan and verify dispatch a subagent; only build and verify edit beyond their own artifacts.
+    for (const stage of STAGES) {
+      expect(STAGE_TOOLS[stage].includes("Agent"), stage).toBe(stage === "plan" || stage === "verify");
+      expect(STAGE_TOOLS[stage].includes("Edit"), stage).toBe(stage === "build" || stage === "verify");
+      for (const t of ["Bash", "Read", "Write", "Skill"]) expect(STAGE_TOOLS[stage], stage).toContain(t);
+    }
     expect(PRESETS.claude!.command(opts, { preset: "claude" }, "").argv).toEqual(["claude", ...claudeArgs(opts)]);
   });
 

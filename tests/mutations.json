@@ -118,5 +118,7 @@
   {"name": "proof: exit code decides bites", "file": "src/proof.ts", "find": "status: result.code === 0 ? \"passes-without\" : \"bites\"", "replace": "status: result.code === 0 ? \"bites\" : \"passes-without\"", "test": "tests/proof.test.ts"},
   {"name": "proof: HEAD restored after the revert", "file": "src/proof.ts", "find": "  } finally {\n    await git.restoreHead(worktree);\n  }", "replace": "  } finally {\n  }", "test": "tests/proof.test.ts"},
   {"name": "proof: factory files never reverted", "file": "src/proof.ts", "find": ".filter((c) => !FACTORY_OWNED.test(c.path))", "replace": "", "test": "tests/proof.test.ts"},
-  {"name": "proof: runner runs it before verify", "file": "src/watch.ts", "find": "if (deps.proofGit) {", "replace": "if (false) {", "test": "tests/proof.test.ts"}
+  {"name": "proof: runner runs it before verify", "file": "src/watch.ts", "find": "if (deps.proofGit) {", "replace": "if (false) {", "test": "tests/proof.test.ts"},
+  {"name": "claude: per-stage --tools", "file": "src/agents/presets/claude.ts", "find": "    \"--tools\",\n    STAGE_TOOLS[opts.stage].join(\",\"),\n", "replace": "", "test": "tests/agents.test.ts"},
+  {"name": "claude: Agent only where a skill dispatches one", "file": "src/stage-permissions.ts", "find": "  triage: BASE_TOOLS,", "replace": "  triage: [...BASE_TOOLS, \"Agent\"],", "test": "tests/agents.test.ts"}
 ]
