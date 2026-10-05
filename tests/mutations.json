@@ -109,5 +109,7 @@
   {"name": "recheck: a range overlaps a hunk", "file": "src/recheck.ts", "find": "at!.from <= b && at!.to >= a", "replace": "at!.from >= a && at!.to <= b", "test": "tests/recheck.test.ts"},
   {"name": "recheck: a deleted file has no new side", "file": "src/recheck.ts", "find": "file[1] === \"/dev/null\" ? undefined : []", "replace": "[]", "test": "tests/recheck.test.ts"},
   {"name": "claude preset: triage runs cheap", "file": "src/agents/presets/claude.ts", "find": "triage: { model: \"sonnet\", effort: \"low\" },", "replace": "triage: {},", "test": "tests/agents.test.ts"},
-  {"name": "claude preset: a configured model wins", "file": "src/agents/presets/claude.ts", "find": "configured ?? model", "replace": "model ?? configured", "test": "tests/agents.test.ts"}
+  {"name": "claude preset: a configured model wins", "file": "src/agents/presets/claude.ts", "find": "configured ?? model", "replace": "model ?? configured", "test": "tests/agents.test.ts"},
+  {"name": "token budget: pr gets the full pack", "file": "src/context.ts", "find": "  pr: [],", "replace": "  pr: [\"conventions\", \"charter\", \"lessons\", \"routeSkills\", \"architecture\", \"planFiles\"],", "test": "tests/token-budget.test.ts"},
+  {"name": "token budget: AGENTS.md loaded twice", "file": "src/context.ts", "find": "  if (!contextFile) return false;\n", "replace": "  return false;\n", "test": "tests/token-budget.test.ts"}
 ]
