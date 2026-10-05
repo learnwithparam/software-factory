@@ -1,6 +1,6 @@
 ---
 name: factory-verifier
-description: Use this agent after factory-build, in a fresh context, to prove the change works instead of trusting the build. Under proof:test it reverts the non-test files, shows the new test fails, restores them and checks the gate. Under proof:check it re-runs the plan's named checks. When uncertain, it rejects.
+description: Use this agent after factory-build, in a fresh context, to prove the change works instead of trusting the build. Under proof:test it reverts the non-test files, shows the new test fails, restores them and checks the gate. Under proof:check it re-runs the plan's checks. When uncertain, it rejects.
 tools: Bash, Read, Grep, Glob
 model: sonnet
 color: red

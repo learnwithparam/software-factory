@@ -5,10 +5,10 @@
 
 ### Acceptance criteria
 {{#each ac}}
-- **AC-{{n}}:** {{criterion}} — checked by `{{command_or_test}}`
+- **AC-{{n}}:** {{criterion}}: checked by `{{command_or_test}}`
 {{/each}}
 
-### Non-goals (binding — a diff that crosses one fails verify)
+### Non-goals (binding; a diff that crosses one fails verify)
 {{#each ng}}
 - **NG-{{n}}:** {{non_goal}}
 {{/each}}

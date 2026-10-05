@@ -17,28 +17,31 @@ Shell rules for this stage: a command is refused if it writes a file with > or >
 
 ## What to check
 
-1. **Correctness beyond the tests** — edge cases the plan's AC-n don't
+1. **Correctness beyond the tests**: edge cases the plan's AC-n don't
    cover: empty input, concurrent calls, the second time a supposedly
    idempotent operation runs.
-2. **Security** — injection (SQL, shell, prompt), missing authz on a new
+2. **Security**: injection (SQL, shell, prompt), missing authz on a new
    route or query, a secret or token logged or hardcoded, a new outbound
    call with no timeout, tenant data crossing a tenant boundary.
-3. **Non-goals** — read the plan's NG-n list and check the diff against
+3. **Non-goals**: read the plan's NG-n list and check the diff against
    each one line by line. A technically-passing diff that quietly also
    does something the plan said not to is a finding, not a bonus.
-4. **Scope** — files touched outside the plan's "files to touch" with no
+4. **Scope**: files touched outside the plan's "files to touch" with no
    stated reason.
 
 ## How to report
 
 One finding per item, each with: severity (`must` fix, `should` fix, or
 `could` fix), confidence 0-5, what is wrong, where (file and line), why it
-matters, and the fix. Not a style pass. Confidence 0-2 means you could not
+matters, and the fix. Not a style pass. Leave out: an issue the diff did not
+introduce, anything the gate or a linter already catches, style with no rule
+you can quote, and a problem you can only imagine. A `must` quotes the rule
+it breaks or the `file:line` that fails. Confidence 0-2 means you could not
 show it from the diff: leave it out. `must` and `should` at 3 or more block
 the verdict; `could` does not. If you find
 nothing, say "None" plainly; do not manufacture a nitpick to look
 thorough.
 
 You are read-only and stateless: you see this diff once, report on it
-once, and are not asked to weigh in on a revision — a later run reviews
+once, and are not asked to weigh in on a revision; a later run reviews
 the revision fresh, without memory of this one.
