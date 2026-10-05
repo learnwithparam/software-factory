@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# SubagentStop hook. Inside a factory stage, when factory-verifier's last message
-# says a command was refused or a criterion could not be verified, sends it back
-# once to re-run the command in an allowed form. Any error lets the stop through.
+# Stop hook. In the verify stage, when the session's last message says a command was
+# refused or a criterion could not be verified, sends it back once to re-run the
+# command in an allowed form. Any error lets the stop through.
 set -uo pipefail
 
-[ -n "${FACTORY_STAGE:-}" ] || exit 0
+[ "${FACTORY_STAGE:-}" = "verify" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 out="$(python3 -c '
 import json, re, sys
 event = json.load(sys.stdin)
-if event.get("agent_type") != "factory-verifier" or event.get("stop_hook_active"):
+if event.get("stop_hook_active"):
     sys.exit(0)
 text = event.get("last_assistant_message") or ""
 # A refusal names the command or tool refused, so "GET /admin is denied with 403" and a

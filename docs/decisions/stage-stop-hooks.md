@@ -22,8 +22,8 @@ claude 2.1.289, `-p`, dontAsk, a probe subagent ($0.03). The Stop input carries
    failed verify owes only its outcome and summary, since the runner reads nothing else. For
    verify, whose validator is deeper, the test asserts only that the hook never blocks a verdict
    the runner accepts.
-2. `stop-verifier-evidence.sh` blocks factory-verifier once (`stop_hook_active`) when its last
-   message names a command, shell or tool as denied or refused, or says a criterion could not be
+2. `stop-verifier-evidence.sh` blocks the verify stage's Stop once (`stop_hook_active`) when its
+   last message names a command, shell or tool as denied or refused, or says a criterion could not be
    verified. "GET /admin is denied with 403" names no command, so it is a result.
 3. `post-edit-check.sh` runs `postEditCommand` in the build stage after each edit, skipping the
    factory's own files under `.factory/` and the scratch dir. It is an argv list with `{file}` as

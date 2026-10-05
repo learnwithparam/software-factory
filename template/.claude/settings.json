@@ -33,13 +33,7 @@
             "type": "command",
             "command": ".claude/hooks/stop-artifact.sh",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": ".claude/hooks/stop-verifier-evidence.sh",

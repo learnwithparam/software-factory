@@ -1,6 +1,6 @@
 ---
 name: factory-verify
-description: Verifies a build against its plan by running the factory-verifier and factory-reviewer subagents, then writes a pass, reject, or uncertain verdict with per-AC evidence and a test-that-bites proof. Use as the verification stage, after build finished.
+description: Verifies a build against its plan by proving it (a test that fails without the change) and running the factory-reviewer subagent, then writes a pass, reject, or uncertain verdict with per-AC evidence and a test-that-bites proof. Use as the verification stage, after build finished.
 ---
 
 # factory-verify
@@ -27,26 +27,20 @@ the runner posts the verdict and moves the issue's label.
 Only when `triage.json`'s `type` is `ui`: read
 `.claude/skills/factory-verify/references/ui-route.md` and follow it alongside step 3, not instead of it.
 
-## 3. Run the subagents
+## 3. Prove it, then review it
 
-Read `plan.json`'s `proof` (absent means `test`) and pass it to
-`factory-verifier`.
-
-Dispatch to `factory-verifier` (fresh context) with the plan's AC-n, NG-n,
-`proof` and base branch. "When uncertain, reject" is its rule, not yours to
-override. If it reports a refused command, or says it could not run Bash,
-dispatch it once more with the refused command quoted and this line: "Bash
-works; that one command broke a shell rule. Rewrite it and continue." Only a
-second refusal makes the verdict `uncertain`.
+This session is already a fresh context, separate from build: prove the
+change yourself. Read `.claude/skills/factory-verify/references/prove.md`
+and follow it for the plan's `proof`, AC-n and NG-n. When uncertain, the
+verdict is `uncertain`; a refused command is not uncertainty.
 
 Dispatch to `factory-reviewer` (fresh context, read-only): correctness,
 security (injection, authz, secrets), and whether the diff crosses any
-NG-n. Collect its findings verbatim, do not soften or drop one, then
-re-check each yourself against the diff at the current head. Drop one the
-code does not support (confidence 0-2), and one the diff did not introduce
-(the base branch has it too): name that one in the comment as a separate
-issue, never as a reason to reject. Never keep a finding you could not
-reproduce from the diff.
+NG-n. Collect its findings verbatim, do not soften them. Drop only one the
+diff did not introduce (the base branch has it too): name it in the comment
+as a separate issue, never as a reason to reject. The runner drops any
+finding whose `where` is not on a line the diff changed, so give every
+`must`/`should` finding a `file:line`.
 
 ## 4. Decide the verdict
 
@@ -57,7 +51,7 @@ reproduce from the diff.
 - **reject**: any AC unproven, gate red, an NG-n crossed, or a blocking
   finding. The runner retries `factory-build` up to twice, then routes to
   a human automatically; just report `reject` honestly each time.
-- **uncertain**: the verifier or reviewer could not reach a confident
+- **uncertain**: the proof or the reviewer could not reach a confident
   answer, or round limit hit. Route to a human, don't guess.
 
 ## 5. Write the outputs

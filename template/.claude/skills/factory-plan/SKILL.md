@@ -18,9 +18,9 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
   `/factory revise <text>`: their feedback on the previous plan revision.
   `revision.md` beside it repeats that feedback with every earlier round
   of feedback and the previous summary; honour all of it.
-- `AGENTS.md`, `.factory/charter.md`, and the repo's skills index
-  (`.claude/skills/*/SKILL.md`, minus `factory-*`): what repo-specific
-  skills exist to apply (e.g. `handling-money`).
+- The charter and the repo skills index (one line per repo skill, e.g.
+  `handling-money`) are in your context pack. Open a skill's SKILL.md only
+  when you plan to name it.
 - `.factory/config.json`'s `routes[type].proof`: this issue's proof kind,
   `"test"` (default, when absent) or `"check"`. Carry it into `plan.json` so
   `factory-build` and `factory-verify` read it from there, never from the
@@ -28,12 +28,13 @@ runner posts and labels. Runs after `factory-triage` returned `proceed`.
 - `.factory/runs/issue-<N>/plan.json`, if this is a revision: read the
   current `revision` number so you increment it, not reset it.
 
-## 2. Research through the explorer, not yourself
+## 2. Research through Explore, not yourself
 
 Delegate codebase questions ("where does X live", "what calls it", "what
-tests cover it") to the `factory-explorer` subagent. Ask it targeted
-questions and use its conclusions; do not read the whole codebase into your
-own context doing the same search yourself.
+tests cover it") to the built-in `Explore` subagent. Ask it targeted
+questions, tell it to answer with file:line evidence using Grep, Glob and
+Read only (it does not get the shell rules), and use its conclusions; do
+not read the whole codebase into your own context doing the same search.
 
 ## 3. Write the plan
 

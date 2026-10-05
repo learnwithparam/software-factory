@@ -77,7 +77,7 @@ const STATE_DESCRIPTIONS: Record<StateLabel, string> = {
   "factory:planning": "factory-plan is writing the plan comment",
   "factory:awaiting-approval": "Plan posted, waiting on /factory approve",
   "factory:building": "factory-build is making the change on factory/issue-N",
-  "factory:verifying": "factory-verifier and factory-reviewer are checking the diff",
+  "factory:verifying": "proving the change and running factory-reviewer on the diff",
   "factory:in-review": "Draft PR open, waiting on human review and merge",
 };
 

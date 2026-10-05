@@ -202,8 +202,8 @@ describe("every inline shell command in the template passes the stage shell rule
 
 // Shape is not enough: dontAsk also refuses a command off the stage allow-list.
 // The verifier was told to run .factory/gates.sh, which only build may run.
-describe("every inline command in factory-verifier is on the verify allow-list", () => {
-  const body = readFileSync(join(import.meta.dir, "..", "template", ".claude", "agents", "factory-verifier.md"), "utf8");
+describe("every inline command in verify's prove reference is on the verify allow-list", () => {
+  const body = readFileSync(join(SKILLS_DIR, "factory-verify", "references", "prove.md"), "utf8");
   const allowed = stageAllowRules("verify", 1)
     .map((rule) => /^Bash\((.*)\)$/.exec(rule)?.[1])
     .filter((p): p is string => p !== undefined)

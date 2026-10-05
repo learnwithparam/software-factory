@@ -12,14 +12,14 @@ A human labels an issue `factory:ready`. The runner claims it, then drives five 
 Claude Code skill working in its own git worktree, then the runner opens the PR:
 
 1. **triage** classifies risk and posts a triage comment.
-2. **plan** researches the code (via `factory-explorer`) and posts a plan comment with acceptance
+2. **plan** researches the code (via Claude Code's built-in `Explore` subagent) and posts a plan comment with acceptance
    criteria and a risk verdict. Low risk with the auto-approve toggle on continues automatically;
    everything else waits on `/factory approve`.
 3. **build** makes the smallest test-first change. The runner, not the agent, then runs the
    repo's own `gates.sh` and parses its `FACTORY_GATES:` line as the only source of green/red, and
    commits everything the stage touched (excluding `.factory/runs`, the stage handoff itself).
-4. **verify** dispatches `factory-verifier` (proves the change actually causes the tests to fail
-   if reverted) and `factory-reviewer` (correctness, security, scope). Reject sends it back to
+4. **verify** runs in a fresh session, proves the change (reverts it and shows the new tests
+   fail) and dispatches `factory-reviewer` (correctness, security, scope). Reject sends it back to
    build, twice, then parks the issue on a human.
 5. **pr** fills the repo's PR template and hands the body back.
 6. The runner pushes the branch and opens the PR as a draft while it works, then marks it ready for review and labels the issue `factory:in-review`. A `/factory revise` puts it back to draft until the rebuild is done.
@@ -170,7 +170,7 @@ not just at the tool-call layer a hook can see:
 | Two runs can't both claim an issue | claiming builds a unique commit on top of `origin/<base>` (`commit-tree`) and pushes it without `--force`, a non-fast-forward rejection means another run already owns it (`src/git.ts`); pushing the *same* base SHA twice, the old bug, is a fast-forward no-op that lets both callers "win" |
 | A stage can't run away on cost or time | `maxBudgetUsd` per stage passed to `claude -p --max-budget-usd`; `stageTimeoutMinutes` and `maxToolCalls` kill a stuck or runaway process and park the run as `failed` |
 | Too many open PRs pauses new work | `maxOpenFactoryPrs` triggers a `STOP_IF` pause on intake, visible on the dashboard |
-| The writer doesn't grade its own work | the runner runs `.factory/gates.sh` itself and trusts only its `FACTORY_GATES:` line, never the agent's own `build.json: green` claim; `factory-verifier` also runs in a fresh subagent context and reverts the non-test hunk to confirm the new test actually fails before restoring it; optional `holdout` tests (`src/holdout.ts`) go further, staying sparse-checked-out of every stage's worktree so no agent can read or tune against them, and only the runner ever runs them |
+| The writer doesn't grade its own work | the runner runs `.factory/gates.sh` itself and trusts only its `FACTORY_GATES:` line, never the agent's own `build.json: green` claim; the verify stage also runs in a fresh session and reverts the non-test hunk to confirm the new test actually fails before restoring it; optional `holdout` tests (`src/holdout.ts`) go further, staying sparse-checked-out of every stage's worktree so no agent can read or tune against them, and only the runner ever runs them |
 | The dashboard isn't a public backdoor | binds `127.0.0.1` by default; a non-loopback `FACTORY_DASHBOARD_HOST` refuses to serve without `FACTORY_DASHBOARD_TOKEN` set; mutating routes require same-origin JSON, rejecting the `text/plain` a cross-site form can send without a CORS preflight |
 | An untrusted comment can't steer the agent | `src/chatops.ts#isTrusted` only accepts `OWNER`/`MEMBER`/`COLLABORATOR`; the CI workflow's own `if:` re-checks the same association before spending a runner-minute, and the runner re-derives trust from the thread regardless of what the workflow-level check already filtered |
 
@@ -183,9 +183,9 @@ layer actually lives in this repo:
 |---|---|---|
 | **Boundary** | What may it touch unattended? | `.factory/config.json`'s `protectedPaths`, `guard-paths.sh` (fails closed), `.claude/settings.json` deny rules, env scrub in `src/executor.ts`, the runner's own diff check (`src/boundary.ts`), CODEOWNERS, the trust rule, per-stage budgets and timeouts |
 | **Execution** | Where does it run, and what can it reach? | One git worktree per issue (`src/git.ts`), the `Executor` interface, claim-by-CAS, the worker pool (`src/pool.ts`), local/Docker/Actions run modes |
-| **Context** | What does the task need to know? | `issue.json` plus the rehydrated stage handoff (`src/rehydrate.ts`), the repo's `AGENTS.md`/charter, the `factory-explorer` subagent |
+| **Context** | What does the task need to know? | `issue.json` plus the rehydrated stage handoff (`src/rehydrate.ts`), the repo's `AGENTS.md`/charter, the built-in `Explore` subagent |
 | **Skills** | What know-how is reusable? | `template/.claude/skills/factory-{triage,plan,build,verify,pr}`, three repo-specific skills a target repo adds itself |
-| **Verification** | What proof exists before a human looks? | runner-run `gates.sh` (`src/gates.ts`), `factory-verifier` (reverts the fix, proves the new test actually catches it), `factory-reviewer`, the CI required check |
+| **Verification** | What proof exists before a human looks? | runner-run `gates.sh` (`src/gates.ts`), the verify stage (reverts the fix, proves the new test actually catches it), `factory-reviewer`, the CI required check |
 | **Delivery** | How does work reach a person, and who ships it? | a PR from the target repo's own PR template, a human merges it, branch protection, `factory scan` feeding new issues into intake |
 
 Teaching checkpoints are `checkpoint/<name>` tags in `learnwithparam/splitbill-demo`, one per
