@@ -57,6 +57,7 @@ export interface RouteConfig {
 export interface FactoryConfig {
   readonly repo: string; // "owner/name"
   readonly protectedPaths: readonly string[]; // globs the guard hook and triage refuse
+  readonly postEditCommand: readonly string[]; // argv the post-edit-check hook runs on each build edit; {file} is the path; [] is off
   readonly riskPolicy: RiskPolicy;
   readonly maxOpenFactoryPrs: number; // STOP_IF threshold (plan section 9: 3)
   readonly concurrency: number; // worktrees in flight at once
@@ -142,6 +143,7 @@ export function holdoutEnabled(holdout: HoldoutConfig): boolean {
 export const DEFAULT_CONFIG: FactoryConfig = {
   repo: "",
   protectedPaths: [],
+  postEditCommand: [],
   riskPolicy: { autoApproveLowRisk: true },
   maxOpenFactoryPrs: 3,
   concurrency: 3,
@@ -191,6 +193,7 @@ type Kind = "string" | "posInt" | "positive" | "boolean" | "strings" | "object";
 const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   repo: "string",
   protectedPaths: "strings",
+  postEditCommand: "strings",
   riskPolicy: "object",
   maxOpenFactoryPrs: "posInt",
   concurrency: "posInt",

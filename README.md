@@ -255,7 +255,9 @@ Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) a
 build). Stages get only what the config grants, through `--settings` on `claude -p`; a project
 `permissions.allow` block is ignored in headless mode. `gates.sh` prints
 `FACTORY_GATES: status=GREEN|RED|MISCONFIGURED passed=N failed=N skipped=N failed_gates=a,b`.
-Unknown keys and a missing `repo` are errors, other missing fields take the defaults in
+`postEditCommand` (off by default) is an argv list the build stage runs after every edit, with
+`{file}` replaced by the edited path, for example `["bunx", "biome", "check", "--write", "--no-errors-on-unmatched", "{file}"]` (the flag keeps an edit to a file Biome skips, such as Markdown, from failing);
+a failure's output goes straight back to the agent. Unknown keys and a missing `repo` are errors, other missing fields take the defaults in
 `src/config.ts`.
 
 ### Choosing the agent

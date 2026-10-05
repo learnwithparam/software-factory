@@ -6,7 +6,7 @@
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { runDir } from "../artifacts";
+import { JSON_FILENAMES, runDir } from "../artifacts";
 import type { RouteConfig } from "../config";
 import { buildContextPack } from "../context";
 import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
@@ -16,7 +16,7 @@ import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
 import { structuredCommand } from "./structured";
-import { replySchema } from "../schemas";
+import { replySchema, stageSchema } from "../schemas";
 import { typesFor } from "../labels";
 import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
@@ -25,6 +25,12 @@ import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } fro
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
 export const MAX_ARG_BYTES = 120 * 1024;
+// What the stop-artifact hook checks: only the stages whose file watch.ts requires and
+// validates (pr and retro owe none), and a stopped verify owes nothing but its outcome.
+export function stopArtifactSpec(stage: StageRunOptions["stage"], types: readonly string[]): Record<string, unknown> | undefined {
+  if (stage !== "triage" && stage !== "plan" && stage !== "build" && stage !== "verify") return undefined;
+  return { file: JSON_FILENAMES[stage], schema: stageSchema(stage, types), stoppedOwesOnlyOutcome: stage === "verify" };
+}
 
 export const MAX_EVENT_LINE_BYTES = 1 << 20;
 export const MAX_RECORDED_OUTPUT_BYTES = 64 << 20;
@@ -124,6 +130,9 @@ export class CommandExecutor implements Executor {
     let argv: readonly string[];
     let stdin: string | undefined;
     const types = typesFor(this.routes);
+    // The stop-artifact hook checks the stage's file against this before the agent stops.
+    const spec = readOnly ? undefined : stopArtifactSpec(opts.stage, types);
+    if (spec) writeFileSync(join(scratch, "artifact.schema.json"), JSON.stringify(spec));
     const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
     const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, skills);
     if (agent.preset?.ownsPrompt) {

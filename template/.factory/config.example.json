@@ -12,6 +12,8 @@
     "verify": ["TODO: the commands the verifier may run, e.g. make *"]
   },
   "protectedPaths": [".factory/**", ".claude/**", ".agents/**", ".github/**"],
+  "_postEditCommand": "optional: argv run after each build edit, {file} is the path, e.g. [\"bunx\", \"biome\", \"check\", \"--write\", \"--no-errors-on-unmatched\", \"{file}\"]",
+  "postEditCommand": [],
   "riskPolicy": { "autoApproveLowRisk": true },
   "maxOpenFactoryPrs": 3,
   "concurrency": 3,
