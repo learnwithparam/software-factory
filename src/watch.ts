@@ -41,6 +41,7 @@ import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { fireCron } from "./engine/triggers";
+import { TRUSTED_ROLES } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
 
@@ -62,7 +63,25 @@ function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, st
   return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);
 }
 
+// Intake trust (P36): a label is a request to spend tokens and push a branch,
+// so it counts only from someone who could push that branch themselves.
+// Anyone else's factory:ready is taken off with a comment saying why.
+async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<boolean> {
+  const by = await deps.github.labeledBy(config.repo, issue.number, LABEL.ready);
+  const role = by ? await deps.github.roleOf(config.repo, by) : "none";
+  if (TRUSTED_ROLES.includes(role)) return true;
+  await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
+  await postComment(
+    deps,
+    config,
+    issue.number,
+    `\`${LABEL.ready}\` was removed: ${by ? `@${by} has the ${role} role here` : "the issue history does not say who applied it"}, and the factory starts only for people with write access or higher. A maintainer can add the label again to start it.`,
+  );
+  return false;
+}
+
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
+  if (!(await readyIsTrusted(issue, deps, config))) return "untrusted";
   const claimed = await deps.git.claim(deps.cloneDir, issue.number, config.base);
   if (!claimed) {
     // Another runner may have claimed it first, or `factory:ready` was
@@ -408,22 +427,38 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
 // stage — was done. A shared `inFlight` set is what makes that safe instead
 // of a repeat of audit finding #2 (double-dispatch): an issue still being
 // worked by an earlier, still-running poll is invisible to a newer one.
-export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void): () => void {
+//
+// A webhook delivery (dashboard/server.ts records it in the same SQLite file,
+// from this process or the dashboard's own) polls straight away instead of
+// waiting out the interval.
+export const WEBHOOK_CHECK_MS = 2000;
+
+export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void, webhookCheckMs = WEBHOOK_CHECK_MS): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const inFlight = new Set<number>();
+  let seenDelivery = deps.state.latestDelivery();
 
   function tick(): void {
     if (stopped) return;
+    if (timer) clearTimeout(timer);
     pollOnce(deps, config, inFlight)
       .then((result) => onTick?.(result))
       .catch((err) => console.error("factory watch: poll failed", err));
     timer = setTimeout(tick, config.pollIntervalSeconds * 1000);
   }
 
+  const webhooks = setInterval(() => {
+    const latest = deps.state.latestDelivery();
+    if (latest === seenDelivery) return;
+    seenDelivery = latest;
+    tick();
+  }, webhookCheckMs);
+
   tick();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    clearInterval(webhooks);
   };
 }

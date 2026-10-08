@@ -7,7 +7,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
-import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
+import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus, type RepoRole } from "../src/github";
 import { Git } from "../src/git";
 import type { ChangedFile } from "../src/merge-policy";
 import type { GateRunner } from "../src/gates";
@@ -48,6 +48,16 @@ export class FakeGitHub extends GitHub {
 
   override async listOpenIssues(_repo: string): Promise<GhIssue[]> {
     return [...this.issues.values()].filter((i) => i.state !== "CLOSED");
+  }
+
+  // Who applied a label, and each login's role; by default a maintainer applied everything.
+  labelers = new Map<number, string | undefined>();
+  roles = new Map<string, RepoRole>([["maintainer", "admin"]]);
+  override async labeledBy(_repo: string, number: number): Promise<string | undefined> {
+    return this.labelers.has(number) ? this.labelers.get(number) : "maintainer";
+  }
+  override async roleOf(_repo: string, login: string): Promise<RepoRole> {
+    return this.roles.get(login) ?? "none";
   }
 
   override async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
@@ -200,10 +210,12 @@ export class FakeGitHub extends GitHub {
 
 export class FakeGit extends Git {
   claimResult = true;
+  claims = 0;
   pushed: number[] = [];
   committed: string[] = [];
 
   override async claim(): Promise<boolean> {
+    this.claims++;
     return this.claimResult;
   }
 

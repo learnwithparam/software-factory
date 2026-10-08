@@ -166,5 +166,13 @@
   {"name": "cron trigger: the poll fires it", "file": "src/watch.ts", "find": "  await fireCron(deps.github", "replace": "  if (false) await fireCron(deps.github", "test": "tests/triggers.test.ts"},
   {"name": "workflow: on.cron tz is checked", "file": "src/core/workflow.ts", "find": "      wallClock(new Date(0), tz);\n", "replace": "", "test": "tests/triggers.test.ts"},
   {"name": "clone: inherited credential helpers are cleared", "file": "src/repo.ts", "find": "  await run(runner, [\"config\", \"--local\", \"--replace-all\", \"credential.helper\", \"\"], dir);\n", "replace": "", "test": "tests/repo.test.ts"},
-  {"name": "clone: an existing clone is fixed too", "file": "src/repo.ts", "find": "    return dir;\n  }\n  await useGhCredentials(runner, dir);\n", "replace": "    return dir;\n  }\n", "test": "tests/repo.test.ts"}
+  {"name": "clone: an existing clone is fixed too", "file": "src/repo.ts", "find": "    return dir;\n  }\n  await useGhCredentials(runner, dir);\n", "replace": "    return dir;\n  }\n", "test": "tests/repo.test.ts"},
+  {"name": "trust: ready checks who labelled it", "file": "src/watch.ts", "find": "  if (!(await readyIsTrusted(issue, deps, config))) return \"untrusted\";\n", "replace": "", "test": "tests/intake-trust.test.ts"},
+  {"name": "trust: triage is not trusted", "file": "src/ports/scm.ts", "find": "\"admin\", \"maintain\", \"write\"]", "replace": "\"admin\", \"maintain\", \"write\", \"triage\"]", "test": "tests/intake-trust.test.ts"},
+  {"name": "trust: only a 404 means none", "file": "src/github.ts", "find": "if (result.code !== 0 && /HTTP 404/.test(result.stderr)) return \"none\";", "replace": "if (result.code !== 0) return \"none\";", "test": "tests/intake-trust.test.ts"},
+  {"name": "webhook: signature is checked", "file": "dashboard/server.ts", "find": "if (!signatureMatches(secret, body, req.headers.get(\"x-hub-signature-256\")))", "replace": "if (false)", "test": "tests/webhook.test.ts"},
+  {"name": "webhook: other repos are ignored", "file": "dashboard/server.ts", "find": "(repo && d.repo.toLowerCase() !== repo.toLowerCase())", "replace": "false", "test": "tests/webhook.test.ts"},
+  {"name": "webhook: a redelivery is one row", "file": "src/state.ts", "find": "INSERT OR IGNORE INTO webhook_deliveries", "replace": "INSERT OR REPLACE INTO webhook_deliveries", "test": "tests/webhook.test.ts"},
+  {"name": "webhook: the secret opens only its route", "file": "dashboard/server.ts", "find": "route?.label === WEBHOOK_ROUTE && webhookSecret() !== \"\"", "replace": "webhookSecret() !== \"\"", "test": "tests/webhook.test.ts"},
+  {"name": "webhook: a delivery wakes the watcher", "file": "src/watch.ts", "find": "    seenDelivery = latest;\n    tick();\n", "replace": "    seenDelivery = latest;\n", "test": "tests/webhook.test.ts"}
 ]

@@ -34,6 +34,7 @@ export type Outcome =
   | "shipped"
   | "cancelled"
   | "lost-claim"
+  | "untrusted"
   | "waiting";
 
 export interface WatchDeps {

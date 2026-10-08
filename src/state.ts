@@ -196,6 +196,14 @@ export class FactoryState {
         learned_at TEXT
       );
       CREATE INDEX IF NOT EXISTS retros_repo_status ON retros(repo, status);
+      CREATE TABLE IF NOT EXISTS webhook_deliveries (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        delivery_id TEXT NOT NULL UNIQUE,
+        event TEXT NOT NULL,
+        action TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        received_at TEXT NOT NULL
+      );
     `);
     // Forward-only and idempotent: safe to run on boot from several replicas.
     const have = new Set((this.db.query("PRAGMA table_info(stage_runs)").all() as { name: string }[]).map((c) => c.name));
@@ -510,6 +518,20 @@ export class FactoryState {
     this.db
       .query("INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
       .run({ $key: key, $value: value ? "1" : "0" });
+  }
+
+  // One row per GitHub delivery id; false when GitHub redelivered one already seen.
+  recordDelivery(d: { id: string; event: string; action: string; repo: string }, at = new Date()): boolean {
+    const r = this.db
+      .query("INSERT OR IGNORE INTO webhook_deliveries (delivery_id, event, action, repo, received_at) VALUES ($id, $event, $action, $repo, $at)")
+      .run({ $id: d.id, $event: d.event, $action: d.action, $repo: d.repo, $at: at.toISOString() });
+    return r.changes > 0;
+  }
+
+  // The newest delivery's sequence number; the watcher polls early when it moves.
+  latestDelivery(): number {
+    const row = this.db.query("SELECT MAX(seq) AS seq FROM webhook_deliveries").get() as { seq: number | null };
+    return row.seq ?? 0;
   }
 
   // A free-form value in the same key table as the toggles (a cron trigger's last-checked minute).
