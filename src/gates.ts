@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { ExecutionPort } from "./ports/execution";
 import type { GateResult, GateRunner } from "./ports/check";
 import { LocalExecution } from "./adapters/local/execution";
+import { gateCount } from "./config";
 export type { GateResult, GateRunner };
 
 const LINE_RE = /FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+skipped=(\d+)\s+failed_gates=(\S*)/;
@@ -56,8 +57,7 @@ export function hasNoGates(worktreeDir: string): boolean {
   const file = join(worktreeDir, ".factory", "config.json");
   if (!existsSync(file)) return false;
   try {
-    const gates = (JSON.parse(readFileSync(file, "utf8")) as { gates?: unknown }).gates;
-    return gates === undefined || (Array.isArray(gates) && gates.length === 0);
+    return gateCount(JSON.parse(readFileSync(file, "utf8"))) === 0;
   } catch {
     return false;
   }

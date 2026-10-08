@@ -290,6 +290,11 @@ proof reverts the change and runs the `role: "test"` gate, or the one named `tes
 the PR's run summary says the proof was unavailable. A config with no gates parks each issue
 before the build agent runs, with a comment saying how to add one. A docs-only repo needs only a
 lint or link-check gate.
+In a monorepo, `packages` lists each package as `{ "path": "packages/api", "gates": [...] }`. Its
+gates run from its own directory, and only when the diff against `base` touches a file under its
+path; `"always": true` runs them every time. Top-level `gates` always run. With no base to diff
+against, or a diff that touches no package, every package runs. The proof runs only a top-level
+test gate.
 `postEditCommand` (off by default) is an argv list the build stage runs after every edit, with
 `{file}` replaced by the edited path, for example `["bunx", "biome", "check", "--write", "--no-errors-on-unmatched", "{file}"]` (the flag keeps an edit to a file Biome skips, such as Markdown, from failing);
 a failure's output goes straight back to the agent. Unknown keys and a missing `repo` are errors, other missing fields take the defaults in

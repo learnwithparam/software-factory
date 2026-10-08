@@ -3,7 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { configProblems, DEFAULT_CONFIG, holdoutEnabled, loadConfig, testGate } from "../src/config";
+import { configProblems, DEFAULT_CONFIG, gateCount, holdoutEnabled, loadConfig, testGate } from "../src/config";
+import { hasNoGates } from "../src/gates";
+import { isFilledIn } from "../src/init";
 
 const dir = mkdtempSync(join(tmpdir(), "factory-cfg-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -129,6 +131,33 @@ describe("config validation at boot", () => {
     expect(configProblems({ ...DEFAULT_CONFIG, repo: "a/b" })).toEqual([]);
     const example = JSON.parse(readFileSync(join(import.meta.dir, "../template/.factory/config.example.json"), "utf8"));
     expect(configProblems(example)).toEqual([]);
+  });
+});
+
+describe("packages", () => {
+  const fixture = JSON.parse(readFileSync(join(import.meta.dir, "fixtures", "monorepo", ".factory", "config.json"), "utf8"));
+
+  test("the two-package fixture is a valid config", () => {
+    expect(configProblems(fixture)).toEqual([]);
+  });
+
+  test("a package needs a relative path and its own valid gates", () => {
+    expect(configProblems({ repo: "a/b", packages: [{ path: "../x", gates: [] }, { gates: [{ name: "t", cmd: "x", required: true, role: "unit" }] }, { path: "p", gates: [], owners: ["@a"] }] })).toEqual([
+      'packages[0].path: must be relative to the repo root, got "../x"',
+      "packages[1].path: required",
+      'packages[1].gates[0].role: "unit" is not one of test, lint, typecheck, build, format, audit, docs',
+      "packages[2].owners: unknown key (allowed: path, gates, always)",
+    ]);
+  });
+
+  test("package gates count as gates: doctor, init and the build step's no-gates park agree", () => {
+    const onlyPackages = { repo: "a/b", gates: [], packages: [{ path: "p", gates: [{ name: "t", cmd: "x", required: true }] }] };
+    expect(gateCount(fixture)).toBe(4);
+    expect(gateCount(onlyPackages)).toBe(1);
+    expect(isFilledIn(JSON.stringify(onlyPackages))).toBe(true);
+    const d = repoWith(onlyPackages);
+    expect(hasNoGates(d)).toBe(false);
+    expect(hasNoGates(repoWith({ repo: "a/b", gates: [], packages: [] }))).toBe(true);
   });
 });
 

@@ -3,7 +3,7 @@
 
 import type { CommandRunner, ScmPort } from "./github";
 import { labelsFor } from "./labels";
-import type { RouteConfig, RuntimeConfig } from "./config";
+import { gateCount, type RouteConfig, type RuntimeConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
@@ -377,8 +377,7 @@ function parseManifest(text: string | undefined): Record<string, string> | undef
 function gatesIn(text: string | undefined): number | undefined {
   if (text === undefined) return undefined;
   try {
-    const gates = (JSON.parse(text) as { gates?: unknown }).gates;
-    return Array.isArray(gates) ? gates.length : 0;
+    return gateCount(JSON.parse(text));
   } catch {
     return undefined;
   }

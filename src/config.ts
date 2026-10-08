@@ -45,6 +45,24 @@ export interface GateSpec {
   readonly role?: GateRole;
 }
 
+// A package in a monorepo: its gates run from its own directory, and only when
+// the diff touches a file under `path` (or `always` is set). Top-level gates always run.
+export interface PackageSpec {
+  readonly path: string; // relative to the repo root, e.g. "packages/api"
+  readonly gates: readonly GateSpec[];
+  readonly always?: boolean;
+}
+
+// The one count of gates a config defines, top-level and per package. Doctor,
+// init and the build step's no-gates check all read it. Unparsable is 0.
+export function gateCount(raw: unknown): number {
+  if (typeof raw !== "object" || raw === null) return 0;
+  const cfg = raw as { gates?: unknown; packages?: unknown };
+  const n = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+  const packages = Array.isArray(cfg.packages) ? cfg.packages : [];
+  return n(cfg.gates) + packages.reduce((sum: number, p) => sum + n((p as { gates?: unknown } | null)?.gates), 0);
+}
+
 export const GATE_ROLES = ["test", "lint", "typecheck", "build", "format", "audit", "docs"] as const;
 export type GateRole = (typeof GATE_ROLES)[number];
 
@@ -81,6 +99,8 @@ export interface FactoryConfig {
   readonly stageTimeoutMinutes: number; // kills a stuck `claude` process (audit finding #15)
   readonly maxToolCalls: number; // kills a runaway stage before it burns budget
   readonly gates: readonly GateSpec[]; // read by .factory/gates.sh
+  // Monorepo packages, each with its own gates; see PackageSpec.
+  readonly packages?: readonly PackageSpec[];
   // Opt-in: `reset`/`rebaseline` refuse on any repo where this is false (the
   // default), so a live repo (lwp-website) can never be force-pushed back to
   // a baseline tag by a stray `factory reset` (plan v2.6.2 item 2).
@@ -246,6 +266,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   stageTimeoutMinutes: "posInt",
   maxToolCalls: "posInt",
   gates: "object",
+  packages: "object",
   resettable: "boolean",
   setup: "strings",
   agentCommands: "object",
@@ -321,19 +342,32 @@ export function configProblems(raw: unknown): string[] {
       else problems.push(`holdout.${key}: unknown key (allowed: paths, cmd)`);
     }
   }
-  if (cfg.gates !== undefined) {
-    if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");
-    else cfg.gates.forEach((g, i) => {
-      if (typeof g !== "object" || g === null) problems.push(`gates[${i}]: expected an object`);
-      else {
-        const gate = g as Record<string, unknown>;
-        checkKeys(gate, { name: "string", cmd: "string", required: "boolean", role: "string" }, `gates[${i}].`, problems);
-        if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role)) problems.push(`gates[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
-      }
+  if (cfg.gates !== undefined) gateProblems(cfg.gates, "gates", problems);
+  if (cfg.packages !== undefined) {
+    if (!Array.isArray(cfg.packages)) problems.push("packages: expected a list");
+    else cfg.packages.forEach((p, i) => {
+      const where = `packages[${i}]`;
+      if (typeof p !== "object" || p === null) return problems.push(`${where}: expected an object`);
+      const pkg = p as Record<string, unknown>;
+      checkKeys(pkg, { path: "string", gates: "object", always: "boolean" }, `${where}.`, problems);
+      if (typeof pkg.path !== "string" || !pkg.path) problems.push(`${where}.path: required`);
+      else if (pkg.path.startsWith("/") || pkg.path.split("/").includes("..")) problems.push(`${where}.path: must be relative to the repo root, got ${JSON.stringify(pkg.path)}`);
+      if (pkg.gates === undefined) problems.push(`${where}.gates: required`);
+      else gateProblems(pkg.gates, `${where}.gates`, problems);
     });
   }
   problems.push(...agentProblems(cfg.agents, cfg.stages, cfg.routes));
   return problems;
+}
+
+function gateProblems(list: unknown, where: string, problems: string[]): void {
+  if (!Array.isArray(list)) return void problems.push(`${where}: expected a list`);
+  list.forEach((g, i) => {
+    if (typeof g !== "object" || g === null) return problems.push(`${where}[${i}]: expected an object`);
+    const gate = g as Record<string, unknown>;
+    checkKeys(gate, { name: "string", cmd: "string", required: "boolean", role: "string" }, `${where}[${i}].`, problems);
+    if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role)) problems.push(`${where}[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
+  });
 }
 
 const STAGE_KEYS = ["default", "triage", "plan", "build", "verify", "pr", "retro"];

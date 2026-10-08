@@ -3,14 +3,14 @@
 // init fills only what it read from the repo: repo, gates, setup and the
 // commands the build and verify stages may run.
 
+import { gateCount } from "./config";
 import type { Stack } from "./stack";
 
 // A config a person has filled in (no TODO, at least one gate) is theirs: init leaves it alone.
 export function isFilledIn(text: string | undefined): boolean {
   if (text === undefined || text.includes("TODO")) return false;
   try {
-    const gates = (JSON.parse(text) as { gates?: unknown }).gates;
-    return Array.isArray(gates) && gates.length > 0;
+    return gateCount(JSON.parse(text)) > 0;
   } catch {
     return false;
   }

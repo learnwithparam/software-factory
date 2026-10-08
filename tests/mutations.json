@@ -244,5 +244,11 @@
   {"name": "init: the lockfile picks the package manager", "file": "src/stack.ts", "find": "files.exists(\"pnpm-lock.yaml\") ? \"pnpm\" : ", "replace": "", "test": "tests/stack.test.ts"},
   {"name": "init: a Makefile check target wins", "file": "src/stack.ts", "find": "  if (targets.has(\"check\")) {", "replace": "  if (false) {", "test": "tests/stack.test.ts"},
   {"name": "init: a filled-in config is left alone", "file": "src/cli.ts", "find": "  if (isFilledIn(current) && !has(\"force\")) {", "replace": "  if (false) {", "test": "tests/stack.test.ts"},
-  {"name": "init: the written config carries the detected gates", "file": "src/init.ts", "find": "    gates: stack.gates,\n", "replace": "", "test": "tests/stack.test.ts"}
+  {"name": "init: the written config carries the detected gates", "file": "src/init.ts", "find": "    gates: stack.gates,\n", "replace": "", "test": "tests/stack.test.ts"},
+  {"name": "gates.sh: an untouched package's gates do not run", "file": "template/.factory/gates.sh", "find": "if [ -z \"$changed\" ] || printf", "replace": "if true || printf", "test": "tests/gates.test.ts"},
+  {"name": "gates.sh: a diff that touches no package runs every package", "file": "template/.factory/gates.sh", "find": "[ \"$touched\" -eq 0 ]", "replace": "[ \"$touched\" -eq 9 ]", "test": "tests/gates.test.ts"},
+  {"name": "gates.sh: an always package runs untouched", "file": "template/.factory/gates.sh", "find": ".packages[$i].always // false", "replace": ".packages[$i].never // false", "test": "tests/gates.test.ts"},
+  {"name": "gates.sh: uncommitted changes count as touching a package", "file": "template/.factory/gates.sh", "find": " git diff --name-only HEAD; git ls-files --others --exclude-standard;", "replace": "", "test": "tests/gates.test.ts"},
+  {"name": "config: package gates count as gates", "file": "src/config.ts", "find": "return n(cfg.gates) + packages.reduce", "replace": "return n(cfg.gates) + 0 * packages.reduce", "test": "tests/config.test.ts"},
+  {"name": "config: a package path may not leave the repo", "file": "src/config.ts", "find": ".split(\"/\").includes(\"..\")", "replace": ".split(\"/\").includes(\"...\")", "test": "tests/config.test.ts"}
 ]
