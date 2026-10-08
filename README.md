@@ -87,6 +87,7 @@ The issue's label is the state. Everything else is derived from the thread.
 | `factory:failed` | a stage broke (timeout, red gates, boundary, denied tool) | `/factory retry` |
 | `factory:needs-human` | refused or out of rounds | `/factory retry` |
 | `factory:monitor` | filed by `factory scan` from a production signal; a provenance label, not a stage | nothing, it stays on the issue |
+| `factory:ledger` | the one issue that holds the spend ledger when spend is kept on GitHub: one comment per worker per UTC day | leave it open; caps read it |
 
 ## Where a human acts
 

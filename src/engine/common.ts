@@ -20,6 +20,7 @@ import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
 import { withLease, type Held, type LeaseOpts } from "./lease";
 import type { LeasePort } from "../ports/lease";
+import type { SpendEntry, SpendStore, SpendTotal } from "../ports/spend";
 import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
@@ -62,6 +63,10 @@ export interface WatchDeps {
   // so workers on other machines, CI jobs and cloud routines never run the
   // same issue at once, and a crashed worker's issue is reclaimed after the TTL.
   readonly leases?: { readonly port: LeasePort; readonly holder: string; readonly opts?: LeaseOpts; readonly held: Map<number, Held> };
+  // Absent: caps read this machine's SQLite. Present: every stage's spend is
+  // also recorded here and caps read the larger of the two, so they hold
+  // across every worker.
+  readonly spend?: SpendStore;
   // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
   readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
   // Absent means this process alone decides concurrency (config.concurrency,
@@ -308,7 +313,7 @@ export async function runStage(
     killed_reason: result.killedReason ?? null,
     session_id: result.sessionId ?? null,
   });
-  if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
+  await recordSpend(deps, config, { issue: issueNumber, stage, costUsd, tokensIn: result.tokensIn, tokensOut: result.tokensOut, at: startedAt.toISOString() });
   deps.state.updateRun(config.repo, issueNumber, {
     tool_calls: run.tool_calls + result.toolCalls,
     tokens_in: run.tokens_in + result.tokensIn,
@@ -317,6 +322,14 @@ export async function runStage(
   });
   if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
   return result;
+}
+
+// The machine's tally and the shared store, after stage_runs. A shared store
+// that can't be written is logged, not fatal: the stage's work is done, and
+// SQLite still has the row.
+async function recordSpend(deps: WatchDeps, config: FactoryConfig, e: SpendEntry): Promise<void> {
+  if (e.costUsd !== null) deps.machine?.spend.record(config.repo, e.costUsd);
+  await deps.spend?.record(e).catch((err) => console.error(`[spend] #${e.issue} ${e.stage}: ${err instanceof Error ? err.message : err}`));
 }
 
 // The transcript and live-file paths for a stage, and the issue's window
@@ -379,7 +392,7 @@ export async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: Gh
       killed_reason: result.killedReason ?? null,
       session_id: result.sessionId ?? null,
     });
-    if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
+    await recordSpend(deps, config, { issue: issueNumber, stage: "retro", costUsd, tokensIn: result.tokensIn, tokensOut: result.tokensOut, at: startedAt.toISOString() });
     const art = await readStageArtifacts(worktree, issueNumber, "retro");
     deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
   } catch (err) {
@@ -434,6 +447,18 @@ export function failureTail(text: string): string {
 
 export const EPOCH = "1970-01-01T00:00:00.000Z";
 
+// The repo's spend today: every worker's, from the shared store when there is one.
+export async function repoSpendToday(deps: WatchDeps, config: FactoryConfig): Promise<SpendTotal> {
+  return larger(deps.state.spendSummary(config.repo, startOfTodayUtc()), await deps.spend?.since(startOfTodayUtc()));
+}
+
+// This machine's own spend is always in SQLite, so a shared store that missed
+// a write (an outage, a missing label) can never read lower than it.
+function larger(local: SpendTotal, shared: SpendTotal | undefined): SpendTotal {
+  if (!shared) return local;
+  return { costUsd: Math.max(local.costUsd, shared.costUsd), unreportedRuns: Math.max(local.unreportedRuns, shared.unreportedRuns) };
+}
+
 export function startOfTodayUtc(): string {
   return `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
 }
@@ -442,16 +467,16 @@ export function startOfTodayUtc(): string {
 // spend and unreported-run count, this repo's spend today, and — when a
 // machine is configured — the whole machine's spend today. The first
 // breached cap wins and its message is what parks the issue.
-export function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): string | undefined {
+export async function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): Promise<string | undefined> {
   const { perIssueUsd, dailyUsd, maxUnreportedRuns } = config.spend;
-  const perIssue = deps.state.spendSummary(config.repo, EPOCH, issueNumber);
+  const perIssue = larger(deps.state.spendSummary(config.repo, EPOCH, issueNumber), await deps.spend?.issue(issueNumber));
   if (perIssueUsd !== undefined && perIssue.costUsd >= perIssueUsd) {
     return `this issue has spent $${perIssue.costUsd.toFixed(2)}, at or over its perIssueUsd cap of $${perIssueUsd.toFixed(2)}`;
   }
   if (maxUnreportedRuns !== undefined && perIssue.unreportedRuns >= maxUnreportedRuns) {
     return `this issue has ${perIssue.unreportedRuns} stage run(s) with unknown cost, at or over the maxUnreportedRuns cap of ${maxUnreportedRuns}`;
   }
-  const repoToday = deps.state.spendSummary(config.repo, startOfTodayUtc());
+  const repoToday = await repoSpendToday(deps, config);
   if (dailyUsd !== undefined && repoToday.costUsd >= dailyUsd) {
     return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
   }

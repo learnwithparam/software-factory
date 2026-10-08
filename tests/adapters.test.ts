@@ -8,13 +8,15 @@ import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
 import { DockerExecution } from "../src/adapters/docker/execution";
 import { GitLeases } from "../src/adapters/git-lease/lease";
+import { GitHubSpend } from "../src/adapters/github-store/spend";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 import { executionContract } from "./ports/execution.contract";
 import { leaseContract } from "./ports/lease.contract";
-import { FakeLeases } from "./harness";
+import { spendContract } from "./ports/spend.contract";
+import { baseIssue, FakeGitHub, FakeLeases } from "./harness";
 
 // A fake that obeys the contract by running through bash too: what a test
 // double of a remote runtime looks like when it is held to the same suite.
@@ -54,6 +56,11 @@ function gitLeases() {
 
 const REGISTRY: Record<string, () => void> = {
   "git-lease": () => leaseContract("git-lease", gitLeases),
+  "github-store": () =>
+    spendContract("github-store", () => {
+      const github = new FakeGitHub([1, 2, 3, 4].map((n) => baseIssue(n, [])));
+      return { store: new GitHubSpend(github, "a/b", "me"), worker: (holder) => new GitHubSpend(github, "a/b", holder) };
+    }),
   local: () => executionContract("local", () => new LocalExecution()),
   docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
   lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),

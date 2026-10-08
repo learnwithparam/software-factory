@@ -29,9 +29,9 @@ import {
   labelsOf,
   leased,
   postComment,
+  repoSpendToday,
   runQueuedRetros,
   runRetro,
-  startOfTodayUtc,
   worktreeFor,
   type Outcome,
   type RunCtx,
@@ -361,7 +361,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // an issue already in flight keeps going, since checkSpendCap parks it on
   // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
   const repoDailyUsd = config.spend.dailyUsd;
-  const repoDailyCapHit = repoDailyUsd !== undefined && deps.state.spendSummary(config.repo, startOfTodayUtc()).costUsd >= repoDailyUsd;
+  const repoDailyCapHit = repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd;
   const machineDailyUsd = deps.machine?.config.dailyUsd;
   const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;

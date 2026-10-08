@@ -37,6 +37,7 @@ import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { workflowFor } from "./engine/workflows";
 import { GitLeases } from "./adapters/git-lease/lease";
+import { GitHubSpend } from "./adapters/github-store/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 
 const args = process.argv.slice(2);
@@ -98,12 +99,15 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
   const runtimes = runtimesFrom(machineConfig.runtimes);
   const unknown = unknownRuntimes(runtimeRefs(config, workflow.steps), runtimes);
   if (unknown.length) throw new Error(unknown.join("\n"));
+  const github = new GitHub();
+  // This process, as leases and the spend ledger name it.
+  const holder = `${hostname()}-${process.pid}`;
   return {
     workflow,
     runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
-    github: new GitHub(),
+    github,
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
@@ -120,7 +124,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
     // Issue leases on the repo's own remote, so watchers on other machines,
     // CI jobs and cloud routines driving the same repo never run one issue twice.
-    leases: { port: new GitLeases(cloneDir), holder: `${hostname()}-${process.pid}`, held: new Map() },
+    leases: { port: new GitLeases(cloneDir), holder, held: new Map() },
+    // Spend on the issue and the ledger issue, so caps hold across all of them too.
+    spend: new GitHubSpend(github, config.repo, holder),
   };
 }
 

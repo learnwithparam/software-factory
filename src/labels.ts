@@ -27,6 +27,7 @@ export const LABEL = {
   needsHuman: "factory:needs-human",
   failed: "factory:failed",
   monitor: "factory:monitor",
+  ledger: "factory:ledger",
 } as const;
 
 // One state label at a time: where an issue sits in the lifecycle (plan section 1).
@@ -45,7 +46,7 @@ export const STATE_LABELS = [
 export const PARKED_LABELS = [LABEL.needsInfo, LABEL.needsHuman, LABEL.failed] as const;
 
 // Provenance: how the issue was filed.
-export const PROVENANCE_LABELS = [LABEL.monitor] as const;
+export const PROVENANCE_LABELS = [LABEL.monitor, LABEL.ledger] as const;
 
 // Type: set by the issue form, read by triage/plan for risk policy. This is
 // the default list; a repo may add types via config.routes (e.g. lwp adds
@@ -89,6 +90,7 @@ const PARKED_DESCRIPTIONS: Record<ParkedLabel, string> = {
 
 const PROVENANCE_DESCRIPTIONS: Record<ProvenanceLabel, string> = {
   "factory:monitor": "Filed by factory scan from a production signal",
+  "factory:ledger": "The factory's spend ledger: one comment per worker per day",
 };
 
 const TYPE_DESCRIPTIONS: Record<TypeLabel, string> = {
