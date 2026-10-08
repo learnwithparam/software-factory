@@ -23,6 +23,18 @@ interface StreamJsonLine {
   };
   usage?: unknown;
   permission_denials?: Array<{ tool_name?: string; tool_input?: { file_path?: string; command?: string } }>;
+  // On the init event. A server that could not start reports status "failed"
+  // (seen on 2.1.294); the *_errors arrays are absent when nothing failed.
+  mcp_servers?: Array<{ name?: string; status?: string }>;
+  plugin_errors?: unknown[];
+  mcp_server_errors?: unknown[];
+}
+
+// What on the init event means the stage started without the setup it asked for.
+function startupProblems(init: StreamJsonLine): string[] {
+  const failed = (init.mcp_servers ?? []).filter((s) => s.status === "failed").map((s) => `MCP server ${s.name ?? "?"} failed to start`);
+  const errors = [...(init.plugin_errors ?? []), ...(init.mcp_server_errors ?? [])].map((e) => (typeof e === "string" ? e : JSON.stringify(e)));
+  return [...failed, ...errors];
 }
 
 export function parseStreamJsonLine(line: string): StageEvent[] {
@@ -37,8 +49,9 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
   }
   const events: StageEvent[] = [];
 
-  if (parsed.type === "system" && parsed.subtype === "init" && parsed.session_id) {
-    events.push({ kind: "session", sessionId: parsed.session_id, text: parsed.session_id });
+  if (parsed.type === "system" && parsed.subtype === "init") {
+    if (parsed.session_id) events.push({ kind: "session", sessionId: parsed.session_id, text: parsed.session_id });
+    for (const problem of startupProblems(parsed)) events.push({ kind: "startup_error", text: problem });
   } else if (parsed.type === "assistant" && parsed.message?.content) {
     for (const block of parsed.message.content) {
       if (block.type === "text" && block.text) {
@@ -130,6 +143,8 @@ export const claudePreset: AgentPreset = {
   verified: true,
   version: "2.1.286",
   envKeys: ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+  // A headless stage has no one to resume a background task for, and no reason to phone home.
+  env: { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
   readOnlyBy: "the stage allow-list under `dontAsk`",
   skillsDir: ".claude/skills",
   contextFile: "CLAUDE.md",

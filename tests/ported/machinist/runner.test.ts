@@ -79,7 +79,10 @@ describe("process group", () => {
     expect(result.killedReason).toContain("stageTimeoutMinutes");
     expect(result.exitCode).not.toBe(0);
     const pid = Number(readFileSync(marker, "utf8"));
-    expect(() => process.kill(pid, 0)).toThrow(); // the grandchild is gone
+    // SIGKILL lands asynchronously; under load the grandchild can outlive the stage by a few ms.
+    const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    for (let waited = 0; alive() && waited < 2_000; waited += 50) await Bun.sleep(50);
+    expect(alive()).toBe(false); // the grandchild is gone
   });
 
   test("a descendant that keeps the output pipe open does not hang a finished stage", async () => {

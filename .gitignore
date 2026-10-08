@@ -5,3 +5,5 @@ workspaces/
 .DS_Store
 artifacts/
 .worktrees/
+.factory-home/
+.factory-wt.env

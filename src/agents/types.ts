@@ -48,6 +48,8 @@ export interface AgentPreset {
   readonly version: string;
   // Provider keys this agent may see. Every other known provider key is stripped from its env.
   readonly envKeys: readonly string[];
+  // Set on every stage run of this agent, after the parent env is sanitized.
+  readonly env?: Readonly<Record<string, string>>;
   // What keeps a read-only stage read-only for this agent (shown in docs/agents.md).
   readonly readOnlyBy: string;
   // Project directory `install --agents` links the skills into, and the context file it points at.

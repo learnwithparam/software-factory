@@ -17,11 +17,14 @@ export const PRICES: Readonly<Record<string, Price>> = {
   "claude-opus-4-5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25, source: ANTHROPIC, asOf: "2026-09-24" },
   "claude-sonnet-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5, source: ANTHROPIC, asOf: "2026-09-27" },
   "claude-opus-5-5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5, source: ANTHROPIC, asOf: "2026-09-27" },
+  "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5, source: ANTHROPIC, asOf: "2026-10-08" },
+  "claude-fable-5-1": { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5, source: ANTHROPIC, asOf: "2026-10-08" },
 };
 
 // Models the docs and example config name whose price has not been sourced yet.
 // Each one shows "Not reported" until a row moves into PRICES.
 export const UNPRICED: Readonly<Record<string, string>> = {
+  "claude-haiku-5-5": "tiered by prompt size (100K tokens); Price has one rate, so it stays unpriced",
   "gpt-5.6-terra": "OpenAI list price not yet captured (needs a source URL)",
 };
 

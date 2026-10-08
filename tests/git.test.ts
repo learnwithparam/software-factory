@@ -10,7 +10,7 @@ import { afterEach, describe, expect, test, setDefaultTimeout } from "bun:test";
 
 // Real git processes: a loaded machine can exceed bun's 5s default.
 setDefaultTimeout(30_000);
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Git, GitCommandRunner, sparseCheckoutPatterns } from "../src/git";
@@ -157,6 +157,42 @@ describe("Git.changedFiles", () => {
     const { clones } = await bareOriginWithClones(root, ["clone-a"]);
     const git = new Git(new GitCommandRunner());
     expect(await git.changedFiles(clones[0]!, "main")).toEqual([]);
+  });
+});
+
+describe("Git.diffStat", () => {
+  test("lists both sides of a rename, each file's mode, binaries, and only the given head's diff", async () => {
+    const root = tmpRoot();
+    const clone = (await bareOriginWithClones(root, ["clone-a"])).clones[0]!;
+    const commit = (m: string) => run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", m], clone);
+    await run(["git", "checkout", "-b", "factory/issue-6"], clone);
+    mkdirSync(join(clone, "moved"));
+    await run(["git", "mv", "README.md", "moved/README.md"], clone);
+    writeFileSync(join(clone, "run.sh"), "echo hi\n", { mode: 0o755 });
+    writeFileSync(join(clone, "logo.bin"), Buffer.from([0, 1, 2, 0, 255]));
+    symlinkSync("moved/README.md", join(clone, "link"));
+    await run(["git", "add", "-A"], clone);
+    await commit("shape");
+    const judged = (await run(["git", "rev-parse", "HEAD"], clone)).trim();
+    writeFileSync(join(clone, "later.ts"), "x\n");
+    await run(["git", "add", "-A"], clone);
+    await commit("after the PR head");
+
+    const files = await new Git(new GitCommandRunner()).diffStat(clone, "main", judged);
+    const byPath = Object.fromEntries(files.map((f) => [f.path, f]));
+    expect(Object.keys(byPath).sort()).toEqual(["README.md", "link", "logo.bin", "moved/README.md", "run.sh"]);
+    expect(byPath["README.md"]!.mode).toBe("000000");
+    expect(byPath["moved/README.md"]!.mode).toBe("100644");
+    expect(byPath["run.sh"]!.mode).toBe("100755");
+    expect(byPath["link"]!.mode).toBe("120000");
+    expect(byPath["logo.bin"]!.binary).toBe(true);
+    expect(byPath["run.sh"]!.binary).toBeUndefined();
+  });
+
+  test("throws when the head is not in the clone, so the merge fails closed", async () => {
+    const root = tmpRoot();
+    const clone = (await bareOriginWithClones(root, ["clone-a"])).clones[0]!;
+    await expect(new Git(new GitCommandRunner()).diffStat(clone, "main", "0".repeat(40))).rejects.toThrow("git diff");
   });
 });
 

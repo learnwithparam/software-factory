@@ -159,8 +159,8 @@ describe("factory takeover helpers", () => {
       "factory takeover: claude --resume s1  (in /w/issue-3; exit to hand back)",
       "factory takeover: Claude will ask to trust this worktree: choose Yes",
     ]);
-    // bin/factory prints it before it hands over the terminal.
-    const bin = readFileSync("bin/factory", "utf8");
+    // The CLI prints it before it hands over the terminal.
+    const bin = readFileSync("src/cli.ts", "utf8");
     expect(bin.indexOf("takeoverBanner(argv, worktree)")).toBeGreaterThan(-1);
     expect(bin.indexOf("takeoverBanner(argv, worktree)")).toBeLessThan(bin.indexOf("Bun.spawn(argv, { cwd: worktree"));
   });

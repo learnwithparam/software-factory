@@ -6,6 +6,7 @@ import { EXIT, failureJson, successJson } from "../src/cli-output";
 import { ConfigError } from "../src/config";
 
 const bin = join(import.meta.dir, "..", "bin", "factory");
+const cli = join(import.meta.dir, "..", "src", "cli.ts");
 const dir = mkdtempSync(join(tmpdir(), "factory-cli-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -60,13 +61,13 @@ test("the README exit-code table lists every code the CLI can return", () => {
   for (const code of Object.values(EXIT)) expect(readme).toMatch(new RegExp(`^\\| ${code} \\|`, "m"));
 });
 
-test("bin/factory exits only through EXIT, never a bare number", () => {
-  const src = readFileSync(bin, "utf8");
+test("the CLI exits only through EXIT, never a bare number", () => {
+  const src = readFileSync(cli, "utf8");
   expect([...src.matchAll(/process\.exit\((\d+)\)/g)].map((m) => m[0])).toEqual([]);
 });
 
 test("every pause-aware --json command exits EXIT.paused, so tick and watch --once agree", () => {
-  const src = readFileSync(bin, "utf8");
+  const src = readFileSync(cli, "utf8");
   expect(src.match(/if \(result\.paused\) process\.exit\(EXIT\.paused\)/g)?.length).toBe(2);
 });
 

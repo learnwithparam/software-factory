@@ -7,6 +7,7 @@ import type { RouteConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
+import { createHash } from "node:crypto";
 
 export interface DoctorCheck {
   readonly name: string;
@@ -197,6 +198,27 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       warn: true,
     });
   }
+  // install.sh records the sha256 of every factory file it left in place; a file that no longer
+  // matches was edited in this repo, and the next `install --update` would overwrite it.
+  const manifest = parseManifest(await deps.readFile(`${ctx.cloneDir}/.factory/manifest.json`));
+  if (manifest) {
+    const edited: string[] = [];
+    const overridden = (path: string) => (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
+    for (const [path, sha] of Object.entries(manifest)) {
+      if (overridden(path)) continue;
+      const text = await deps.readFile(`${ctx.cloneDir}/${path}`);
+      if (text === undefined || sha256(text) !== sha) edited.push(path);
+    }
+    checks.push({
+      name: "factory files unchanged since install",
+      ok: edited.length === 0,
+      detail: edited.length
+        ? `${edited.length} edited or missing (${edited[0]}); \`factory install --update\` overwrites them, so list a kept edit in templateOverrides`
+        : "match .factory/manifest.json",
+      fixable: false,
+      warn: true,
+    });
+  }
   if (ctx.tmux) {
     checks.push({ name: "tmux is installed (tmux.enabled)", ok: await deps.which("tmux"), detail: "install tmux, or set tmux.enabled to false", fixable: false });
   }
@@ -279,5 +301,20 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
 export async function fixDoctor(github: GitHub, repo: string, routes?: Readonly<Record<string, RouteConfig>>): Promise<void> {
   for (const label of labelsFor(routes)) {
     await github.ensureLabel(repo, label.name, label.color, label.description);
+  }
+}
+
+export function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+// `.factory/manifest.json` is `{ "files": { "<path>": "<sha256>" } }`; anything else is no manifest.
+function parseManifest(text: string | undefined): Record<string, string> | undefined {
+  if (text === undefined) return undefined;
+  try {
+    const files = JSON.parse(text)?.files;
+    return files && typeof files === "object" && !Array.isArray(files) ? files : undefined;
+  } catch {
+    return undefined;
   }
 }
