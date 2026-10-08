@@ -167,6 +167,21 @@ describe("approval paths", () => {
     done(c);
   });
 
+  test("4c. a repo with no gates parks before the build agent runs, saying how to add one", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.git.seed = { ".factory/config.json": JSON.stringify({ gates: [] }) };
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    expect(await c.step()).toBe("needs-human");
+    expect(labels(c.github, 1)).toEqual([LABEL.needsHuman]);
+    expect(c.executor.mcp.map(([stage]) => stage)).toEqual(["triage", "plan"]);
+    expect(c.gateRunner.runs).toBe(0);
+    expect(c.github.issues.get(1)!.comments.at(-1)!.body).toContain("factory init");
+    expect(c.state.getRun("acme/widgets", 1)!.reason).toBe("no gates in .factory/config.json");
+    done(c);
+  });
+
   test("4b. every stage that runs is recorded as a stage_runs row, retries included", async () => {
     const c = setup([LABEL.ready]);
     c.state.setToggle("auto_approve_low_risk", true);

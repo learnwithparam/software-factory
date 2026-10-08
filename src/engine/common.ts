@@ -16,7 +16,7 @@ import { mcpServersFor } from "../mcp";
 import { deriveIssueState } from "../derive";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
-import type { ProofGit } from "../proof";
+import type { ProofGit, ProofStatus } from "../proof";
 import type { GhIssue } from "../github";
 import { withLease, type Held, type LeaseOpts } from "./lease";
 import type { LeasePort } from "../ports/lease";
@@ -490,9 +490,9 @@ export async function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issu
   return undefined;
 }
 // The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
-export function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx): string {
+export function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx, proof?: ProofStatus): string {
   if (!config.prRunSummary) return body;
   const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
   const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;
-  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries })}`;
+  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries, proof })}`;
 }

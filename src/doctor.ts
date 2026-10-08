@@ -192,6 +192,17 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       fixable: false,
     });
   }
+  // With no gates no build can go green, so the watcher parks every issue at build.
+  const config = await deps.readFile(`${ctx.cloneDir}/.factory/config.json`);
+  const gateCount = gatesIn(config);
+  if (gateCount !== undefined) {
+    checks.push({
+      name: ".factory/config.json defines at least one gate",
+      ok: gateCount > 0,
+      detail: gateCount > 0 ? `${gateCount} gate(s)` : "no gates: run `factory init`, or add one (a docs-only repo needs only a lint or link check)",
+      fixable: false,
+    });
+  }
   if (ctx.templateSkills) {
     const stale: string[] = [];
     const overridden = (path: string) => (ctx.templateOverrides ?? []).some((o) => path === o || path.startsWith(o.endsWith("/") ? o : `${o}/`));
@@ -357,6 +368,17 @@ function parseManifest(text: string | undefined): Record<string, string> | undef
   try {
     const files = JSON.parse(text)?.files;
     return files && typeof files === "object" && !Array.isArray(files) ? files : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// The number of gates in a config file's text; undefined when it is missing or not JSON.
+function gatesIn(text: string | undefined): number | undefined {
+  if (text === undefined) return undefined;
+  try {
+    const gates = (JSON.parse(text) as { gates?: unknown }).gates;
+    return Array.isArray(gates) ? gates.length : 0;
   } catch {
     return undefined;
   }

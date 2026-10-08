@@ -280,6 +280,11 @@ Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) a
 build). Stages get only what the config grants, through `--settings` on `claude -p`; a project
 `permissions.allow` block is ignored in headless mode. `gates.sh` prints
 `FACTORY_GATES: status=GREEN|RED|MISCONFIGURED passed=N failed=N skipped=N failed_gates=a,b`.
+A gate may name its `role` (`test`, `lint`, `typecheck`, `build`, `format`, `audit` or `docs`). The
+proof reverts the change and runs the `role: "test"` gate, or the one named `test`; with neither,
+the PR's run summary says the proof was unavailable. A config with no gates parks each issue
+before the build agent runs, with a comment saying how to add one. A docs-only repo needs only a
+lint or link-check gate.
 `postEditCommand` (off by default) is an argv list the build stage runs after every edit, with
 `{file}` replaced by the edited path, for example `["bunx", "biome", "check", "--write", "--no-errors-on-unmatched", "{file}"]` (the flag keeps an edit to a file Biome skips, such as Markdown, from failing);
 a failure's output goes straight back to the agent. Unknown keys and a missing `repo` are errors, other missing fields take the defaults in

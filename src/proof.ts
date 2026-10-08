@@ -7,7 +7,9 @@
 
 import type { CommandResult } from "./github";
 
-export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped";
+// "unavailable": the repo has no test gate, so nothing could prove the change. It is shown
+// in the PR's run summary rather than passing silently.
+export type ProofStatus = "bites" | "passes-without" | "no-tests" | "skipped" | "unavailable";
 
 export interface ProofResult {
   readonly status: ProofStatus;
@@ -41,7 +43,7 @@ const FACTORY_OWNED = /^\.(factory|claude|agents)\//;
 export async function runProof(git: ProofGit, worktree: string, base: string, proof: "test" | "check" | undefined, testCmd: string | undefined): Promise<ProofResult> {
   const cmd = testCmd ?? "";
   if (proof === "check") return { status: "skipped", reverted: [], tests: [], cmd, tail: "plan proof is check: re-run the named checks" };
-  if (!testCmd) return { status: "skipped", reverted: [], tests: [], cmd, tail: "no gate named test in .factory/config.json" };
+  if (!testCmd) return { status: "unavailable", reverted: [], tests: [], cmd, tail: "no gate has role test (or is named test) in .factory/config.json" };
   const changes = (await git.changes(worktree, base)).filter((c) => !FACTORY_OWNED.test(c.path));
   const tests = changes.filter((c) => isTestPath(c.path) && c.status !== "D").map((c) => c.path);
   const impl = changes.filter((c) => !isTestPath(c.path));

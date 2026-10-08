@@ -232,5 +232,12 @@
   {"name": "http sandbox: a malformed answer is not a result", "file": "src/adapters/http-sandbox/execution.ts", "find": "typeof r.stdout === \"string\" && typeof r.stderr === \"string\" && Number.isInteger(r.code)", "replace": "true", "test": "tests/runtimes.test.ts"},
   {"name": "spend: the ledger label is created on a repo that predates it", "file": "src/adapters/github-store/spend.ts", "find": "      await this.scm.ensureLabel(this.repo, label.name, label.color, label.description);\n", "replace": "", "test": "tests/adapters.test.ts"},
   {"name": "daemon: systemd path settings are bare, not quoted", "file": "src/daemon.ts", "find": "WorkingDirectory=${unitPath(spec.workdir)}", "replace": "WorkingDirectory=${unitArg(spec.workdir)}", "test": "tests/daemon.test.ts"},
-  {"name": "daemon: % in a systemd log path is doubled", "file": "src/daemon.ts", "find": "StandardOutput=append:${unitPath(join(", "replace": "StandardOutput=append:${(join(", "test": "tests/daemon.test.ts"}
+  {"name": "daemon: % in a systemd log path is doubled", "file": "src/daemon.ts", "find": "StandardOutput=append:${unitPath(join(", "replace": "StandardOutput=append:${(join(", "test": "tests/daemon.test.ts"},
+  {"name": "gates: a repo with no gates parks before the build agent runs", "file": "src/engine/steps.ts", "find": "    if (hasNoGates(worktree)) {", "replace": "    if (false) {", "test": "tests/scenarios.test.ts"},
+  {"name": "gates: hasNoGates treats an empty list as no gates", "file": "src/gates.ts", "find": "(Array.isArray(gates) && gates.length === 0)", "replace": "false", "test": "tests/scenarios.test.ts"},
+  {"name": "config: the test gate prefers role test over the name", "file": "src/config.ts", "find": "gates.find((g) => g.role === \"test\") ?? ", "replace": "", "test": "tests/config.test.ts"},
+  {"name": "config: an unknown gate role is refused", "file": "src/config.ts", "find": "if (typeof gate.role === \"string\" && !(GATE_ROLES as readonly string[]).includes(gate.role)) ", "replace": "if (false) ", "test": "tests/config.test.ts"},
+  {"name": "proof: no test gate is unavailable, not skipped", "file": "src/proof.ts", "find": "if (!testCmd) return { status: \"unavailable\"", "replace": "if (!testCmd) return { status: \"skipped\"", "test": "tests/proof.test.ts"},
+  {"name": "run summary: the proof line reaches the PR body", "file": "src/engine/steps.ts", "find": ", ctx, readProofStatus(worktree, issueNumber)),", "replace": ", ctx),", "test": "tests/proof.test.ts"},
+  {"name": "doctor: a config with no gates is flagged", "file": "src/doctor.ts", "find": "      ok: gateCount > 0,", "replace": "      ok: true,", "test": "tests/doctor.test.ts"}
 ]

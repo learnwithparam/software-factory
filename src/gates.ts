@@ -4,6 +4,8 @@
 // `.factory/gates.sh` directly and parses the one line it's contracted to
 // print: `FACTORY_GATES: status=... passed=N failed=N skipped=N failed_gates=a,b`.
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ExecutionPort } from "./ports/execution";
 import type { GateResult, GateRunner } from "./ports/check";
 import { LocalExecution } from "./adapters/local/execution";
@@ -46,3 +48,21 @@ export async function runGates(gateRunner: GateRunner, worktreeDir: string): Pro
     raw: combined.slice(-2000),
   };
 }
+
+// True when the worktree's config lists no gates, so no build there can ever go
+// green. Checked before the build agent runs, so it costs no tokens. A missing or
+// unreadable config is left to gates.sh, which names it.
+export function hasNoGates(worktreeDir: string): boolean {
+  const file = join(worktreeDir, ".factory", "config.json");
+  if (!existsSync(file)) return false;
+  try {
+    const gates = (JSON.parse(readFileSync(file, "utf8")) as { gates?: unknown }).gates;
+    return gates === undefined || (Array.isArray(gates) && gates.length === 0);
+  } catch {
+    return false;
+  }
+}
+
+export const NO_GATES_COMMENT = `This repo has no gates in \`.factory/config.json\`, so no build here can be checked, and the factory parked this issue instead of building it.
+
+Add a gate: run \`factory init\` to detect the stack and write them, or add one by hand. A docs-only repo can ship with one lint or link-check gate. Then move this issue back to \`factory:ready\`.`;

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { configProblems, DEFAULT_CONFIG, holdoutEnabled, loadConfig } from "../src/config";
+import { configProblems, DEFAULT_CONFIG, holdoutEnabled, loadConfig, testGate } from "../src/config";
 
 const dir = mkdtempSync(join(tmpdir(), "factory-cfg-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -129,5 +129,22 @@ describe("config validation at boot", () => {
     expect(configProblems({ ...DEFAULT_CONFIG, repo: "a/b" })).toEqual([]);
     const example = JSON.parse(readFileSync(join(import.meta.dir, "../template/.factory/config.example.json"), "utf8"));
     expect(configProblems(example)).toEqual([]);
+  });
+});
+
+describe("gate roles", () => {
+  test("a gate may name its role; an unknown role is refused", () => {
+    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "test" }] })).toEqual([]);
+    expect(configProblems({ repo: "a/b", gates: [{ name: "unit", cmd: "x", required: true, role: "tests" }] })).toEqual([
+      'gates[0].role: "tests" is not one of test, lint, typecheck, build, format, audit, docs',
+    ]);
+  });
+
+  test("the test gate is the one with role test, else the one named test", () => {
+    const named = { name: "test", cmd: "named", required: true };
+    const roled = { name: "unit", cmd: "roled", required: true, role: "test" as const };
+    expect(testGate([named, roled])?.cmd).toBe("roled");
+    expect(testGate([named])?.cmd).toBe("named");
+    expect(testGate([{ name: "lint", cmd: "x", required: true, role: "lint" }])).toBeUndefined();
   });
 });

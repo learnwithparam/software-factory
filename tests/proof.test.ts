@@ -82,13 +82,13 @@ describe("runProof", () => {
     expect(run(["git", "status", "--porcelain"], work)).toBe("");
   });
 
-  test("no-tests, skipped for proof:check, skipped without a test gate; none runs the command", async () => {
+  test("no-tests, skipped for proof:check, unavailable without a test gate; none runs the command", async () => {
     const work = repo();
     write(work, "src/add.ts", "export const add = (a: number, b: number) => a + b;\n");
     commit(work);
     expect((await runProof(git, work, "main", "test", "exit 7")).status).toBe("no-tests");
     expect((await runProof(git, work, "main", "check", "exit 7")).status).toBe("skipped");
-    expect((await runProof(git, work, "main", undefined, undefined)).status).toBe("skipped");
+    expect((await runProof(git, work, "main", undefined, undefined)).status).toBe("unavailable");
   });
 
   test("the factory's own files are never reverted", async () => {
@@ -150,5 +150,6 @@ describe("watch.ts runs the proof before verify", () => {
     expect(await advanceIssue(deps, config, github.issues.get(1)!)).toBe("shipped");
     expect(calls).toEqual(["restore src/a.ts", "test make test", "head"]);
     expect(seen).toMatchObject({ status: "bites", tests: ["tests/a.test.ts"], reverted: ["src/a.ts"], cmd: "make test" });
+    expect(github.createdPrs[0]!.body).toContain("Proof: the new test fails without the change.");
   });
 });

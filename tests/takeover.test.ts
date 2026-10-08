@@ -127,6 +127,8 @@ describe("renderRunSummary", () => {
     expect(out).not.toContain("verify approved");
     expect(out).toContain("- verify: uncertain");
     expect(renderRunSummary([run({ stage: "verify", verdict: "pass" })], { rejectRounds: 0, retries: 0 })).toContain("- verify approved on the first round");
+    expect(renderRunSummary([run({ stage: "verify" })], { rejectRounds: 0, retries: 0, proof: "unavailable" })).toContain("Proof: unavailable: the repo has no test gate");
+    expect(renderRunSummary([run({ stage: "verify" })], { rejectRounds: 0, retries: 0 })).not.toContain("Proof:");
   });
 
   test("takeovers, reruns, rejections, retries and unknown cost are all named", () => {

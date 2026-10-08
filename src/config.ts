@@ -41,6 +41,16 @@ export interface GateSpec {
   readonly name: string;
   readonly cmd: string;
   readonly required: boolean;
+  // What the gate checks. The proof reverts the change and runs the `test` one.
+  readonly role?: GateRole;
+}
+
+export const GATE_ROLES = ["test", "lint", "typecheck", "build", "format", "audit", "docs"] as const;
+export type GateRole = (typeof GATE_ROLES)[number];
+
+// The one resolver for "the test gate": the gate with role test, else one named test.
+export function testGate(gates: readonly GateSpec[]): GateSpec | undefined {
+  return gates.find((g) => g.role === "test") ?? gates.find((g) => g.name === "test");
 }
 
 // A route for one issue type (a label: the five in TYPE_LABELS, or one a repo
@@ -315,7 +325,11 @@ export function configProblems(raw: unknown): string[] {
     if (!Array.isArray(cfg.gates)) problems.push("gates: expected a list");
     else cfg.gates.forEach((g, i) => {
       if (typeof g !== "object" || g === null) problems.push(`gates[${i}]: expected an object`);
-      else checkKeys(g as Record<string, unknown>, { name: "string", cmd: "string", required: "boolean" }, `gates[${i}].`, problems);
+      else {
+        const gate = g as Record<string, unknown>;
+        checkKeys(gate, { name: "string", cmd: "string", required: "boolean", role: "string" }, `gates[${i}].`, problems);
+        if (typeof gate.role === "string" && !(GATE_ROLES as readonly string[]).includes(gate.role)) problems.push(`gates[${i}].role: "${gate.role}" is not one of ${GATE_ROLES.join(", ")}`);
+      }
     });
   }
   problems.push(...agentProblems(cfg.agents, cfg.stages, cfg.routes));
