@@ -245,6 +245,7 @@ describe("needs-info path", () => {
     // A trusted reply resumes triage; simulate the resumed run's own output
     // via a second queued round for the same stage:issue key.
     await new Promise((r) => setTimeout(r, 5));
+    github.roles.set("param", "admin");
     issue.comments.push({ id: 9002, author: "param", authorAssociation: "OWNER", body: "staging", createdAt: new Date().toISOString() });
     executor.push("triage", 2, fixtureFor("triage", 2), {
       "triage.json": JSON.stringify({

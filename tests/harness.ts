@@ -52,7 +52,8 @@ export class FakeGitHub extends GitHub {
 
   // Who applied a label, and each login's role; by default a maintainer applied everything.
   labelers = new Map<number, string | undefined>();
-  roles = new Map<string, RepoRole>([["maintainer", "admin"]]);
+  // "human" writes every scripted comment; "maintainer" applies every label.
+  roles = new Map<string, RepoRole>([["maintainer", "admin"], ["human", "admin"]]);
   override async labeledBy(_repo: string, number: number): Promise<string | undefined> {
     return this.labelers.has(number) ? this.labelers.get(number) : "maintainer";
   }

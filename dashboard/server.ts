@@ -26,7 +26,7 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
-import { readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
+import { readCapped, readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
 // instead (src/webhook.ts), and is the one public route reachable from off
@@ -322,8 +322,8 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const secret = webhookSecret();
         if (!secret) return json({ error: "not found" }, { status: 404 });
         if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
-        const body = new Uint8Array(await req.arrayBuffer());
-        if (body.byteLength > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
+        const body = await readCapped(req.body, WEBHOOK_MAX_BYTES);
+        if (!body) return json({ error: "too large" }, { status: 413 });
         if (!signatureMatches(secret, body, req.headers.get("x-hub-signature-256"))) return json({ error: "bad signature" }, { status: 401 });
         let payload: unknown;
         try {

@@ -9,6 +9,7 @@ import { mergeConfig } from "../src/config";
 import { LABEL } from "../src/labels";
 import { FactoryState } from "../src/state";
 import { advanceIssue } from "../src/watch";
+import { readCapped } from "../src/webhook";
 import { GitHub, type RepoRole } from "../src/github";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, MultiStageExecutor } from "./harness";
 
@@ -78,5 +79,44 @@ describe("GitHub.labeledBy and roleOf", () => {
 
   test("an unknown role string is not trusted", async () => {
     expect(await new GitHub(runner(0, "superuser\n")).roleOf("acme/widgets", "dev")).toBe("none");
+  });
+});
+
+describe("commands need write access too", () => {
+  // A read or triage collaborator still shows as COLLABORATOR on the comment.
+  function parked(role: RepoRole) {
+    const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-clone-")), mkdtempSync(join(tmpdir(), "trust-ws-"))];
+    dirs.push(cloneDir, workspacesDir);
+    const github = new FakeGitHub([baseIssue(1, [LABEL.failed])]);
+    github.roles.set("human", role);
+    const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor: new MultiStageExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
+    github.say(1, "/factory retry", "COLLABORATOR");
+    return { github, run: () => advanceIssue(deps, mergeConfig({ repo: "acme/widgets" }), github.issues.get(1)!) };
+  }
+
+  test.each(["read", "triage"] as const)("a %s collaborator's /factory retry is ignored", async (role) => {
+    const { github, run } = parked(role);
+    expect(await run()).toBe("waiting");
+    expect(labels(github)).toEqual([LABEL.failed]);
+  });
+
+  test("a writer's /factory retry goes ahead", async () => {
+    const { github, run } = parked("write");
+    await run().catch(() => undefined);
+    expect(github.issues.get(1)!.comments.some((c) => c.body.includes("factory:retry"))).toBe(true);
+  });
+});
+
+describe("webhook body cap", () => {
+  const stream = (chunks: number[]) =>
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        for (const n of chunks) c.enqueue(new Uint8Array(n));
+        c.close();
+      },
+    });
+  test("a chunked body over the cap stops being read, Content-Length or not", async () => {
+    expect(await readCapped(stream([600, 600]), 1000)).toBeUndefined();
+    expect((await readCapped(stream([400, 600]), 1000))!.byteLength).toBe(1000);
   });
 });

@@ -40,3 +40,29 @@ export function readDelivery(headers: Headers, payload: unknown): Delivery | und
   if (!/^[\w-]{1,64}$/.test(id) || !/^[a-z_]{1,64}$/.test(event)) return undefined;
   return { id, event, action: typeof p.action === "string" ? p.action.slice(0, 64) : "", repo };
 }
+
+// The body, or undefined once it passes `max` bytes. Reads the stream itself, so
+// a chunked request with no Content-Length is cut off at the cap, not buffered whole.
+export async function readCapped(body: ReadableStream<Uint8Array> | null, max: number): Promise<Uint8Array | undefined> {
+  if (!body) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
+}

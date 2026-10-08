@@ -41,7 +41,7 @@ import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
 import { fireCron } from "./engine/triggers";
-import { TRUSTED_ROLES } from "./ports/scm";
+import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
 
@@ -66,9 +66,30 @@ function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, st
 // Intake trust (P36): a label is a request to spend tokens and push a branch,
 // so it counts only from someone who could push that branch themselves.
 // Anyone else's factory:ready is taken off with a comment saying why.
+// One trust rule for labels and commands: write access or higher. A comment's
+// authorAssociation alone is not enough, since a read-only collaborator is a
+// COLLABORATOR too. Roles are cached for ROLE_CACHE_MS per SCM so a waiting
+// issue does not cost an API call every poll.
+export const ROLE_CACHE_MS = 5 * 60_000;
+const roleCache = new WeakMap<object, Map<string, { role: RepoRole; at: number }>>();
+async function roleOf(deps: WatchDeps, config: FactoryConfig, login: string): Promise<RepoRole> {
+  const cache = roleCache.get(deps.github) ?? new Map();
+  roleCache.set(deps.github, cache);
+  const key = `${config.repo}:${login}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < ROLE_CACHE_MS) return hit.role;
+  const role = await deps.github.roleOf(config.repo, login);
+  cache.set(key, { role, at: Date.now() });
+  return role;
+}
+
+async function commandIsTrusted(deps: WatchDeps, config: FactoryConfig, comment: GhComment): Promise<boolean> {
+  return TRUSTED_ROLES.includes(await roleOf(deps, config, comment.author));
+}
+
 async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<boolean> {
   const by = await deps.github.labeledBy(config.repo, issue.number, LABEL.ready);
-  const role = by ? await deps.github.roleOf(config.repo, by) : "none";
+  const role = by ? await roleOf(deps, config, by) : "none";
   if (TRUSTED_ROLES.includes(role)) return true;
   await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
   await postComment(
@@ -144,7 +165,7 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   const question = findQuestionComment(issue);
   if (!question) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, question.createdAt);
-  if (!reply) return "waiting";
+  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
   const derived = deriveIssueState(issue, workflowOf(deps));
@@ -162,7 +183,7 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   const plan = findPlanComment(issue);
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
-  if (!reply) return "waiting";
+  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   const command = parseChatOps(reply.body);
   const worktree = worktreeFor(deps, issue.number);
 
@@ -191,6 +212,7 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const verb = parseChatOps(latest.body).type;
   if (verb === "cancel") return cancelRun(issue, deps, config);
   if (verb !== "retry") return undefined;
+  if (!(await commandIsTrusted(deps, config, latest))) return undefined;
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
   if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;
@@ -261,7 +283,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
     .filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > since)
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .at(-1);
-  if (latest) {
+  if (latest && (await commandIsTrusted(deps, config, latest))) {
     const command = parseChatOps(latest.body);
     if (command.type === "cancel") return cancelRun(issue, deps, config);
     const reviseTo = stepByLabel(workflowOf(deps), LABEL.inReview)?.revise;
