@@ -18,6 +18,7 @@ import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
+import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
 import type { Workflow } from "../core/workflow";
@@ -54,6 +55,8 @@ export interface WatchDeps {
   // Runs config.setup once per worktree; defaults to a real shell so tests
   // can inject a fake instead of actually running `npm ci`.
   readonly setupRunner?: SetupRunner;
+  // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
+  readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
   // Absent means this process alone decides concurrency (config.concurrency,
   // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
   // a machine-wide lease, so a second watcher (another repo, same

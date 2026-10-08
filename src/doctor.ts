@@ -3,12 +3,13 @@
 
 import type { CommandRunner, ScmPort } from "./github";
 import { labelsFor } from "./labels";
-import type { RouteConfig } from "./config";
+import type { RouteConfig, RuntimeConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
 import { loadWorkflow } from "./engine/workflows";
 import { MCP_REGISTRY, mcpProblems, parseMcpRegistry } from "./mcp";
+import { runtimeRefs, unknownRuntimes } from "./runtimes";
 import type { Workflow } from "./core/workflow";
 import { createHash } from "node:crypto";
 
@@ -34,6 +35,9 @@ export interface DoctorDeps {
 
 export interface DoctorContext {
   readonly repo: string;
+  // config.runtime and the runtime names this machine has (built-ins plus machine.json runtimes).
+  readonly runtime?: RuntimeConfig;
+  readonly runtimeNames?: readonly string[];
   readonly cloneDir: string;
   readonly baselineTag: string;
   readonly factoryMode?: string; // FACTORY_MODE, "actions" when CI drives the loop
@@ -234,6 +238,16 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: loaded.ok ? `${Object.keys(loaded.workflow.steps).length} steps from ${loaded.workflow.start}` : loaded.problems.join("; "),
       fixable: false,
     });
+    const refs = runtimeRefs({ runtime: ctx.runtime }, loaded.ok ? loaded.workflow.steps : {});
+    if (ctx.runtimeNames && refs.length > 0) {
+      const unknown = unknownRuntimes(refs, Object.fromEntries(ctx.runtimeNames.map((n) => [n, true])));
+      checks.push({
+        name: "every runtime the config and workflow name exists on this machine",
+        ok: unknown.length === 0,
+        detail: unknown.length ? unknown.join("; ") : refs.map((r) => `${r.where}: ${r.name}`).join(", "),
+        fixable: false,
+      });
+    }
     const named = loaded.ok ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n }))) : [];
     if (named.length > 0) {
       const registry = parseMcpRegistry(await deps.readFile(`${ctx.cloneDir}/${MCP_REGISTRY}`));

@@ -345,7 +345,10 @@ const check: StepType = {
   command: true,
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
-    const out = await (deps.setupRunner ?? new ShellSetupRunner()).run(step.run!, worktree);
+    const name = step.runtime ?? config.runtime?.check;
+    const runtime = name ? deps.runtimes?.[name] : (deps.setupRunner ?? new ShellSetupRunner());
+    if (!runtime) throw new Error(`steps.${step.id}: no runtime "${name}"`);
+    const out = await runtime.run(step.run!, worktree);
     if (out.code === 0) return { kind: "next", facts: { ok: true } };
     const tail = `${out.stdout}\n${out.stderr}`.trim().slice(-4000);
     await postComment(deps, config, issue.number, `Step \`${step.id}\` failed: \`${step.run}\` exited ${out.code}.\n\n\`\`\`\n${tail}\n\`\`\``, { stage: step.id, json: { ok: false, code: out.code } });

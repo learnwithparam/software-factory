@@ -103,6 +103,13 @@ export interface FactoryConfig {
   readonly workflow: string;
   // Defaults for a company size (PROFILES); any key set explicitly still wins.
   readonly profile?: Profile;
+  // Where gates and check steps run, by runtime name (src/runtimes.ts); unset is "local".
+  readonly runtime?: RuntimeConfig;
+}
+
+export interface RuntimeConfig {
+  readonly gates?: string;
+  readonly check?: string;
 }
 
 export type Profile = "solo" | "team" | "startup" | "scaleup" | "enterprise";
@@ -243,6 +250,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   templateOverrides: "strings",
   workflow: "string",
   profile: "string",
+  runtime: "object",
   riskCriteria: "object",
 };
 
@@ -282,6 +290,7 @@ export function configProblems(raw: unknown): string[] {
   if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string)) problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
   nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive", retro: "positive" });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
+  nested("runtime", { gates: "string", check: "string" });
   nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });
   if (cfg.merge !== undefined && kindOk(cfg.merge, "object")) {
     const policy = (cfg.merge as Record<string, unknown>).policy;

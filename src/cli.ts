@@ -35,6 +35,7 @@ import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { workflowFor } from "./engine/workflows";
+import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -90,15 +91,21 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
 // gate runner — one place, not three copies to drift (audit finding #1).
 async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
+  const workflow = await workflowFor(cloneDir, config);
+  const machineConfig = loadMachineConfig();
+  const runtimes = runtimesFrom(machineConfig.runtimes);
+  const unknown = unknownRuntimes(runtimeRefs(config, workflow.steps), runtimes);
+  if (unknown.length) throw new Error(unknown.join("\n"));
   return {
-    workflow: await workflowFor(cloneDir, config),
+    workflow,
+    runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
     github: new GitHub(),
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
-    gateRunner: new ShellGateRunner(),
+    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
     proofGit: new ShellProofGit(),
@@ -108,7 +115,7 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     // Real cross-process leases: every real CLI invocation (watch, run, tick)
     // shares this machine's FACTORY_HOME/machine.db, so a second repo's
     // watcher on the same machine is respected (plan v2.7.0 item 5).
-    machine: { leases: new MachineLeases(), config: loadMachineConfig(), spend: new MachineSpend() },
+    machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
   };
 }
 
@@ -340,6 +347,8 @@ async function cmdDoctor(): Promise<void> {
       templateSkills: templateSkills(),
       templateOverrides: config.templateOverrides,
       workflow: config.workflow,
+      runtime: config.runtime,
+      runtimeNames: Object.keys(runtimesFrom(loadMachineConfig().runtimes)),
       tmux: config.tmux.enabled,
       legacyStatePath: defaultStatePath(process.env),
       legacyWorkspacesDir: defaultWorkspacesDir(process.env),
