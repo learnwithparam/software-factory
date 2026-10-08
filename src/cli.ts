@@ -3,7 +3,7 @@
 // stays testable without a child process.
 
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { GitHub, type ScmPort } from "./github";
 import { GitCommandRunner, Git, issueOfPr } from "./git";
@@ -25,11 +25,12 @@ import { runDoctor, fixDoctor } from "./doctor";
 import { loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
 import { versionOf, which } from "./probes";
-import { workspacesDir as defaultWorkspacesDir, defaultStatePath, livePath, transcriptPath } from "./paths";
+import { workspacesDir as defaultWorkspacesDir, defaultStatePath, factoryHome, livePath, transcriptPath } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
+import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
 import { helpText } from "./help";
 import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
@@ -494,6 +495,32 @@ async function waitForLabel(github: ScmPort, repo: string, n: number, label: str
   }
 }
 
+// `daemon install|uninstall`: `factory up` for this repo in the background,
+// at login, restarted when it exits (src/daemon.ts).
+async function cmdDaemon(): Promise<void> {
+  const action = args[1];
+  if (action !== "install" && action !== "uninstall") throw new UsageError("daemon: usage: factory daemon (install | uninstall) (--repo-dir <path> | --repo <owner/name>)");
+  const platform = daemonPlatform(process.platform);
+  if (!platform) throw new Error(`daemon: no launchd or systemd on ${process.platform}; run \`factory up\` under your own supervisor`);
+  const cloneDir = await resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const home = homedir();
+  const uid = process.getuid?.() ?? 0;
+  const runner = { run: async (argv: readonly string[]) => {
+    const p = Bun.spawn([...argv], { stdout: "ignore", stderr: "pipe" });
+    return { exitCode: await p.exited, stderr: await new Response(p.stderr).text() };
+  } };
+  if (action === "uninstall") {
+    console.log(`factory daemon: removed ${await uninstallDaemon(platform, home, config.repo, uid, runner)}`);
+    return;
+  }
+  const pass = ["db", "workspaces"].flatMap((f) => (flag(f) ? [`--${f}`, flag(f)!] : []));
+  const argv = [process.execPath, Bun.main, "up", "--repo-dir", cloneDir, ...pass];
+  const logDir = join(factoryHome(), "logs");
+  const file = await installDaemon(platform, { repo: config.repo, argv, workdir: cloneDir, logDir, path: process.env.PATH ?? "/usr/bin:/bin", home }, uid, runner);
+  console.log(`factory daemon: ${platform} runs \`factory up\` for ${config.repo} from ${file}; logs in ${logDir}`);
+}
+
 async function cmdTakeover(): Promise<void> {
   const n = Number(args[1]);
   if (!n) throw new UsageError("takeover: usage: factory takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]");
@@ -639,6 +666,8 @@ async function main(): Promise<void> {
       return cmdAttach();
     case "takeover":
       return cmdTakeover();
+    case "daemon":
+      return cmdDaemon();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

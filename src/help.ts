@@ -7,6 +7,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "run", usage: "run (--repo-dir <path> | --repo <owner/name>) (--issue <N> | --pr <N>)", does: "advance one issue (or the issue a PR works on) once, then exit (CI)" },
   { name: "tick", usage: "tick (--repo-dir <path> | --repo <owner/name>)", does: "one poll pass over every open issue, then exit (cron)" },
   { name: "park", usage: "park --repo-dir <path> (--issue <N> | --pr <N>) [--reason <text>]", does: "park an issue as needs-human from outside the loop" },
+  { name: "daemon", usage: "daemon (install | uninstall) (--repo-dir <path> | --repo <owner/name>)", does: "run `up` in the background at login, restarted when it exits (launchd on macOS, systemd user unit on Linux)" },
   { name: "dashboard", usage: "dashboard [--repo <owner/name> | --repo-dir <path>] [--port <n>]", does: "serve the board (default :4100, loopback)" },
   { name: "attach", usage: "attach [<N>] (--repo <owner/name> | --repo-dir <path>) [--session <name>]", does: "join the tmux session; with <N>, open that issue's live window (works over ssh -t and docker exec -it)" },
   { name: "takeover", usage: "takeover <N> (--repo-dir <path> | --repo <owner/name>) [--no-handback]", does: "stop #N's running stage, open its Claude session in the worktree, and /factory retry when you exit" },
