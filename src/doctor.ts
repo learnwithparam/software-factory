@@ -8,6 +8,7 @@ import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
 import { loadWorkflow } from "./engine/workflows";
+import { MCP_REGISTRY, mcpProblems, parseMcpRegistry } from "./mcp";
 import type { Workflow } from "./core/workflow";
 import { createHash } from "node:crypto";
 
@@ -233,6 +234,17 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       detail: loaded.ok ? `${Object.keys(loaded.workflow.steps).length} steps from ${loaded.workflow.start}` : loaded.problems.join("; "),
       fixable: false,
     });
+    const named = loaded.ok ? Object.values(loaded.workflow.steps).flatMap((s) => (s.mcp ?? []).map((n) => ({ step: s.id, n }))) : [];
+    if (named.length > 0) {
+      const registry = parseMcpRegistry(await deps.readFile(`${ctx.cloneDir}/${MCP_REGISTRY}`));
+      const problems = mcpProblems(registry, [...new Set(named.map((x) => x.n))]);
+      checks.push({
+        name: `every mcp: server in ${ctx.workflow} is in ${MCP_REGISTRY}`,
+        ok: problems.length === 0,
+        detail: problems.length ? problems.join("; ") : named.map((x) => `${x.step}: ${x.n}`).join(", "),
+        fixable: false,
+      });
+    }
   }
   if (ctx.tmux) {
     checks.push({ name: "tmux is installed (tmux.enabled)", ok: await deps.which("tmux"), detail: "install tmux, or set tmux.enabled to false", fixable: false });

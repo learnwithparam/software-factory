@@ -78,6 +78,7 @@ async function askOrHandOver(sc: StepCtx, question: string | undefined): Promise
 }
 
 const triage: StepType = {
+  agent: true,
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
@@ -89,7 +90,7 @@ const triage: StepType = {
       finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);
       return stop("needs-human");
     }
-    const result = await runStage(deps, config, issue, "triage", worktree);
+    const result = await runStage(deps, config, issue, "triage", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "triage");
     const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
     if (result.exitCode !== 0 || !json) {
@@ -111,10 +112,11 @@ const triage: StepType = {
 };
 
 const plan: StepType = {
+  agent: true,
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
-    const result = await runStage(deps, config, issue, "plan", worktree);
+    const result = await runStage(deps, config, issue, "plan", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "plan");
     const { json, problem } = stageJson<PlanArtifact>("plan", art.json);
     // A plan stage that crashes (or writes nothing) used to fall through
@@ -143,10 +145,11 @@ function rebuildFrom(sc: StepCtx): { resume?: { sessionId: string; failure: stri
 }
 
 const build: StepType = {
+  agent: true,
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
-    const result = await runStage(deps, config, issue, "build", worktree, rebuildFrom(sc));
+    const result = await runStage(deps, config, issue, "build", worktree, { ...rebuildFrom(sc), mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
     const problem = built.problem;
@@ -206,6 +209,7 @@ const build: StepType = {
 };
 
 const verify: StepType = {
+  agent: true,
   rejects: true,
   async run(sc) {
     const { deps, config, issue, worktree, ctx, step, workflow } = sc;
@@ -264,7 +268,7 @@ const verify: StepType = {
       }
       await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
     }
-    const result = await runStage(deps, config, issue, "verify", worktree);
+    const result = await runStage(deps, config, issue, "verify", worktree, { mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "verify");
     const checked = art.json === undefined ? undefined : validateVerdict(art.json);
     let json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
@@ -306,11 +310,12 @@ const verify: StepType = {
 };
 
 const pr: StepType = {
+  agent: true,
   terminal: true,
   async run(sc) {
     const { deps, config, issue, worktree, ctx } = sc;
     const issueNumber = issue.number;
-    await runStage(deps, config, issue, "pr", worktree);
+    await runStage(deps, config, issue, "pr", worktree, { mcp: sc.step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "pr");
     // A revise from in-review re-enters here with the PR already open;
     // the push in build already updated its branch.

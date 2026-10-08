@@ -134,14 +134,16 @@ class FakeShell implements SetupRunner {
   }
 }
 
-function engine(workflow: Workflow, lintExit: number) {
+function engine(workflow: Workflow, lintExit: number, seed: Record<string, string> = {}) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
   const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
   const executor = new MultiStageExecutor();
   const setupRunner = new FakeShell(lintExit);
-  const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow };
+  const git = new FakeGit();
+  git.seed = seed;
+  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow };
   const config = mergeConfig({ repo: "acme/widgets" });
   const push = (stage: Parameters<MultiStageExecutor["push"]>[0], files: Record<string, string>) => executor.push(stage, 1, fixtureFor(stage, 1), files);
   push("triage", { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "x", confidence: 0.9 }) });
@@ -172,5 +174,25 @@ describe("a custom workflow drives the issue", () => {
     expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain("lint says no");
     expect(e.github.seenLabels).not.toContain(LABEL.verifying);
     expect(e.github.createdPrs).toHaveLength(0);
+  });
+});
+
+describe("a step's mcp: reaches only that step's run", () => {
+  const parsed = parseWorkflowText(CUSTOM.replace("build: { uses: build,", "build: { uses: build, mcp: [docs],"));
+  if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+  const docs = { command: "docs-mcp" };
+  const registry = (servers: object) => ({ ".factory/mcp.json": JSON.stringify({ mcpServers: servers }) });
+
+  test("build gets docs from the worktree's registry; the other steps get none", async () => {
+    const e = engine(parsed.workflow, 0, registry({ docs, tracker: { command: "t" } }));
+    expect(await e.run()).toBe("shipped");
+    expect(e.executor.mcp).toEqual([["triage", undefined], ["build", { docs }], ["verify", undefined], ["pr", undefined]]);
+  });
+
+  test("a name the registry lacks fails the issue before build runs", async () => {
+    const e = engine(parsed.workflow, 0, registry({ tracker: { command: "t" } }));
+    expect(await e.run()).toBe("failed");
+    expect(e.executor.mcp.map(([stage]) => stage)).toEqual(["triage"]);
+    expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain('"docs" is not in .factory/mcp.json');
   });
 });

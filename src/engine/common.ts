@@ -12,6 +12,7 @@ import type { IssueView } from "../tmux";
 import { clearStageArtifacts, validateStepJson, readStageArtifacts, runDir, type RetroArtifact, type VerdictArtifact } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isHumanComment, parseChatOps } from "../chatops";
+import { mcpServersFor } from "../mcp";
 import { deriveIssueState } from "../derive";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
@@ -225,9 +226,12 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume"> = {},
+  extra: Pick<StageRunOptions, "resume"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
+  // Read from this worktree's own .factory/mcp.json; a missing name throws before anything is recorded or spent.
+  const { mcp: mcpNames, ...rest } = extra;
+  const mcp = mcpNames?.length ? mcpServersFor(worktree, mcpNames) : undefined;
   // rehydrate before clearing: rehydrate only ever repopulates *earlier*
   // stages' artifacts from the thread, never this stage's own output, so the
   // order only matters for readability, not correctness — but clearing after
@@ -251,7 +255,8 @@ export async function runStage(
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
     ...files,
-    ...extra,
+    ...rest,
+    ...(mcp ? { mcp } : {}),
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();

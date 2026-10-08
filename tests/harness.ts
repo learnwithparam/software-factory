@@ -4,7 +4,7 @@
 // type; subclassing and overriding every public method is the honest fake.
 
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
 import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus, type RepoRole } from "../src/github";
@@ -220,8 +220,15 @@ export class FakeGit extends Git {
     return this.claimResult;
   }
 
+  // Files every new worktree starts with, as if checked out from the repo.
+  seed: Record<string, string> = {};
+
   override async ensureWorktree(_cloneDir: string, worktreeDir: string, issue: number): Promise<void> {
     mkdirSync(join(worktreeDir, runDir(issue)), { recursive: true });
+    for (const [name, content] of Object.entries(this.seed)) {
+      mkdirSync(dirname(join(worktreeDir, name)), { recursive: true });
+      writeFileSync(join(worktreeDir, name), content);
+    }
   }
 
   override async removeWorktree(_cloneDir: string, worktreeDir: string): Promise<void> {
@@ -351,9 +358,12 @@ export class MultiStageExecutor {
 
   // What each run was asked to resume, in order: a rebuild's session and failure tail.
   readonly resumed: Array<StageRunOptions["resume"]> = [];
+  // The MCP servers each run was handed, by stage.
+  readonly mcp: Array<[StageName, StageRunOptions["mcp"]]> = [];
 
-  async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number; resume?: StageRunOptions["resume"] }) {
+  async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number; resume?: StageRunOptions["resume"]; mcp?: StageRunOptions["mcp"] }) {
     this.resumed.push(opts.resume);
+    this.mcp.push([opts.stage, opts.mcp]);
     const key = `${opts.stage}:${opts.issue}`;
     const arr = this.queue.get(key);
     const next = arr?.shift();

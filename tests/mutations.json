@@ -181,5 +181,12 @@
   {"name": "profile: its defaults apply", "file": "src/config.ts", "find": "partial.profile ? PROFILES[partial.profile] : {}", "replace": "partial.profile ? {} : {}", "test": "tests/profiles.test.ts"},
   {"name": "profile: an explicit key wins", "file": "src/config.ts", "find": "...p.riskPolicy, ...partial.riskPolicy", "replace": "...partial.riskPolicy, ...p.riskPolicy", "test": "tests/profiles.test.ts"},
   {"name": "plan gate: medium risk only under a medium ceiling", "file": "template/.factory/workflows/feature-to-pr.yml", "find": "config.riskPolicy.autoApproveMaxRisk == 'medium'", "replace": "true", "test": "tests/profiles.test.ts"},
-  {"name": "profile: an unknown name is refused", "file": "src/config.ts", "find": "if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))", "replace": "if (false)", "test": "tests/profiles.test.ts"}
+  {"name": "profile: an unknown name is refused", "file": "src/config.ts", "find": "if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))", "replace": "if (false)", "test": "tests/profiles.test.ts"},
+  {"name": "mcp: claude gets --mcp-config", "file": "src/agents/presets/claude.ts", "find": "...(mcpConfig ? [\"--mcp-config\", mcpConfig] : []),", "replace": "", "test": "tests/mcp.test.ts"},
+  {"name": "mcp: a named server's tools are allowed", "file": "src/stage-permissions.ts", "find": ", ...mcpServers.map((s) => `mcp__${s}`)", "replace": "", "test": "tests/mcp.test.ts"},
+  {"name": "mcp: only a preset that loads MCP takes servers", "file": "src/agents/executor.ts", "find": "if (!agent.preset?.mcp || agent.config.command) throw", "replace": "if (false) throw", "test": "tests/mcp.test.ts"},
+  {"name": "mcp: a check step names no servers", "file": "src/core/workflow.ts", "find": "else if (kind && !kind.agent) problems.push", "replace": "else if (false) problems.push", "test": "tests/mcp.test.ts"},
+  {"name": "mcp: the registry gives only the named servers", "file": "src/engine/common.ts", "find": "const mcp = mcpNames?.length ? mcpServersFor(worktree, mcpNames) : undefined;", "replace": "const mcp = undefined;", "test": "tests/workflow.test.ts"},
+  {"name": "mcp: a missing server fails the issue", "file": "src/engine/runner.ts", "find": "    if (e instanceof McpError) {", "replace": "    if (false) {", "test": "tests/workflow.test.ts"},
+  {"name": "mcp: doctor checks the registry", "file": "src/doctor.ts", "find": "        ok: problems.length === 0,\n        detail: problems.length ? problems.join", "replace": "        ok: true,\n        detail: problems.length ? problems.join", "test": "tests/doctor.test.ts"}
 ]

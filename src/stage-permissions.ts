@@ -84,6 +84,7 @@ export function stageAllowRules(stage: StageName, issue: number, extra?: AgentCo
   return rules;
 }
 
-export function stageSettings(stage: StageName, issue: number, extra?: AgentCommands): string {
-  return JSON.stringify({ permissions: { allow: stageAllowRules(stage, issue, extra) } });
+// `mcp__<server>` allows every tool of a server the step named; under dontAsk an unlisted tool is denied.
+export function stageSettings(stage: StageName, issue: number, extra?: AgentCommands, mcpServers: readonly string[] = []): string {
+  return JSON.stringify({ permissions: { allow: [...stageAllowRules(stage, issue, extra), ...mcpServers.map((s) => `mcp__${s}`)] } });
 }

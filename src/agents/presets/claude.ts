@@ -91,7 +91,7 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
 // --append-system-prompt as STAGE_GUIDANCE, appended after it. --help gives
 // no guarantee that repeating the flag concatenates rather than overriding,
 // so this sends one flag with one value rather than risk losing STAGE_GUIDANCE.
-export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
+export function claudeArgs(opts: StageRunOptions, contextPack = "", mcpConfig?: string): string[] {
   const command = `/factory-${opts.stage} ${opts.issue}`;
   return [
     "-p",
@@ -107,14 +107,16 @@ export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
     "none",
     "--setting-sources",
     "project,local",
-    // The operator's claude.ai connectors (Gmail, Drive) loaded into stages without it.
+    // Only the servers the step named; with none, no server at all. Without
+    // --strict-mcp-config the operator's claude.ai connectors (Gmail, Drive) load too.
+    ...(mcpConfig ? ["--mcp-config", mcpConfig] : []),
     "--strict-mcp-config",
     "--disallowedTools",
     STAGE_DISALLOWED_TOOLS.join(","),
     "--tools",
     STAGE_TOOLS[opts.stage].join(","),
     "--settings",
-    stageSettings(opts.stage, opts.issue, opts.agentCommands),
+    stageSettings(opts.stage, opts.issue, opts.agentCommands, Object.keys(opts.mcp ?? {})),
     "--append-system-prompt",
     contextPack ? `${STAGE_GUIDANCE}\n\n${contextPack}` : STAGE_GUIDANCE,
     "--max-budget-usd",
@@ -154,7 +156,8 @@ export const claudePreset: AgentPreset = {
   ownsPrompt: true,
   // `prompt` is the context pack for an ownsPrompt agent: Claude runs its own
   // skill and ignores everything else spawnStage would otherwise put there.
-  command: (opts, agent, prompt) => ({ argv: ["claude", ...claudeArgs(opts, prompt), ...claudeModelArgs(opts.stage, agent.model)] }),
+  mcp: true,
+  command: (opts, agent, prompt, ctx) => ({ argv: ["claude", ...claudeArgs(opts, prompt, ctx?.mcpConfig), ...claudeModelArgs(opts.stage, agent.model)] }),
   parseLine: parseStreamJsonLine,
   isUsageCandidate: (line) => isUsageResultCandidate(line, "result"),
 };
