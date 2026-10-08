@@ -27,12 +27,6 @@ describe("evalExpr", () => {
     expect(run("!toggles.off && toggles.on", ctx)).toBe(true);
     expect(run("!!toggles.on", ctx)).toBe(true);
   });
-  test("the bundled auto-approve condition", () => {
-    const src = "plan.risk == 'low' && plan.autoApproveEligible && toggles.autoApproveLowRisk";
-    expect(run(src, { ...ctx, toggles: { autoApproveLowRisk: true } })).toBe(true);
-    expect(run(src, { ...ctx, toggles: { autoApproveLowRisk: false } })).toBe(false);
-    expect(run(src, { plan: { risk: "medium", autoApproveEligible: true }, toggles: { autoApproveLowRisk: true } })).toBe(false);
-  });
   test("escaped quotes in a string literal", () => expect(run("a == 'it\\'s'", { a: "it's" })).toBe(true));
 });
 

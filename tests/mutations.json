@@ -177,5 +177,9 @@
   {"name": "webhook: a delivery wakes the watcher", "file": "src/watch.ts", "find": "    seenDelivery = latest;\n    tick();\n", "replace": "    seenDelivery = latest;\n", "test": "tests/webhook.test.ts"},
   {"name": "trust: a retry needs write access", "file": "src/watch.ts", "find": "  if (!(await commandIsTrusted(deps, config, latest))) return undefined;\n", "replace": "", "test": "tests/intake-trust.test.ts"},
   {"name": "webhook: a chunked body is cut at the cap", "file": "src/webhook.ts", "find": "    if (size > max) {", "replace": "    if (false) {", "test": "tests/intake-trust.test.ts"},
-  {"name": "trust: a cancel needs write access", "file": "src/watch.ts", "find": "  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "replace": "  if (verb === \"cancel\") return cancelRun(issue, deps, config);\n  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "test": "tests/intake-trust.test.ts"}
+  {"name": "trust: a cancel needs write access", "file": "src/watch.ts", "find": "  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "replace": "  if (verb === \"cancel\") return cancelRun(issue, deps, config);\n  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "test": "tests/intake-trust.test.ts"},
+  {"name": "profile: its defaults apply", "file": "src/config.ts", "find": "partial.profile ? PROFILES[partial.profile] : {}", "replace": "partial.profile ? {} : {}", "test": "tests/profiles.test.ts"},
+  {"name": "profile: an explicit key wins", "file": "src/config.ts", "find": "...p.riskPolicy, ...partial.riskPolicy", "replace": "...partial.riskPolicy, ...p.riskPolicy", "test": "tests/profiles.test.ts"},
+  {"name": "plan gate: medium risk only under a medium ceiling", "file": "template/.factory/workflows/feature-to-pr.yml", "find": "config.riskPolicy.autoApproveMaxRisk == 'medium'", "replace": "true", "test": "tests/profiles.test.ts"},
+  {"name": "profile: an unknown name is refused", "file": "src/config.ts", "find": "if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string))", "replace": "if (false)", "test": "tests/profiles.test.ts"}
 ]
