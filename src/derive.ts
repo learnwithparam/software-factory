@@ -12,7 +12,7 @@
 import { isHumanComment, parseChatOps } from "./chatops";
 import type { GhComment, GhIssue } from "./github";
 import { LABEL } from "./labels";
-import type { Stage } from "./state";
+import type { Workflow } from "./core/workflow";
 
 export interface DataMarker {
   readonly stage: string;
@@ -46,7 +46,8 @@ export function countMarkers(markers: readonly DataMarker[], stage: string): num
   return markers.filter((m) => m.stage === stage).length;
 }
 
-const STAGE_BY_LABEL: Record<string, Stage> = {
+// The built-in pipeline's steps, for a caller that has no workflow to hand.
+const STAGE_BY_LABEL: Record<string, string> = {
   [LABEL.triaging]: "triage",
   [LABEL.planning]: "plan",
   [LABEL.building]: "build",
@@ -57,7 +58,8 @@ const STAGE_BY_LABEL: Record<string, Stage> = {
 export interface DerivedIssueState {
   // The stage a resumed run should start from — the stage whose in-flight
   // label is currently on the issue, or "triage" for a fresh factory:ready.
-  readonly resumeStage: Stage;
+  // A workflow step id; the built-in pipeline's are triage, plan, build, verify and pr.
+  readonly resumeStage: string;
   // How many rounds of needs-info questions and verify rejects this issue has
   // already been through, recovered from the thread so a restart doesn't
   // reset the caps in derive's callers (round-cap findings #20/#5).
@@ -88,14 +90,18 @@ function countRejectsSinceRetry(comments: readonly GhComment[]): number {
 
 const STAGE_MARKER_NAMES = new Set(["triage", "plan", "build", "verify"]);
 
-export function deriveIssueState(issue: GhIssue): DerivedIssueState {
+// With a workflow, its steps' labels and ids replace the built-in ones, so a
+// custom step (a `check`, say) is resumed and retried like any other.
+export function deriveIssueState(issue: GhIssue, workflow?: Pick<Workflow, "steps">): DerivedIssueState {
+  const byLabel = workflow ? Object.fromEntries(Object.values(workflow.steps).map((s) => [s.label, s.id])) : STAGE_BY_LABEL;
+  const markerNames = workflow ? new Set(Object.keys(workflow.steps)) : STAGE_MARKER_NAMES;
   const labelNames = issue.labels.map((l) => l.name);
   const markers = parseDataMarkers(issue.comments);
-  const runningLabel = labelNames.find((n) => STAGE_BY_LABEL[n]);
+  const runningLabel = labelNames.find((n) => byLabel[n]);
 
-  let resumeStage: Stage;
+  let resumeStage: string;
   if (runningLabel) {
-    resumeStage = STAGE_BY_LABEL[runningLabel]!;
+    resumeStage = byLabel[runningLabel]!;
   } else {
     // Parked (needs-info / needs-human / failed): there's no in-flight
     // label to read the stage off, since it was already replaced by the
@@ -107,11 +113,11 @@ export function deriveIssueState(issue: GhIssue): DerivedIssueState {
     const stageOf = (m: DataMarker): string | undefined =>
       m.stage === "question" || m.stage === "takeover"
         ? (m.json as { stage?: string } | undefined)?.stage
-        : STAGE_MARKER_NAMES.has(m.stage)
+        : markerNames.has(m.stage)
           ? m.stage
           : undefined;
     const last = [...markers].reverse().find((m) => stageOf(m));
-    resumeStage = ((last && stageOf(last)) as Stage | undefined) ?? "triage";
+    resumeStage = (last && stageOf(last)) ?? (workflow ? Object.keys(workflow.steps)[0]! : "triage");
   }
 
   const statusComment = findMarkerComment(issue.comments, "<!-- factory:status v1");

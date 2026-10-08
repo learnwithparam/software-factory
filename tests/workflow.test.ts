@@ -1,0 +1,167 @@
+// A workflow file is checked whole at load: every problem is named, so a bad
+// file never gets halfway through an issue. Then a custom workflow drives a
+// real issue on the engine, so the YAML is the pipeline, not a description of it.
+
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { mergeConfig } from "../src/config";
+import { parseWorkflow, type Workflow } from "../src/core/workflow";
+import { STEP_TYPES } from "../src/engine/steps";
+import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText } from "../src/engine/workflows";
+import { LABEL } from "../src/labels";
+import type { SetupRunner } from "../src/setup";
+import { FactoryState } from "../src/state";
+import { advanceIssue } from "../src/watch";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+
+const dirs: string[] = [];
+afterAll(() => {
+  for (const d of dirs) rmSync(d, { recursive: true, force: true });
+});
+
+const parse = (raw: unknown) => parseWorkflow(raw, STEP_TYPES, EXPR_ROOTS);
+const problems = (raw: unknown) => {
+  const r = parse(raw);
+  return r.ok ? [] : r.problems;
+};
+const minimal = (steps: Record<string, unknown>) => ({ name: "t", steps });
+
+describe("the bundled feature-to-pr", () => {
+  const wf = defaultWorkflow();
+  test("is today's pipeline, in order, on today's labels", () => {
+    expect(wf.start).toBe("triage");
+    expect(Object.values(wf.steps).map((s) => [s.id, s.label])).toEqual([
+      ["triage", LABEL.triaging],
+      ["plan", LABEL.planning],
+      ["build", LABEL.building],
+      ["verify", LABEL.verifying],
+      ["pr", LABEL.inReview],
+    ]);
+    expect(wf.limits).toEqual({ questions: 2, rejects: 2 });
+    expect(wf.steps.verify!.reject).toBe("build");
+    expect(wf.steps.pr!.revise).toBe("build");
+  });
+});
+
+describe("parseWorkflow names every problem", () => {
+  const cases: [string, unknown, string][] = [
+    ["not a mapping", [], "a workflow is a mapping"],
+    ["unknown top key", { ...minimal({ p: { uses: "pr", label: "x" } }), stepz: 1 }, "stepz: unknown key"],
+    ["no name", { steps: { p: { uses: "pr", label: "x" } } }, "name: required"],
+    ["no steps", { name: "t", steps: {} }, "steps: needs at least one step"],
+    ["bad limit", { ...minimal({ p: { uses: "pr", label: "x" } }), limits: { rejects: -1 } }, "limits.rejects: must be a whole number"],
+    ["unknown limit", { ...minimal({ p: { uses: "pr", label: "x" } }), limits: { tries: 1 } }, "limits.tries: unknown key"],
+    ["unknown step type", minimal({ a: { uses: "deploy", label: "x" } }), 'steps.a.uses: "deploy" is not a step type'],
+    ["missing label", minimal({ p: { uses: "pr" } }), "steps.p.label: required"],
+    ["duplicate label", minimal({ a: { uses: "build", label: "x", next: "p" }, p: { uses: "pr", label: "x" } }), 'steps.p.label: "x" is already a\'s label'],
+    ["unknown step key", minimal({ p: { uses: "pr", label: "x", retries: 3 } }), "steps.p.retries: unknown key"],
+    ["non-terminal without next", minimal({ a: { uses: "build", label: "a" } }), "steps.a.next: required"],
+    ["terminal with next", minimal({ p: { uses: "pr", label: "p", next: "p" } }), "a pr step ends the workflow"],
+    ["verify without reject", minimal({ v: { uses: "verify", label: "v", next: "p" }, p: { uses: "pr", label: "p" } }), "steps.v.reject: required"],
+    ["reject on a step that never rejects", minimal({ a: { uses: "build", label: "a", next: "p", reject: "a" }, p: { uses: "pr", label: "p" } }), "a build step never rejects"],
+    ["check without run", minimal({ c: { uses: "check", label: "c", next: "p" }, p: { uses: "pr", label: "p" } }), "steps.c.run: required"],
+    ["run on a step that takes none", minimal({ a: { uses: "build", label: "a", next: "p", run: "x" }, p: { uses: "pr", label: "p" } }), "a build step takes no command"],
+    ["missing target", minimal({ a: { uses: "build", label: "a", next: "nowhere" } }), 'steps.a.next[0].to: no step "nowhere"'],
+    ["edge with to and park", minimal({ a: { uses: "plan", label: "a", next: [{ to: "p", park: "awaiting-approval" }] }, p: { uses: "pr", label: "p" } }), "needs exactly one of to or park"],
+    ["unknown park", minimal({ a: { uses: "plan", label: "a", next: [{ park: "nap", approve: "p", revise: "a" }] }, p: { uses: "pr", label: "p" } }), '"nap" is not one of'],
+    ["park without approve", minimal({ a: { uses: "plan", label: "a", next: [{ park: "awaiting-approval", revise: "a" }] }, p: { uses: "pr", label: "p" } }), "approve: required with park"],
+    ["unconditional edge before another", minimal({ a: { uses: "plan", label: "a", next: [{ to: "p" }, { to: "p" }] }, p: { uses: "pr", label: "p" } }), "the edges after it never run"],
+    ["last edge conditional", minimal({ a: { uses: "plan", label: "a", next: [{ if: "a.x", to: "p" }] }, p: { uses: "pr", label: "p" } }), "the last edge needs no if:"],
+    ["bad if", minimal({ a: { uses: "plan", label: "a", next: [{ if: "a ==", to: "p" }, { to: "p" }] }, p: { uses: "pr", label: "p" } }), "steps.a.next[0].if: unexpected end"],
+    ["if reads an unknown root", minimal({ a: { uses: "plan", label: "a", next: [{ if: "secrets.x", to: "p" }, { to: "p" }] }, p: { uses: "pr", label: "p" } }), '"secrets" is not a step'],
+    ["forward cycle", minimal({ a: { uses: "build", label: "a", next: "b" }, b: { uses: "build", label: "b", next: "a" } }), "loops through next:"],
+    ["unreachable step", minimal({ p: { uses: "pr", label: "p" }, q: { uses: "pr", label: "q" } }), "steps.q: no edge reaches it from p"],
+  ];
+  for (const [what, raw, expected] of cases)
+    test(what, () => expect(problems(raw).join("\n")).toContain(expected));
+
+  test("reports every problem at once, not the first", () => {
+    expect(problems(minimal({ a: { uses: "deploy" }, b: { uses: "pr", label: "b", next: "a" } })).length).toBeGreaterThanOrEqual(3);
+  });
+  test("a back edge through reject or revise is not a cycle", () => {
+    expect(problems(minimal({ b: { uses: "build", label: "b", next: "v" }, v: { uses: "verify", label: "v", next: "p", reject: "b" }, p: { uses: "pr", label: "p", revise: "b" } }))).toEqual([]);
+  });
+});
+
+describe("loadWorkflow", () => {
+  test("the repo's file wins, a missing one falls back to the bundled, a broken one is an error", async () => {
+    const clone = mkdtempSync(join(tmpdir(), "factory-wf-"));
+    dirs.push(clone);
+    expect((await loadWorkflow(clone)).ok).toBe(true);
+    mkdirSync(join(clone, ".factory", "workflows"), { recursive: true });
+    writeFileSync(join(clone, ".factory", "workflows", "feature-to-pr.yml"), "name: mine\nsteps:\n  p: { uses: pr, label: factory:in-review }\n");
+    const mine = await loadWorkflow(clone);
+    expect(mine.ok && mine.workflow.name).toBe("mine");
+    writeFileSync(join(clone, ".factory", "workflows", "broken.yml"), "name: [\n");
+    expect(await loadWorkflow(clone, "broken")).toMatchObject({ ok: false });
+    expect(await loadWorkflow(clone, "absent")).toMatchObject({ ok: false });
+    expect(await loadWorkflow(clone, "../etc/passwd")).toMatchObject({ ok: false });
+  });
+  test("YAML that is not a workflow names the problem", () => {
+    expect(parseWorkflowText("just a string")).toEqual({ ok: false, problems: ["a workflow is a mapping with name and steps"] });
+  });
+});
+
+// A repo's own pipeline: no plan, a shell check between build and verify.
+const CUSTOM = `
+name: quick-fix
+limits: { questions: 1, rejects: 1 }
+steps:
+  triage: { uses: triage, label: factory:triaging, next: build }
+  build: { uses: build, label: factory:building, next: lint }
+  lint: { uses: check, label: "factory:linting", run: "make lint", next: verify }
+  verify: { uses: verify, label: factory:verifying, next: pr, reject: build }
+  pr: { uses: pr, label: factory:in-review, revise: build }
+`;
+
+class FakeShell implements SetupRunner {
+  readonly ran: string[] = [];
+  constructor(private readonly code: number) {}
+  async run(cmd: string) {
+    this.ran.push(cmd);
+    return { stdout: "lint says no", stderr: "", code: cmd === "make lint" ? this.code : 0 };
+  }
+}
+
+function engine(workflow: Workflow, lintExit: number) {
+  const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
+  const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
+  dirs.push(workspacesDir, cloneDir);
+  const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
+  const executor = new MultiStageExecutor();
+  const setupRunner = new FakeShell(lintExit);
+  const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow };
+  const config = mergeConfig({ repo: "acme/widgets" });
+  const push = (stage: Parameters<MultiStageExecutor["push"]>[0], files: Record<string, string>) => executor.push(stage, 1, fixtureFor(stage, 1), files);
+  push("triage", { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "x", confidence: 0.9 }) });
+  push("build", { "status-comment.md": "<!-- factory:status v1 -->\nb", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) });
+  push("verify", { "verdict-comment.md": "<!-- factory:verdict v1 -->\nv", "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }) });
+  push("pr", { "pr-body.md": "Did it.\nCloses #1" });
+  return { github, executor, setupRunner, run: () => advanceIssue(deps, config, github.issues.get(1)!) };
+}
+
+describe("a custom workflow drives the issue", () => {
+  const parsed = parseWorkflowText(CUSTOM);
+  if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+  const wf = parsed.workflow;
+
+  test("skips plan, runs the check, ships", async () => {
+    const e = engine(wf, 0);
+    expect(await e.run()).toBe("shipped");
+    expect(e.setupRunner.ran).toContain("make lint");
+    expect(e.github.seenLabels).toContain("factory:linting");
+    expect(e.github.seenLabels).not.toContain(LABEL.planning);
+    expect(e.github.createdPrs).toHaveLength(1);
+  });
+
+  test("a red check parks it failed with the output, before verify spends a token", async () => {
+    const e = engine(wf, 2);
+    expect(await e.run()).toBe("failed");
+    expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.failed]);
+    expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain("lint says no");
+    expect(e.github.seenLabels).not.toContain(LABEL.verifying);
+    expect(e.github.createdPrs).toHaveLength(0);
+  });
+});
