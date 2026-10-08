@@ -46,7 +46,8 @@ it loses history, never state.
 The loop is the same state machine regardless of where it runs; only how you start it
 and where its clone lives changes. Claude Code is the verified agent. `.factory/config.json`'s
 `agents`, `stages` and `routes` keys pick an agent per stage, and [docs/agents.md](docs/agents.md)
-lists the other presets and which of them have been run live.
+lists the other presets and which of them have been run live. Its `workflow` key picks the steps an issue
+runs; [docs/workflows.md](docs/workflows.md) has the format.
 
 | Mode | Start | Auth | State lives in | Cockpit |
 |---|---|---|---|---|

@@ -7,6 +7,8 @@ import type { RouteConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
 import { PRESETS } from "./agents/presets";
 import { suggestSlots } from "./machine";
+import { loadWorkflow } from "./engine/workflows";
+import type { Workflow } from "./core/workflow";
 import { createHash } from "node:crypto";
 
 export interface DoctorCheck {
@@ -57,6 +59,8 @@ export interface DoctorContext {
   // compare it against suggestSlots()'s cores/memory heuristic. Advice only
   // (plan v2.7.0 item 5): nothing here enforces the suggestion.
   readonly configuredSlots?: number;
+  // config.workflow: the watcher refuses to start on a workflow that does not parse.
+  readonly workflow?: string;
 }
 
 // Flags that let a CLI run headless without waiting on an approval prompt.
@@ -219,6 +223,17 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
       warn: true,
     });
   }
+  let stepLabels: string[] = [];
+  if (ctx.workflow !== undefined) {
+    const loaded = await loadWorkflow(ctx.cloneDir, ctx.workflow, deps.readFile);
+    if (loaded.ok) stepLabels = workflowLabels(loaded.workflow);
+    checks.push({
+      name: `workflow ${ctx.workflow} is valid`,
+      ok: loaded.ok,
+      detail: loaded.ok ? `${Object.keys(loaded.workflow.steps).length} steps from ${loaded.workflow.start}` : loaded.problems.join("; "),
+      fixable: false,
+    });
+  }
   if (ctx.tmux) {
     checks.push({ name: "tmux is installed (tmux.enabled)", ok: await deps.which("tmux"), detail: "install tmux, or set tmux.enabled to false", fixable: false });
   }
@@ -251,7 +266,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   } catch {
     existingLabels = new Set();
   }
-  const missing = labelsFor(ctx.routes).filter((l) => !existingLabels.has(l.name));
+  const missing = labelsFor(ctx.routes, stepLabels).filter((l) => !existingLabels.has(l.name));
   checks.push({
     name: "all factory labels exist",
     ok: missing.length === 0,
@@ -298,11 +313,13 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   return checks;
 }
 
-export async function fixDoctor(github: ScmPort, repo: string, routes?: Readonly<Record<string, RouteConfig>>): Promise<void> {
-  for (const label of labelsFor(routes)) {
+export async function fixDoctor(github: ScmPort, repo: string, routes?: Readonly<Record<string, RouteConfig>>, workflow?: Workflow): Promise<void> {
+  for (const label of labelsFor(routes, workflow ? workflowLabels(workflow) : [])) {
     await github.ensureLabel(repo, label.name, label.color, label.description);
   }
 }
+
+const workflowLabels = (workflow: Workflow): string[] => Object.values(workflow.steps).map((s) => s.label);
 
 export function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");

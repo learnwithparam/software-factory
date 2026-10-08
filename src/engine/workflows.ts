@@ -4,10 +4,11 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_CONFIG, type FactoryConfig } from "../config";
 import { parseWorkflow, type Workflow, type WorkflowResult } from "../core/workflow";
 import { STEP_TYPES } from "./steps";
 
-export const DEFAULT_WORKFLOW = "feature-to-pr";
+export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
 // What an edge's `if:` may read besides the step ids.
 export const EXPR_ROOTS = ["toggles", "config"] as const;
 
@@ -34,13 +35,27 @@ export function defaultWorkflow(): Workflow {
   return bundled;
 }
 
+type ReadFile = (path: string) => Promise<string | undefined>;
+const readIfThere: ReadFile = async (path) => {
+  const file = Bun.file(path);
+  return (await file.exists()) ? file.text() : undefined;
+};
+
 // The repo's own file wins over the bundled one of the same name; a missing
 // file falls back to it, and a broken one is an error, never a silent default.
-export async function loadWorkflow(cloneDir: string, name: string = DEFAULT_WORKFLOW): Promise<WorkflowResult> {
+// `read` is doctor's file reader, so its checks see what the watcher would.
+export async function loadWorkflow(cloneDir: string, name: string = DEFAULT_WORKFLOW, read: ReadFile = readIfThere): Promise<WorkflowResult> {
   if (!/^[\w-]+$/.test(name)) return { ok: false, problems: [`workflow "${name}": letters, digits, - and _ only`] };
   for (const dir of [join(cloneDir, ".factory", "workflows"), BUNDLED_DIR]) {
-    const file = Bun.file(join(dir, `${name}.yml`));
-    if (await file.exists()) return parseWorkflowText(await file.text());
+    const text = await read(join(dir, `${name}.yml`));
+    if (text !== undefined) return parseWorkflowText(text);
   }
   return { ok: false, problems: [`workflow "${name}": no .factory/workflows/${name}.yml in the repo or the runner`] };
+}
+
+// The workflow a watcher runs for this repo; a broken one stops it at boot with every problem.
+export async function workflowFor(cloneDir: string, config: Pick<FactoryConfig, "workflow">): Promise<Workflow> {
+  const loaded = await loadWorkflow(cloneDir, config.workflow);
+  if (!loaded.ok) throw new Error(`workflow ${config.workflow} is invalid:\n  - ${loaded.problems.join("\n  - ")}`);
+  return loaded.workflow;
 }

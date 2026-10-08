@@ -97,6 +97,8 @@ export interface FactoryConfig {
   readonly prRunSummary: boolean;
   // Installed template files this repo changed on purpose; doctor's drift check skips them.
   readonly templateOverrides: readonly string[];
+  // The workflow an issue runs: .factory/workflows/<name>.yml, else the runner's copy.
+  readonly workflow: string;
 }
 
 export interface TmuxConfig {
@@ -167,6 +169,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   tmux: { enabled: false, session: "factory" },
   prRunSummary: true,
   templateOverrides: [],
+  workflow: "feature-to-pr",
 };
 
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
@@ -217,6 +220,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   tmux: "object",
   prRunSummary: "boolean",
   templateOverrides: "strings",
+  workflow: "string",
   riskCriteria: "object",
 };
 

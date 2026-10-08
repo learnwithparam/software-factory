@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { mergeConfig } from "../src/config";
 import { parseWorkflow, type Workflow } from "../src/core/workflow";
 import { STEP_TYPES } from "../src/engine/steps";
-import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText } from "../src/engine/workflows";
+import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText, workflowFor } from "../src/engine/workflows";
 import { LABEL } from "../src/labels";
 import type { SetupRunner } from "../src/setup";
 import { FactoryState } from "../src/state";
@@ -98,6 +98,15 @@ describe("loadWorkflow", () => {
     expect(await loadWorkflow(clone, "broken")).toMatchObject({ ok: false });
     expect(await loadWorkflow(clone, "absent")).toMatchObject({ ok: false });
     expect(await loadWorkflow(clone, "../etc/passwd")).toMatchObject({ ok: false });
+  });
+  test("config.workflow picks the file a watcher runs, and a broken one stops it at boot", async () => {
+    const clone = mkdtempSync(join(tmpdir(), "factory-wf-"));
+    dirs.push(clone);
+    mkdirSync(join(clone, ".factory", "workflows"), { recursive: true });
+    writeFileSync(join(clone, ".factory", "workflows", "docs-only.yml"), "name: docs-only\nsteps:\n  p: { uses: pr, label: factory:in-review }\n");
+    expect((await workflowFor(clone, mergeConfig({ repo: "a/b" }))).name).toBe("feature-to-pr");
+    expect((await workflowFor(clone, mergeConfig({ repo: "a/b", workflow: "docs-only" }))).name).toBe("docs-only");
+    await expect(workflowFor(clone, { workflow: "absent" })).rejects.toThrow("workflow absent is invalid");
   });
   test("YAML that is not a workflow names the problem", () => {
     expect(parseWorkflowText("just a string")).toEqual({ ok: false, problems: ["a workflow is a mapping with name and steps"] });

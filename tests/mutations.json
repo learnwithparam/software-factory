@@ -152,5 +152,9 @@
   {"name": "rebuild: resumes the last build session", "file": "src/engine/steps.ts", "find": "return last && failure !== undefined ? { resume: { sessionId: last.session_id, failure } } : {};", "replace": "return {};", "test": "tests/scenarios.test.ts"},
   {"name": "rebuild: claude forks the session", "file": "src/agents/presets/claude.ts", "find": "...(opts.resume ? [\"--resume\", opts.resume.sessionId, \"--fork-session\"] : []),", "replace": "", "test": "tests/agents.test.ts"},
   {"name": "rebuild: the tail is the end", "file": "src/engine/common.ts", "find": "bytes.subarray(bytes.length - FAILURE_TAIL_BYTES)", "replace": "bytes.subarray(0, FAILURE_TAIL_BYTES)", "test": "tests/agents.test.ts"},
-  {"name": "rebuild: lastSession filters by stage", "file": "src/state.ts", "find": "AND ($stage IS NULL OR stage = $stage)", "replace": "AND ($stage IS NULL OR 1 = 1)", "test": "tests/scenarios.test.ts"}
+  {"name": "rebuild: lastSession filters by stage", "file": "src/state.ts", "find": "AND ($stage IS NULL OR stage = $stage)", "replace": "AND ($stage IS NULL OR 1 = 1)", "test": "tests/scenarios.test.ts"},
+  {"name": "doctor: checks the workflow", "file": "src/doctor.ts", "find": "      ok: loaded.ok,\n      detail: loaded.ok ? `${Object.keys", "replace": "      ok: true,\n      detail: loaded.ok ? `${Object.keys", "test": "tests/doctor.test.ts"},
+  {"name": "doctor: reads the workflow through its own reader", "file": "src/doctor.ts", "find": "await loadWorkflow(ctx.cloneDir, ctx.workflow, deps.readFile);", "replace": "await loadWorkflow(ctx.cloneDir, ctx.workflow);", "test": "tests/doctor.test.ts"},
+  {"name": "config.workflow: the watcher runs the configured one", "file": "src/engine/workflows.ts", "find": "const loaded = await loadWorkflow(cloneDir, config.workflow);", "replace": "const loaded = await loadWorkflow(cloneDir);", "test": "tests/workflow.test.ts"},
+  {"name": "labels: a workflow's step labels are created", "file": "src/labels.ts", "find": "return [...LABELS, ...extra, ...steps];", "replace": "return [...LABELS, ...extra];", "test": "tests/doctor.test.ts"}
 ]

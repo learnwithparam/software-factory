@@ -1,5 +1,44 @@
 # Changelog
 
+## v3.1.0
+
+The pipeline is a YAML workflow, and the runner is split into a pure core, ports and adapters.
+Upgraders: nothing to change; with no `.factory/workflows/` the runner's own `feature-to-pr` runs,
+and it reproduces v3.0.1 step for step (`tests/scenarios.test.ts` drives every branch through it).
+
+- `.factory/workflows/<name>.yml` and `config.workflow` (default `feature-to-pr`): steps of the
+  built-in types `triage`, `plan`, `build`, `verify`, `pr` and the new `check` (a shell command;
+  red parks the issue as failed), each with its label and its edges. An edge can carry an `if:`
+  (`plan.risk == 'low' && toggles.autoApproveLowRisk`) or park for approval. See
+  [docs/workflows.md](docs/workflows.md). `driveFromStage` is gone; `src/engine/runner.ts` walks the
+  workflow, and approve, revise and retry follow its edges.
+- A broken workflow stops `factory watch` at boot with every problem listed; `factory doctor`
+  checks the configured one, and `doctor --fix` creates any step label the factory does not ship.
+- `src/core/` (the workflow parser and the `if:` language, no I/O), `src/ports/` (`ScmPort`,
+  `Executor`, `GateRunner`, `ExecutionPort`) and `src/adapters/local/` (shell commands).
+  `tests/hexagon.test.ts` enforces the import rules: core imports only core, ports only core and
+  ports, no adapter imports another, and the engine never imports an adapter.
+  `tests/adapters.test.ts` fails on an adapter directory that does not run its port's contract
+  suite (`tests/ports/execution.contract.ts`).
+- GitHub Enterprise: `GH_HOST` (the variable `gh` reads) sets the host for clone URLs and for
+  reading `origin`.
+- A rebuild after a reject resumes the last build session (`claude --resume <id> --fork-session`)
+  and is told the last 12 KiB of why it came back: the verifier's comment, the red gate line or the
+  failed holdout output. Agents that keep no session start fresh, as before.
+
+Not in this release:
+
+- `StorePort`, `SecretsPort`, `NotifierPort` and `EventSourcePort` land with their adapters in
+  v3.2 and v3.3; `ExecutionPort` is a single `run` until the remote runtimes need
+  prepare, collect and teardown (v3.3).
+- `src/state.ts` and `src/agents/` stay where they are; the non-Claude presets move to
+  `contrib/agents` later.
+- `--json-schema` does not replace the stop-artifact hook: it constrains only the final message,
+  and the hook checks the artifact files.
+- The dashboard board has no column for a custom step label; such an issue shows in the list only.
+- A rebuild only resumes for the claude preset; the failure tail is not yet in other agents'
+  prompts.
+
 ## v3.0.1
 
 Cleanup before the v3.1 engine. Upgraders: re-run `install.sh --update` to get `.factory/manifest.json`.
