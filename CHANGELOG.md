@@ -21,6 +21,8 @@ Cleanup before the v3.1 engine. Upgraders: re-run `install.sh --update` to get `
 - Pricing for `claude-sonnet-5-5` and `claude-fable-5-1`; `claude-haiku-5-5` stays unpriced because
   its rate is tiered by prompt size. The example config's sonnet agent uses `claude-sonnet-5-5`.
 - The CLI's code moved to `src/cli.ts` (`bin/factory` is a shim), so `tsc` checks it directly.
+- `.config/wt.toml`: a worktrunk worktree of the factory gets its own `FACTORY_HOME`, dashboard port
+  and machine caps in `.factory-wt.env`, so a live loop there shares nothing with another run.
 - `.github/CODEOWNERS`; the README points at `docs/agents.md` for which agents are verified.
 
 ## v3.0.0
