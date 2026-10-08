@@ -12,7 +12,7 @@ import type { GhIssue } from "../github";
 import { LABEL } from "../labels";
 import { McpError } from "../mcp";
 import { checkSpendCap, finish, moveLabel, OperatorTakeover, postComment, stopStep, type Outcome, type RunCtx, type WatchDeps } from "./common";
-import { STEP_TYPES } from "./steps";
+import { RuntimeMissing, STEP_TYPES } from "./steps";
 
 export async function runWorkflow(
   deps: WatchDeps,
@@ -67,8 +67,12 @@ export async function runWorkflow(
     }
   } catch (e) {
     if (e instanceof McpError) {
-      // A server the step names is not in the worktree's .factory/mcp.json: nothing ran, so a retry after the fix is free.
+      // A server the step names is not in the base branch's .factory/mcp.json: nothing ran, so a retry after the fix is free.
       await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to .factory/mcp.json or drop it from the step, then \`/factory retry\`.`, { stage: "mcp", json: { step: step.id, problem: e.message } });
+      return await stopStep(deps, config, issueNumber, step.label, { status: "failed", reason: e.message });
+    }
+    if (e instanceof RuntimeMissing) {
+      await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to FACTORY_HOME/machine.json runtimes or drop it from the step, then \`/factory retry\`.`, { stage: "runtime", json: { step: step.id, problem: e.message } });
       return await stopStep(deps, config, issueNumber, step.label, { status: "failed", reason: e.message });
     }
     if (!(e instanceof OperatorTakeover)) throw e;

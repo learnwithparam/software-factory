@@ -189,5 +189,13 @@
   {"name": "mcp: the registry gives only the named servers", "file": "src/engine/common.ts", "find": "const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;", "replace": "const mcp = undefined;", "test": "tests/workflow.test.ts"},
   {"name": "mcp: a missing server fails the issue", "file": "src/engine/runner.ts", "find": "    if (e instanceof McpError) {", "replace": "    if (false) {", "test": "tests/workflow.test.ts"},
   {"name": "mcp: doctor checks the registry", "file": "src/doctor.ts", "find": "        ok: problems.length === 0,\n        detail: problems.length ? problems.join", "replace": "        ok: true,\n        detail: problems.length ? problems.join", "test": "tests/doctor.test.ts"},
-  {"name": "mcp: the registry is read from the base branch, not the worktree", "file": "src/engine/common.ts", "find": "mcpServersFor(deps.cloneDir, mcpNames)", "replace": "mcpServersFor(worktree, mcpNames)", "test": "tests/workflow.test.ts"}
+  {"name": "mcp: the registry is read from the base branch, not the worktree", "file": "src/engine/common.ts", "find": "mcpServersFor(deps.cloneDir, mcpNames)", "replace": "mcpServersFor(worktree, mcpNames)", "test": "tests/workflow.test.ts"},
+  {"name": "runtimes: docker drops every capability", "file": "src/adapters/docker/execution.ts", "find": "    \"--cap-drop=ALL\",\n", "replace": "", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: docker root filesystem is read-only", "file": "src/adapters/docker/execution.ts", "find": "    \"--read-only\",\n", "replace": "", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: docker has no network by default", "file": "src/adapters/docker/execution.ts", "find": "spec.network ?? \"none\"", "replace": "spec.network ?? \"bridge\"", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: the frame carries the command's code, not the runtime's", "file": "src/core/frame.ts", "find": "code: Number(end[1]) };", "replace": "code: runtimeCode };", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: machine.json runtimes are validated", "file": "src/machine.ts", "find": "runtimeProblems(", "replace": "(() => [])(", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: runtime: is refused on agent steps", "file": "src/core/workflow.ts", "find": "else if (kind && !kind.command)", "replace": "else if (false)", "test": "tests/runtimes.test.ts"},
+  {"name": "runtimes: a check step runs on its named runtime", "file": "src/engine/steps.ts", "find": "const name = step.runtime ?? config.runtime?.check;", "replace": "const name = undefined as string | undefined;", "test": "tests/workflow.test.ts"},
+  {"name": "runtimes: doctor names an unknown runtime", "file": "src/doctor.ts", "find": "        ok: unknown.length === 0,", "replace": "        ok: true,", "test": "tests/doctor.test.ts"}
 ]

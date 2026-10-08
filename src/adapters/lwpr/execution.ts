@@ -30,7 +30,7 @@ export function lwprArgs(spec: LwprSpec, cmd: string): string[] {
 export class LwprExecution implements ExecutionPort {
   constructor(private readonly spec: LwprSpec = { kind: "lwpr" }) {}
   async run(cmd: string, cwd: string): Promise<ExecResult> {
-    const proc = Bun.spawn(lwprArgs(this.spec, cmd), { cwd, stdout: "pipe", stderr: "pipe" });
+    const proc = Bun.spawn(lwprArgs(this.spec, cmd), { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
     const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
     return unframe(`${stdout}\n${stderr}`, code);
   }

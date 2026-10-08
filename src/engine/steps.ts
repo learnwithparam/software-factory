@@ -43,6 +43,10 @@ import {
   type WatchDeps,
 } from "./common";
 
+// A check step names a runtime this machine lacks. Boot refuses that, so this
+// is a workflow edited while the watcher runs.
+export class RuntimeMissing extends Error {}
+
 export interface StepCtx {
   readonly deps: WatchDeps;
   readonly config: FactoryConfig;
@@ -347,7 +351,7 @@ const check: StepType = {
     const { deps, config, issue, worktree, step } = sc;
     const name = step.runtime ?? config.runtime?.check;
     const runtime = name ? deps.runtimes?.[name] : (deps.setupRunner ?? new ShellSetupRunner());
-    if (!runtime) throw new Error(`steps.${step.id}: no runtime "${name}"`);
+    if (!runtime) throw new RuntimeMissing(`no runtime "${name}" on this machine`);
     const out = await runtime.run(step.run!, worktree);
     if (out.code === 0) return { kind: "next", facts: { ok: true } };
     const tail = `${out.stdout}\n${out.stderr}`.trim().slice(-4000);

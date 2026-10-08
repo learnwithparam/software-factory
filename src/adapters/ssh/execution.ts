@@ -27,7 +27,7 @@ export function sshArgs(spec: SshSpec, cmd: string, cwd: string): { sync: string
 }
 
 async function spawn(argv: string[], cwd: string): Promise<ExecResult> {
-  const proc = Bun.spawn(argv, { cwd, stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawn(argv, { cwd, env: process.env, stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
   return { stdout, stderr, code };
 }

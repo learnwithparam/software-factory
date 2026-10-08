@@ -3,8 +3,13 @@
 
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterAll, beforeAll } from "bun:test";
+import { DockerExecution } from "../src/adapters/docker/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
+import { LwprExecution } from "../src/adapters/lwpr/execution";
+import { SshExecution } from "../src/adapters/ssh/execution";
 import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 import { executionContract } from "./ports/execution.contract";
 
@@ -18,8 +23,23 @@ class RecordingExecution implements ExecutionPort {
   }
 }
 
+// Remote runtimes run their real argv against stand-ins on PATH (tests/fixtures/runtimes), which
+// behave like the real tools where it matters: lwpr merges streams and runs on a copy.
+function onFakePath(run: () => void): () => void {
+  return () =>
+    describe("with stand-in tools", () => {
+      const saved = process.env.PATH;
+      beforeAll(() => (process.env.PATH = `${join(import.meta.dir, "fixtures", "runtimes")}:${saved}`));
+      afterAll(() => (process.env.PATH = saved));
+      run();
+    });
+}
+
 const REGISTRY: Record<string, () => void> = {
   local: () => executionContract("local", () => new LocalExecution()),
+  docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
+  lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
+  ssh: onFakePath(() => executionContract("ssh", () => new SshExecution({ kind: "ssh", host: "box", dir: join(tmpdir(), `factory-ssh-${process.pid}`) }))),
 };
 
 describe("adapters", () => {

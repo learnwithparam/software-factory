@@ -135,7 +135,7 @@ class FakeShell implements SetupRunner {
 }
 
 // `base` is written to the clone (the base branch); `seed` to every new worktree.
-function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}) {
+function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}, runtimes: Record<string, FakeShell> = {}) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
@@ -148,7 +148,7 @@ function engine(workflow: Workflow, lintExit: number, base: Record<string, strin
   const setupRunner = new FakeShell(lintExit);
   const git = new FakeGit();
   git.seed = seed;
-  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow };
+  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow, runtimes };
   const config = mergeConfig({ repo: "acme/widgets" });
   const push = (stage: Parameters<MultiStageExecutor["push"]>[0], files: Record<string, string>) => executor.push(stage, 1, fixtureFor(stage, 1), files);
   push("triage", { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "x", confidence: 0.9 }) });
@@ -206,5 +206,24 @@ describe("a step's mcp: reaches only that step's run", () => {
     const e = engine(parsed.workflow, 0, registry({ docs }), registry(planted));
     expect(await e.run()).toBe("shipped");
     expect(e.executor.mcp.find(([stage]) => stage === "build")![1]).toEqual({ docs });
+  });
+});
+
+describe("a check step runs on its named runtime", () => {
+  const parsed = parseWorkflowText(CUSTOM.replace('run: "make lint",', 'run: "make lint", runtime: box,'));
+  if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+
+  test("the command goes to that runtime, not the local shell, and its result counts", async () => {
+    const box = new FakeShell(2);
+    const e = engine(parsed.workflow, 0, {}, {}, { box });
+    expect(await e.run()).toBe("failed");
+    expect(box.ran).toEqual(["make lint"]);
+    expect(e.setupRunner.ran).not.toContain("make lint");
+  });
+
+  test("a name this machine lacks fails the issue", async () => {
+    const e = engine(parsed.workflow, 0);
+    expect(await e.run()).toBe("failed");
+    expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain('no runtime "box"');
   });
 });
