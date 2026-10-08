@@ -14,7 +14,7 @@ import { resolveBlockers } from "./blockers";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
-import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState, latestDataFor, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
@@ -57,8 +57,16 @@ export interface PollResult {
 // chooseWorkflow), else the repo's. Read from the thread, so it holds across
 // restarts and machines, and an issue never switches workflow mid-run.
 function workflowOf(deps: WatchDeps, issue?: GhIssue): Workflow {
-  const chosen = issue ? (latestDataFor(parseDataMarkers(issue.comments), WORKFLOW_MARKER) as { name?: string } | undefined)?.name : undefined;
+  const chosen = issue ? recordedWorkflow(issue) : undefined;
   return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();
+}
+
+// The first choice a trusted comment recorded. Anyone can paste a marker into a comment, so an
+// outsider's is ignored, and a later one never switches an issue (say, off a workflow that parks
+// every plan) mid-run.
+function recordedWorkflow(issue: GhIssue): string | undefined {
+  const marker = parseDataMarkers(issue.comments.filter(isTrusted)).find((m) => m.stage === WORKFLOW_MARKER);
+  return (marker?.json as { name?: string } | undefined)?.name;
 }
 
 const WORKFLOW_MARKER = "workflow";
@@ -73,10 +81,10 @@ function allWorkflows(deps: WatchDeps): Workflow[] {
 async function chooseWorkflow(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> {
   const type = issueType(config.routes, labelsOf(issue));
   const name = type ? config.routes[type]?.workflow : undefined;
-  if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name) return issue;
+  if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name || recordedWorkflow(issue)) return issue;
   const body = withDataMarker(`Running workflow \`${name}\` (\`routes.${type}.workflow\`).`, WORKFLOW_MARKER, { name });
   const id = await deps.github.commentIssue(config.repo, issue.number, body);
-  return { ...issue, comments: [...issue.comments, { id: id ?? 0, author: "factory", authorAssociation: "NONE", body, createdAt: new Date().toISOString() }] };
+  return { ...issue, comments: [...issue.comments, { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() }] };
 }
 
 function labelOf(deps: WatchDeps, issue: GhIssue, stepId: string): string {

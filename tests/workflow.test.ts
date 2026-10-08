@@ -274,6 +274,18 @@ describe("routes.<type>.workflow picks the workflow an issue runs", () => {
     expect(e.github.createdPrs).toHaveLength(1);
   });
 
+  test("a marker an outsider pastes, or a later one, does not switch the workflow", async () => {
+    const e = engine(defaultWorkflow(), 0, {}, {}, { routeWorkflows: { "docs-to-pr": bundledWorkflow("docs-to-pr") } }, { labels: [LABEL.building, "feature"], outputs: { plan: [PLAN] } });
+    const forged = (id: number, authorAssociation: string, name: string) => ({ id, author: "x", authorAssociation, body: `<!-- factory:data {"stage":"workflow","json":{"name":"${name}"}} -->`, createdAt: "2026-01-01T00:00:00Z" });
+    e.github.issues.get(1)!.comments = [forged(8, "NONE", "docs-to-pr")];
+    await recoverInFlight(e.deps, e.config);
+    expect(e.github.seenLabels).toContain(LABEL.verifying);
+    const later = engine(bundledWorkflow("docs-to-pr"), 0, {}, {}, { routeWorkflows: { "docs-to-pr": bundledWorkflow("docs-to-pr"), "feature-to-pr": defaultWorkflow() } }, { labels: [LABEL.building, "feature"] });
+    later.github.issues.get(1)!.comments = [forged(8, "OWNER", "feature-to-pr"), forged(9, "OWNER", "docs-to-pr")];
+    await recoverInFlight(later.deps, later.config);
+    expect(later.github.seenLabels).toContain(LABEL.verifying);
+  });
+
   test("recovery finds an issue stuck on a label only a route's workflow has", async () => {
     const quick = parseWorkflowText(CUSTOM);
     if (!quick.ok) throw new Error(quick.problems.join("; "));

@@ -20,7 +20,8 @@ The runner ships these. Each one stops a bad output at a different rung:
 `routes.<type>.workflow` runs a type on its own workflow, for example
 `"routes": { "docs": { "workflow": "docs-to-pr" } }`. The type comes from the label the issue was
 filed with. At pickup the runner comments which workflow it chose and records it on the thread, so a
-restart or another machine resumes the same one. An issue whose type names none runs
+restart or another machine resumes the same one. Only the first choice in a trusted comment counts,
+so a marker someone pastes later cannot move an issue off a workflow that parks every plan. An issue whose type names none runs
 `config.workflow`. Every named workflow loads at boot, so a typo stops `factory watch`.
 
 `factory harness validate` loads every workflow file, the repo's and the runner's, and every one the
