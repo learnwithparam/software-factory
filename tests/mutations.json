@@ -197,5 +197,11 @@
   {"name": "runtimes: machine.json runtimes are validated", "file": "src/machine.ts", "find": "runtimeProblems(", "replace": "(() => [])(", "test": "tests/runtimes.test.ts"},
   {"name": "runtimes: runtime: is refused on agent steps", "file": "src/core/workflow.ts", "find": "else if (kind && !kind.command)", "replace": "else if (false)", "test": "tests/runtimes.test.ts"},
   {"name": "runtimes: a check step runs on its named runtime", "file": "src/engine/steps.ts", "find": "const name = step.runtime ?? config.runtime?.check;", "replace": "const name = undefined as string | undefined;", "test": "tests/workflow.test.ts"},
-  {"name": "runtimes: doctor names an unknown runtime", "file": "src/doctor.ts", "find": "        ok: unknown.length === 0,", "replace": "        ok: true,", "test": "tests/doctor.test.ts"}
+  {"name": "runtimes: doctor names an unknown runtime", "file": "src/doctor.ts", "find": "        ok: unknown.length === 0,", "replace": "        ok: true,", "test": "tests/doctor.test.ts"},
+  {"name": "leases: an expired lease is reclaimed", "file": "src/core/lease.ts", "find": "current.expiresAt <= now", "replace": "false", "test": "tests/lease.test.ts"},
+  {"name": "leases: a git lease commit is a child of the one it replaces", "file": "src/adapters/git-lease/lease.ts", "find": "...(parent ? [\"-p\", parent] : [])", "replace": "...([] as string[])", "test": "tests/adapters.test.ts"},
+  {"name": "leases: a git lease is released only by its holder", "file": "src/adapters/git-lease/lease.ts", "find": "cur.record?.holder !== holder", "replace": "false", "test": "tests/adapters.test.ts"},
+  {"name": "leases: a failed renewal marks the lease lost", "file": "src/engine/lease.ts", "find": "held.lost = true;", "replace": ";", "test": "tests/lease.test.ts"},
+  {"name": "leases: the runner stops when its lease is lost", "file": "src/engine/runner.ts", "find": "if (deps.leases?.held.get(issueNumber)?.lost) return \"waiting\";", "replace": "", "test": "tests/workflow.test.ts"},
+  {"name": "leases: only the lease holder walks the steps", "file": "src/watch.ts", "find": "return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx));", "replace": "return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);", "test": "tests/scenarios.test.ts"}
 ]

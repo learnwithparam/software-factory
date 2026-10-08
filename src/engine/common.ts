@@ -18,6 +18,8 @@ import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
 import type { GhIssue } from "../github";
+import { withLease, type Held, type LeaseOpts } from "./lease";
+import type { LeasePort } from "../ports/lease";
 import type { ExecutionPort } from "../ports/execution";
 import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
@@ -55,6 +57,11 @@ export interface WatchDeps {
   // Runs config.setup once per worktree; defaults to a real shell so tests
   // can inject a fake instead of actually running `npm ci`.
   readonly setupRunner?: SetupRunner;
+  // Absent: this process is the only worker on the repo. Present: every
+  // advance holds the issue's lease (src/engine/lease.ts) for its whole run,
+  // so workers on other machines, CI jobs and cloud routines never run the
+  // same issue at once, and a crashed worker's issue is reclaimed after the TTL.
+  readonly leases?: { readonly port: LeasePort; readonly holder: string; readonly opts?: LeaseOpts; readonly held: Map<number, Held> };
   // Runtimes by name for check steps (src/runtimes.ts builds them); absent means check steps run like setup.
   readonly runtimes?: Readonly<Record<string, ExecutionPort>>;
   // Absent means this process alone decides concurrency (config.concurrency,
@@ -122,6 +129,22 @@ export async function ensureWorktreeReady(
 
 export function withDataMarker(body: string, stage: string, json: unknown): string {
   return `${body}\n\n<!-- factory:data ${JSON.stringify({ stage, json })} -->`;
+}
+
+// Runs `work` holding the issue's lease when leases are on. "waiting" when
+// another worker holds it: that worker is advancing the issue right now.
+export async function leased(deps: WatchDeps, issueNumber: number, work: () => Promise<Outcome>): Promise<Outcome> {
+  const l = deps.leases;
+  if (!l) return work();
+  const out = await withLease(l.port, String(issueNumber), l.holder, async (held) => {
+    l.held.set(issueNumber, held);
+    try {
+      return await work();
+    } finally {
+      l.held.delete(issueNumber);
+    }
+  }, l.opts);
+  return out ?? "waiting";
 }
 
 export async function postComment(

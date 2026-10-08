@@ -27,6 +27,7 @@ import {
   ensureWorktreeReady,
   finish,
   labelsOf,
+  leased,
   postComment,
   runQueuedRetros,
   runRetro,
@@ -60,7 +61,10 @@ function labelOf(deps: WatchDeps, stepId: string): string {
 }
 
 function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, stepId: string, worktree: string, ctx?: RunCtx): Promise<Outcome> {
-  return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);
+  // With leases on, only the lease holder walks the steps: a second worker
+  // (another machine, a CI job) gets "waiting", and a dead worker's issue is
+  // reclaimed by whoever resumes it after the TTL.
+  return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx));
 }
 
 // Intake trust (P36): a label is a request to spend tokens and push a branch,

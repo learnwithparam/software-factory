@@ -3,6 +3,8 @@
 // Git hold a private CommandRunner field, so a plain object can't satisfy the
 // type; subclassing and overriding every public method is the honest fake.
 
+import { mayTake, type LeaseRecord } from "../src/core/lease";
+import type { LeasePort } from "../src/ports/lease";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
@@ -377,3 +379,20 @@ export class MultiStageExecutor {
   }
 }
 
+
+// One shared lease table, held to tests/ports/lease.contract.ts.
+export class FakeLeases implements LeasePort {
+  readonly table = new Map<string, LeaseRecord>();
+  readonly log: string[] = [];
+  async acquire(key: string, holder: string, ttlMs: number, now: number): Promise<boolean> {
+    if (!mayTake(this.table.get(key), holder, now)) return false;
+    this.table.set(key, { holder, expiresAt: now + ttlMs });
+    this.log.push(`acquire ${key} ${holder}`);
+    return true;
+  }
+  async release(key: string, holder: string): Promise<void> {
+    if (this.table.get(key)?.holder !== holder) return;
+    this.table.set(key, { holder, expiresAt: 0 });
+    this.log.push(`release ${key} ${holder}`);
+  }
+}

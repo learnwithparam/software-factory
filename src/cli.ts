@@ -3,6 +3,7 @@
 // stays testable without a child process.
 
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { GitHub, type ScmPort } from "./github";
 import { GitCommandRunner, Git } from "./git";
@@ -35,6 +36,7 @@ import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { workflowFor } from "./engine/workflows";
+import { GitLeases } from "./adapters/git-lease/lease";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 
 const args = process.argv.slice(2);
@@ -116,6 +118,9 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     // shares this machine's FACTORY_HOME/machine.db, so a second repo's
     // watcher on the same machine is respected (plan v2.7.0 item 5).
     machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
+    // Issue leases on the repo's own remote, so watchers on other machines,
+    // CI jobs and cloud routines driving the same repo never run one issue twice.
+    leases: { port: new GitLeases(cloneDir), holder: `${hostname()}-${process.pid}`, held: new Map() },
   };
 }
 

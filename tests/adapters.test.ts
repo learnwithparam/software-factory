@@ -2,16 +2,19 @@
 // so a new runtime or SCM can't land without proving it behaves like the rest.
 
 import { describe, expect, test } from "bun:test";
-import { readdirSync } from "node:fs";
+import { mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll } from "bun:test";
 import { DockerExecution } from "../src/adapters/docker/execution";
+import { GitLeases } from "../src/adapters/git-lease/lease";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
 import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 import { executionContract } from "./ports/execution.contract";
+import { leaseContract } from "./ports/lease.contract";
+import { FakeLeases } from "./harness";
 
 // A fake that obeys the contract by running through bash too: what a test
 // double of a remote runtime looks like when it is held to the same suite.
@@ -35,7 +38,22 @@ function onFakePath(run: () => void): () => void {
     });
 }
 
+// Each worker gets its own clone of one bare remote, as separate machines would.
+function gitLeases() {
+  const root = mkdtempSync(join(tmpdir(), "factory-lease-"));
+  Bun.spawnSync(["git", "init", "-q", "--bare", join(root, "origin.git")]);
+  let n = 0;
+  const clone = () => {
+    const dir = join(root, `w${n++}`);
+    Bun.spawnSync(["git", "init", "-q", dir]);
+    Bun.spawnSync(["git", "remote", "add", "origin", join(root, "origin.git")], { cwd: dir });
+    return new GitLeases(dir);
+  };
+  return { port: clone(), peer: clone };
+}
+
 const REGISTRY: Record<string, () => void> = {
+  "git-lease": () => leaseContract("git-lease", gitLeases),
   local: () => executionContract("local", () => new LocalExecution()),
   docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
   lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
@@ -53,4 +71,8 @@ describe("adapters", () => {
 
   for (const run of Object.values(REGISTRY)) run();
   executionContract("recording fake", () => new RecordingExecution());
+  leaseContract("in-memory fake", () => {
+    const port = new FakeLeases();
+    return { port, peer: () => port };
+  });
 });

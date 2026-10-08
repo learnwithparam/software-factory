@@ -37,6 +37,8 @@ export async function runWorkflow(
 
   try {
     for (;;) {
+      // The lease lapsed and another worker may hold it now: stop here, between steps, with the label as it is.
+      if (deps.leases?.held.get(issueNumber)?.lost) return "waiting";
       const overBudget = checkSpendCap(deps, config, issueNumber);
       if (overBudget) {
         await postComment(deps, config, issueNumber, `Parked: ${overBudget}.`, { stage: "budget", json: { reason: overBudget } });

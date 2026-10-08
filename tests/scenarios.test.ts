@@ -13,7 +13,7 @@ import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/e
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeLeases, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const seen = new Set<string>();
 const initialLabels = new Map<object, string[]>();
@@ -628,6 +628,24 @@ describe("in-review and claim paths", () => {
     build_to_pr(c);
     expect(await recoverInFlight(c.deps, c.config)).toEqual([1]);
     expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    done(c);
+  });
+
+  test("20b. with leases, recovery leaves an issue a live worker holds and reclaims one whose worker died", async () => {
+    const c = setup([LABEL.building]);
+    c.github.issues.get(1)!.comments = [
+      { id: 1, author: "bot", authorAssociation: "OWNER", body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`, createdAt: "2026-01-01T00:00:00Z" },
+    ];
+    build_to_pr(c);
+    const port = new FakeLeases();
+    const deps = { ...c.deps, leases: { port, holder: "me", held: new Map() } };
+    await port.acquire("1", "other", 30_000, Date.now());
+    await recoverInFlight(deps, c.config);
+    expect(labels(c.github, 1)).toEqual([LABEL.building]);
+    port.table.set("1", { holder: "other", expiresAt: Date.now() - 1 });
+    await recoverInFlight(deps, c.config);
+    expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    expect(port.log.at(-1)).toBe("release 1 me");
     done(c);
   });
 
