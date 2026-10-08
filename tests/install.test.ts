@@ -11,6 +11,7 @@ setDefaultTimeout(30_000);
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { runDoctor, sha256 } from "../src/doctor";
 
 const SCRIPT = join(import.meta.dir, "..", "install.sh");
 
@@ -184,8 +185,8 @@ describe("install.sh scaffold", () => {
 // seam to inject a fake for an in-process test. This proves the wiring
 // exists and is skipped on --dry-run, so a real install is never silently
 // missing the label-creation step it claims to run (plan v2.11.0 item A).
-describe("bin/factory install calls fixDoctor", () => {
-  const bin = readFileSync(join(import.meta.dir, "..", "bin", "factory"), "utf8");
+describe("factory install calls fixDoctor", () => {
+  const bin = readFileSync(join(import.meta.dir, "..", "src", "cli.ts"), "utf8");
   const start = bin.indexOf("async function cmdInstall");
   const end = bin.indexOf("async function main");
   const cmdInstall = bin.slice(start, end);
@@ -241,5 +242,47 @@ describe("install.sh --agents", () => {
     expect(existsSync(join(dry, ".pi"))).toBe(false);
     rmSync(target, { recursive: true, force: true });
     rmSync(dry, { recursive: true, force: true });
+  });
+});
+
+describe("install manifest and doctor drift", () => {
+  const drift = async (target: string, templateOverrides?: string[]) => {
+    const readFile = async (p: string) => (existsSync(p) ? readFileSync(p, "utf8") : undefined);
+    const github = { authStatus: async () => ({ ok: true, detail: "" }) } as never;
+    const d = { github, git: {} as never, which: async () => true, fileExists: async () => true, readFile, isExecutable: async () => true };
+    const checks = await runDoctor(d, { repo: "a/b", cloneDir: target, baselineTag: "", templateOverrides });
+    return checks.find((c) => c.name === "factory files unchanged since install");
+  };
+
+  test("lists every factory file it installed, but not repo-owned files or a file the repo already had", () => {
+    const target = scratchTarget();
+    mkdirSync(join(target, ".claude", "hooks"), { recursive: true });
+    writeFileSync(join(target, ".claude", "hooks", "guard-paths.sh"), "# ours\n");
+    expect(run([target]).code).toBe(0);
+    const files = JSON.parse(readFileSync(join(target, ".factory", "manifest.json"), "utf8")).files;
+    expect(files[".claude/settings.json"]).toBe(sha256(readFileSync(join(target, ".claude", "settings.json"), "utf8")));
+    expect(files[".claude/hooks/guard-paths.sh"]).toBeUndefined();
+    expect(files[".factory/charter.md"]).toBeUndefined();
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("doctor passes on a fresh install and names a file edited after it, unless overridden", async () => {
+    const target = scratchTarget();
+    expect(run([target]).code).toBe(0);
+    expect((await drift(target))?.ok).toBe(true);
+    writeFileSync(join(target, ".claude", "hooks", "guard-paths.sh"), "# edited\n");
+    const check = (await drift(target))!;
+    expect(check.ok).toBe(false);
+    expect(check.warn).toBe(true);
+    expect(check.detail).toContain(".claude/hooks/guard-paths.sh");
+    expect((await drift(target, [".claude/hooks/"]))?.ok).toBe(true);
+    rmSync(target, { recursive: true, force: true });
+  });
+
+  test("--dry-run writes no manifest", () => {
+    const target = scratchTarget();
+    expect(run([target, "--dry-run"]).code).toBe(0);
+    expect(existsSync(join(target, ".factory", "manifest.json"))).toBe(false);
+    rmSync(target, { recursive: true, force: true });
   });
 });

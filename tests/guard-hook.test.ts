@@ -184,6 +184,15 @@ describe("guard-paths.sh", () => {
     expect(code).toBe(0);
   });
 
+  // Lessons are written only by `factory learn`, through a reviewed PR; a stage that edits
+  // the file would teach every later run without review.
+  test("blocks an edit of .factory/memory/lessons.md: only the runner writes lessons", async () => {
+    for (const tool_name of ["Edit", "Write"]) {
+      const { code } = await runHook({ tool_name, tool_input: { file_path: `${projectDir}/.factory/memory/lessons.md` } });
+      expect(code).toBe(2);
+    }
+  });
+
   test("allows a plain read-only Bash command", async () => {
     const { code } = await runHook({
       tool_name: "Bash",

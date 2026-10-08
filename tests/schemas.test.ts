@@ -104,3 +104,18 @@ describe("plan's proof field", () => {
     expect(validateStepJson("plan", { risk: "low", revision: 1, files: [], autoApproveEligible: true })).toEqual({ ok: true });
   });
 });
+
+describe("a retro proposes one change", () => {
+  const ok = { outcome: "complete", summary: "s" };
+  test("a lesson alone, a skill edit alone, or nothing all validate", () => {
+    expect(validateStepJson("retro", ok)).toEqual({ ok: true });
+    expect(validateStepJson("retro", { ...ok, lesson: "l" })).toEqual({ ok: true });
+    expect(validateStepJson("retro", { ...ok, skill_name: "factory-build", skill_edit: "e" })).toEqual({ ok: true });
+  });
+
+  test("a lesson with a skill edit fails, and so does half a skill edit", () => {
+    expect(validateStepJson("retro", { ...ok, lesson: "l", skill_name: "factory-build", skill_edit: "e" })).toEqual({ ok: false, reason: 'retro.json: "lesson" and "skill_edit" cannot appear together' });
+    expect(validateStepJson("retro", { ...ok, skill_name: "factory-build" })).toEqual({ ok: false, reason: 'retro.json: "skill_name" needs "skill_edit"' });
+    expect(validateStepJson("retro", { ...ok, skill_edit: "e" })).toEqual({ ok: false, reason: 'retro.json: "skill_edit" needs "skill_name"' });
+  });
+});

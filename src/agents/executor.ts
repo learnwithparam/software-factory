@@ -40,6 +40,7 @@ export function renderEvent(e: StageEvent): string | undefined {
   if (e.kind === "tool_use") return `> ${e.toolName ?? "tool"}`;
   if (e.kind === "text" || e.kind === "truncated") return e.text ? plain(e.text) : undefined;
   if (e.kind === "session") return `session ${e.sessionId}`;
+  if (e.kind === "startup_error") return `startup error: ${plain(e.text ?? "")}`;
   // One "denied" line per refused call, so scripts/e2e-score.ts can count them.
   if (e.kind === "result")
     return [`result ${e.text ?? ""}${e.costUsd === undefined ? "" : ` $${e.costUsd.toFixed(3)}`}`.trim(), ...(e.denials ?? []).map((d) => `denied ${plain(d)}`)].join("\n");
@@ -174,6 +175,7 @@ export class CommandExecutor implements Executor {
       detached: true, // its own process group, so a kill reaches the agent's children too
       env: {
         ...sanitizeEnv(process.env, agent.preset?.envKeys),
+        ...agent.preset?.env,
         FACTORY_ARTIFACT_DIR: artifactDir,
         FACTORY_ISSUE: String(opts.issue),
         FACTORY_STAGE: opts.stage,
@@ -253,6 +255,11 @@ export class CommandExecutor implements Executor {
           events.push(e);
           const line = renderEvent(e);
           if (line !== undefined) append(opts.transcriptFile, `${line}\n`);
+        }
+        // Running on without the MCP servers or plugins it was configured with gives a wrong result, not a slower one.
+        if (e.kind === "startup_error" && !killedReason) {
+          killedReason = `agent startup failed: ${e.text}`;
+          killGroup();
         }
         if (e.kind !== "tool_use") continue;
         toolCalls += 1;

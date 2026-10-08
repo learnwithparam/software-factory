@@ -10,6 +10,7 @@ import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CommandResult, CommandRunner } from "./github";
+import type { ChangedFile } from "./merge-policy";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
   const proc = Bun.spawn(["git", ...args], { cwd, env: env ? { ...process.env, ...env } : undefined, stdout: "pipe", stderr: "pipe" });
@@ -192,15 +193,28 @@ export class Git {
   // File-by-file added/deleted line counts, for merge-policy's autoEligible
   // (src/merge-policy.ts). A binary file reports "-" for both counts in
   // `--numstat`; those count as a changed file but add no lines.
-  async diffStat(worktreeDir: string, base: string): Promise<{ path: string; additions: number; deletions: number }[]> {
-    const result = await this.runner.run(["diff", "--numstat", `origin/${base}...HEAD`], { cwd: worktreeDir });
-    return result.stdout
-      .split("\n")
-      .map((line) => line.trim())
+  // The diff of `head` (the PR head the merge will match, not whatever the worktree holds)
+  // against the base. --no-renames lists a rename as a delete and an add, so both paths meet
+  // the path globs; --raw gives each file's new mode; numstat's "-" marks a binary file.
+  async diffStat(worktreeDir: string, base: string, head = "HEAD"): Promise<ChangedFile[]> {
+    const range = `origin/${base}...${head}`;
+    const [numstat, raw] = await Promise.all([
+      this.runner.run(["diff", "--numstat", "--no-renames", "-z", range], { cwd: worktreeDir }),
+      this.runner.run(["diff", "--raw", "--no-renames", "-z", range], { cwd: worktreeDir }),
+    ]);
+    if (numstat.code !== 0 || raw.code !== 0) throw new Error(`git diff ${range} failed: ${numstat.stderr || raw.stderr}`);
+    const modes = new Map<string, string>();
+    const rawParts = raw.stdout.split("\0");
+    for (let i = 0; i + 1 < rawParts.length; i += 2) modes.set(rawParts[i + 1]!, rawParts[i]!.split(" ")[1]!);
+    return numstat.stdout
+      .split("\0")
       .filter(Boolean)
-      .map((line) => {
-        const [add, del, ...rest] = line.split("\t");
-        return { path: rest.join("\t"), additions: Number(add) || 0, deletions: Number(del) || 0 };
+      .map((entry) => {
+        const [add, del, ...rest] = entry.split("\t");
+        const path = rest.join("\t");
+        const binary = add === "-" && del === "-";
+        return { path, additions: Number(add) || 0, deletions: Number(del) || 0, mode: modes.get(path) ?? "100644", ...(binary ? { binary } : {}) };
       });
   }
+
 }

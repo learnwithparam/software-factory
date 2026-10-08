@@ -949,7 +949,8 @@ async function checkMergePolicy(deps: WatchDeps, config: FactoryConfig, issue: G
 
     const [ci, readiness] = await Promise.all([ciStatusNow(deps.github, config.repo, pr.number), deps.github.mergeReadiness(config.repo, pr.number)]);
     const worktree = worktreeFor(deps, issueNumber);
-    const changedFiles = await deps.git.diffStat(worktree, config.base);
+    // The PR head, not the worktree's: the policy judges the commit --match-head-commit merges.
+    const changedFiles = await deps.git.diffStat(worktree, config.base, readiness.headRefOid);
     const plan = await readStageArtifacts(worktree, issueNumber, "plan");
     const risk = (plan.json as Pick<PlanArtifact, "risk"> | undefined)?.risk ?? "high";
     const decision = decideMerge({

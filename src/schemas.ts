@@ -71,6 +71,15 @@ const REQUIRED: Record<ArtifactStage, readonly string[]> = {
   retro: [],
 };
 
+// Field combinations the runner checks after the schema: `needs` (a field requires another) and
+// `apart` (fields that never appear together). They stay out of stageSchema, which is handed to
+// other agents' structured-output flags (codex --output-schema) that may not accept draft-07's
+// `dependencies` or `not`. A retro proposes one change: a skill edit names its skill, and a
+// lesson never comes with a skill edit.
+const COMBINATIONS: Partial<Record<ArtifactStage, { needs: Record<string, readonly string[]>; apart: readonly (readonly string[])[] }>> = {
+  retro: { needs: { skill_name: ["skill_edit"], skill_edit: ["skill_name"] }, apart: [["lesson", "skill_edit"]] },
+};
+
 // `types` bounds the triage `type` enum: TYPE_LABELS unless the caller knows
 // the repo's config.routes and passes typesFor(routes) instead (plan v2.7.0
 // item 1). Only triage's schema uses it.
@@ -104,6 +113,14 @@ export function schemaProblem(stage: ArtifactStage, o: Record<string, unknown>, 
   }
   for (const [k, prop] of Object.entries(schema.properties)) {
     if (o[k] !== undefined && !fits(prop, o[k])) return `"${k}" has the wrong type or value`;
+  }
+  const combos = COMBINATIONS[stage];
+  for (const [k, needs] of Object.entries(combos?.needs ?? {})) {
+    const missing = o[k] === undefined ? undefined : needs.find((n) => o[n] === undefined);
+    if (missing) return `"${k}" needs "${missing}"`;
+  }
+  for (const fields of combos?.apart ?? []) {
+    if (fields.every((k) => o[k] !== undefined)) return `${fields.map((k) => `"${k}"`).join(" and ")} cannot appear together`;
   }
   return undefined;
 }

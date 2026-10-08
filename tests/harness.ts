@@ -9,6 +9,7 @@ import { ReplayExecutor, type StageName, type StageRunResult } from "../src/exec
 import { runDir } from "../src/artifacts";
 import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { Git } from "../src/git";
+import type { ChangedFile } from "../src/merge-policy";
 import type { GateRunner } from "../src/gates";
 import type { HoldoutConfig } from "../src/config";
 import type { HoldoutRunner } from "../src/holdout";
@@ -224,9 +225,9 @@ export class FakeGit extends Git {
 
   // Defaults to one line added per changed file; a test that cares about
   // exact counts sets this directly instead.
-  diffStatOverride: { path: string; additions: number; deletions: number }[] | undefined;
+  diffStatOverride: ChangedFile[] | undefined;
 
-  override async diffStat(): Promise<{ path: string; additions: number; deletions: number }[]> {
+  override async diffStat(): Promise<ChangedFile[]> {
     return this.diffStatOverride ?? this.changed.map((path) => ({ path, additions: 1, deletions: 0 }));
   }
 

@@ -10,7 +10,7 @@ import { parseStreamJsonLine } from "./agents/presets/claude";
 export type StageName = "triage" | "plan" | "build" | "verify" | "pr" | "retro";
 
 export interface StageEvent {
-  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session";
+  readonly kind: "tool_use" | "text" | "usage" | "result" | "truncated" | "session" | "startup_error";
   readonly toolName?: string;
   readonly text?: string;
   readonly tokensIn?: number;

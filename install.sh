@@ -161,6 +161,27 @@ if [[ "$UPDATE" -eq 1 ]]; then
   done
 fi
 
+# .factory/manifest.json: the sha256 of every factory file that now equals the template, so
+# `factory doctor` can name the ones this repo edits later. Repo-owned files are not listed.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi
+}
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  body=""
+  count=0
+  while IFS= read -r -d '' file; do
+    rel="${file#"$SRC"/}"
+    case "$rel" in .factory/charter.md|.factory/config.example.json|.factory/memory/lessons.md) continue ;; esac
+    cmp -s "$file" "$TARGET/$rel" || continue
+    [[ "$count" -gt 0 ]] && body+=$',\n'
+    body+="    \"$rel\": \"$(sha256_of "$file")\""
+    count=$((count + 1))
+  done < <(find "$SRC" -type f -print0 | sort -z)
+  mkdir -p "$TARGET/.factory"
+  printf '{\n  "files": {\n%s\n  }\n}\n' "$body" > "$TARGET/.factory/manifest.json"
+  echo "wrote: .factory/manifest.json ($count file(s))"
+fi
+
 LINK_REL=".agents/skills"
 LINK="$TARGET/$LINK_REL"
 if [[ -e "$LINK" || -L "$LINK" ]]; then

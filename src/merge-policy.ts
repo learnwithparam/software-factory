@@ -1,4 +1,4 @@
-// Ported from owainlewis/machinist@3943516 risk_delivery/gate.py (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the refusal list also follows owainlewis/agent-skills@766699e skills/herdr-issue-coordinator/SKILL.md:209-226 (MIT, Copyright (c) 2026 Owain Lewis), reused as ten named refusal reasons rather than copied code; gate.py's hardcoded docs/README-only, 10-file, 200-line allow-list becomes repo config (merge.autoPaths/maxFiles/maxLines), since a blog post is often longer than 200 lines; validate/auto_eligible/run become checkReadiness/autoEligible/decideMerge+attemptMerge, split so a caller can render the "dry-run" audit comment without ever calling mergePr; the merge always runs `gh pr merge --squash --match-head-commit`, never `--admin`, so a branch-protection block is respected even under policy "auto"; the audit comment carries a `factory:merge-policy:<headSha>` marker instead of gate.py's own comment format, to match this codebase's data-marker convention (src/watch.ts).
+// Ported from owainlewis/machinist@3943516 risk_delivery/gate.py (MIT, Copyright (c) 2026 Owain Lewis). Deviations: the refusal list also follows owainlewis/agent-skills@766699e skills/herdr-issue-coordinator/SKILL.md:209-226 (MIT, Copyright (c) 2026 Owain Lewis), reused as ten named refusal reasons rather than copied code; gate.py's hardcoded docs/README-only, 10-file, 200-line allow-list becomes repo config (merge.autoPaths/maxFiles/maxLines), since a blog post is often longer than 200 lines; validate/auto_eligible/run become checkReadiness/autoEligible/decideMerge+attemptMerge, split so a caller can render the "dry-run" audit comment without ever calling mergePr; the merge always runs `gh pr merge --squash --match-head-commit`, never `--admin`, so a branch-protection block is respected even under policy "auto"; the audit comment carries a `factory:merge-policy:<headSha>` marker instead of gate.py's own comment format, to match this codebase's data-marker convention (src/watch.ts). gate.py's file-mode and rename checks read `git diff --raw` modes and `--no-renames` paths from src/git.ts diffStat, and binary files are refused because numstat counts no lines for them.
 
 import type { Risk } from "./artifacts";
 import { touchesProtectedPath } from "./boundary";
@@ -10,7 +10,14 @@ export interface ChangedFile {
   readonly path: string;
   readonly additions: number;
   readonly deletions: number;
+  // The file's git mode after the change: 100644 a plain file, 000000 deleted; 100755, 120000
+  // (symlink) and 160000 (submodule) change what runs or what the path points at.
+  readonly mode?: string;
+  // numstat counts no lines for a binary file, so maxLines cannot bound it.
+  readonly binary?: boolean;
 }
+
+const PLAIN_MODES = new Set(["100644", "000000"]);
 
 // The herdr-issue-coordinator merge-gate checklist (SKILL.md:209-226): ten
 // conditions, any one of which blocks a merge regardless of the others.
@@ -100,6 +107,14 @@ export function autoEligible(
   }
   if (changedFiles.length > merge.maxFiles) {
     refusals.push({ reason: "not-auto-eligible", detail: `${changedFiles.length} files changed, over merge.maxFiles (${merge.maxFiles})` });
+  }
+  const oddModes = changedFiles.filter((f) => f.mode !== undefined && !PLAIN_MODES.has(f.mode));
+  if (oddModes.length > 0) {
+    refusals.push({ reason: "not-auto-eligible", detail: `not a plain file (mode): ${oddModes.map((f) => `${f.path} (${f.mode})`).join(", ")}` });
+  }
+  const binaries = changedFiles.filter((f) => f.binary);
+  if (binaries.length > 0) {
+    refusals.push({ reason: "not-auto-eligible", detail: `binary, so its size is unknown: ${binaries.map((f) => f.path).join(", ")}` });
   }
   const totalLines = changedFiles.reduce((sum, f) => sum + f.additions + f.deletions, 0);
   if (totalLines > merge.maxLines) {

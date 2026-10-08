@@ -7,16 +7,17 @@ import { join } from "node:path";
 import { COMMANDS, helpText } from "../src/help";
 
 const bin = join(import.meta.dir, "..", "bin", "factory");
+const cli = join(import.meta.dir, "..", "src", "cli.ts");
 
 describe("factory help", () => {
   test("lists exactly the dispatcher's commands", () => {
-    const handled = [...readFileSync(bin, "utf8").matchAll(/^ {4}case "([a-z-]+)":/gm)].map((m) => m[1]!).sort();
+    const handled = [...readFileSync(cli, "utf8").matchAll(/^ {4}case "([a-z-]+)":/gm)].map((m) => m[1]!).sort();
     expect(COMMANDS.map((c) => c.name).sort()).toEqual(handled);
     expect(handled.length).toBeGreaterThan(5);
   });
 
   test("every flag the CLI reads is documented", () => {
-    const used = new Set([...readFileSync(bin, "utf8").matchAll(/(?:flag|has)\("([a-z-]+)"\)/g)].map((m) => m[1]));
+    const used = new Set([...readFileSync(cli, "utf8").matchAll(/(?:flag|has)\("([a-z-]+)"\)/g)].map((m) => m[1]));
     for (const f of used) expect(helpText()).toContain(`--${f}`);
   });
 

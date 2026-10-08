@@ -66,3 +66,28 @@ describe("touchesProtectedPath", () => {
     expect(refusals.map((r) => r.reason)).toContain("not-auto-eligible");
   });
 });
+
+// gate.py's shape checks, against what git diff --raw/--numstat reports (src/git.ts diffStat).
+describe("autoEligible refuses a file whose shape its path and line limits cannot judge", () => {
+  const merge = { autoPaths: ["**"], maxFiles: 10, maxLines: 200 };
+  const details = (files: Parameters<typeof autoEligible>[1]) => autoEligible("low", files, merge, []).map((r) => r.detail);
+
+  test("plain and deleted files pass", () => {
+    expect(details([{ path: "a.md", additions: 1, deletions: 0, mode: "100644" }, { path: "b.md", additions: 0, deletions: 3, mode: "000000" }])).toEqual([]);
+  });
+
+  test("an executable, a symlink or a submodule is refused by name", () => {
+    for (const mode of ["100755", "120000", "160000"]) {
+      expect(details([{ path: "x", additions: 1, deletions: 0, mode }])).toEqual([`not a plain file (mode): x (${mode})`]);
+    }
+  });
+
+  test("a binary file is refused, since numstat counts no lines for it", () => {
+    expect(details([{ path: "logo.png", additions: 0, deletions: 0, mode: "100644", binary: true }])).toEqual(["binary, so its size is unknown: logo.png"]);
+  });
+
+  test("a rename out of a protected path is caught on its old side", () => {
+    const refusals = autoEligible("low", [{ path: "secrets/k.txt", additions: 0, deletions: 1, mode: "000000" }, { path: "docs/k.txt", additions: 1, deletions: 0, mode: "100644" }], merge, ["secrets/**"]);
+    expect(refusals.map((r) => r.detail)).toEqual(["protected path(s): secrets/k.txt"]);
+  });
+});

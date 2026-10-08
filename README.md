@@ -44,9 +44,9 @@ it loses history, never state.
 ## Run anywhere
 
 The loop is the same state machine regardless of where it runs; only how you start it
-and where its clone lives changes. Claude Code is the only agent wired up today, `src/executor.ts`
-defines the `Executor` interface as the seam for adding another one later, but there's no config
-key for choosing between agents until a second implementation exists.
+and where its clone lives changes. Claude Code is the verified agent. `.factory/config.json`'s
+`agents`, `stages` and `routes` keys pick an agent per stage, and [docs/agents.md](docs/agents.md)
+lists the other presets and which of them have been run live.
 
 | Mode | Start | Auth | State lives in | Cockpit |
 |---|---|---|---|---|
