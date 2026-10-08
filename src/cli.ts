@@ -36,7 +36,8 @@ import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
-import { workflowFor } from "./engine/workflows";
+import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
+import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
@@ -99,15 +100,17 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
 async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
   const workflow = await workflowFor(cloneDir, config);
+  const routeWorkflows = await routeWorkflowsFor(cloneDir, config);
   const machineConfig = loadMachineConfig();
   const runtimes = runtimesFrom(machineConfig.runtimes);
-  const unknown = unknownRuntimes(runtimeRefs(config, workflow.steps), runtimes);
+  const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
   if (unknown.length) throw new Error(unknown.join("\n"));
   const github = new GitHub();
   // This process, as leases and the spend ledger name it.
   const holder = `${hostname()}-${process.pid}`;
   return {
     workflow,
+    routeWorkflows,
     runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
@@ -678,6 +681,23 @@ async function cmdInit(): Promise<void> {
   console.log("factory init: next, fill the TODOs in .factory/charter.md, then run `factory doctor --repo-dir " + dir + "`");
 }
 
+// `factory harness validate|inventory`: the repo's workflows, checked as the watcher loads them, or listed.
+async function cmdHarness(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "validate" && sub !== "inventory") throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
+  const dir = resolve(flag("repo-dir") ?? ".");
+  const report = await harnessReport(dir, await loadConfig(dir));
+  if (has("json")) {
+    console.log(successJson({ problems: report.problems, workflows: report.entries.map(({ workflow, ...e }) => ({ ...e, steps: workflow ? Object.keys(workflow.steps) : [] })) }));
+  } else if (sub === "inventory") {
+    for (const line of formatInventory(report)) console.log(line);
+  } else {
+    for (const p of report.problems) console.log(`factory harness: ${p}`);
+    if (!report.problems.length) console.log(`factory harness: ${report.entries.length} workflows, all valid`);
+  }
+  if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
@@ -718,6 +738,8 @@ async function main(): Promise<void> {
       return cmdTakeover();
     case "daemon":
       return cmdDaemon();
+    case "harness":
+      return cmdHarness();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

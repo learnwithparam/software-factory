@@ -6,6 +6,27 @@ and where it goes next. `config.workflow` names it (default `feature-to-pr`). Th
 `template/.factory/workflows/`. A file that does not parse stops `factory watch` at boot, and
 `factory doctor` lists every problem.
 
+## The library, and a workflow per issue type
+
+The runner ships these. Each one stops a bad output at a different rung:
+
+| Workflow | Steps | What stops a bad change |
+|---|---|---|
+| `feature-to-pr` | triage, plan, build, verify, pr | gates, then verify; a risky plan parks for approval |
+| `bug-to-pr` | triage, build, verify, pr | verify rejects back to build; no plan step |
+| `docs-to-pr` | triage, build, pr | the gates only (a lint or link check); red gates park it |
+| `approved-plan-to-pr` | triage, plan, build, verify, pr | every plan parks for a person, whatever its risk |
+
+`routes.<type>.workflow` runs a type on its own workflow, for example
+`"routes": { "docs": { "workflow": "docs-to-pr" } }`. The type comes from the label the issue was
+filed with. At pickup the runner comments which workflow it chose and records it on the thread, so a
+restart or another machine resumes the same one. An issue whose type names none runs
+`config.workflow`. Every named workflow loads at boot, so a typo stops `factory watch`.
+
+`factory harness validate` loads every workflow file, the repo's and the runner's, and every one the
+config names, and exits 4 on a problem. `factory harness inventory` lists each one's steps, cron
+triggers and the types routed to it.
+
 ## Step keys
 
 | key | meaning |

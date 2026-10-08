@@ -20,13 +20,14 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "verify-agent", usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]", does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens" },
   { name: "learn", usage: "learn (--repo-dir <path> | --repo <owner/name>)", does: "batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR" },
   { name: "init", usage: "init [--repo-dir <path>] [--dry-run] [--force] [--pr]", does: "detect the repo's stack and write .factory/config.json gates, setup and commands; installs the template first if missing" },
+  { name: "harness", usage: "harness (validate | inventory) --repo-dir <path> [--json]", does: "validate: every workflow file and every one the config names loads (exit 4 if not); inventory: each workflow's steps, cron triggers and routed types" },
   { name: "install", usage: "install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]", does: "install or update the template in a repo; --agents links skills into each agent dir" },
 ];
 
 export const OPTIONS: [string, string][] = [
   ["--db <path>", "SQLite telemetry cache (default ~/.factory/state.db)"],
   ["--workspaces <dir>", "worktree root (default ~/.factory/workspaces)"],
-  ["--json", "run, tick, watch --once and doctor: print {ok,data} on stdout, and errors as {ok:false,error} on stderr"],
+  ["--json", "run, tick, watch --once, doctor and harness: print {ok,data} on stdout, and errors as {ok:false,error} on stderr"],
   ["--tmux", "watch and up: show each issue's live transcript in a tmux window (config tmux.enabled does the same)"],
   ["--port <n>", "dashboard port (default FACTORY_DASHBOARD_PORT or 4100)"],
 ];

@@ -83,6 +83,8 @@ export interface RouteConfig {
   // test, verify re-runs them and a reviewer judges the diff (plan v2.7.0
   // item 8: a blog post can only ever end uncertain/reject under "test").
   readonly proof?: "test" | "check";
+  // A workflow in .factory/workflows/ (or bundled) this type runs instead of the repo's.
+  readonly workflow?: string;
 }
 
 export interface FactoryConfig {
@@ -419,7 +421,8 @@ function agentProblems(agents: unknown, stages: unknown, routes?: unknown): stri
         continue;
       }
       const r = raw as Record<string, unknown>;
-      checkKeys(r, { stages: "object", skills: "strings", proof: "string" }, where, problems);
+      checkKeys(r, { stages: "object", skills: "strings", proof: "string", workflow: "string" }, where, problems);
+      if (typeof r.workflow === "string" && !/^[\w-]+$/.test(r.workflow)) problems.push(`${where}workflow: expected a workflow name like "docs-to-pr", got ${JSON.stringify(r.workflow)}`);
       if (r.proof !== undefined && r.proof !== "test" && r.proof !== "check") problems.push(`${where}proof: expected "test" or "check", got ${JSON.stringify(r.proof)}`);
       if (r.stages !== undefined) {
         if (typeof r.stages !== "object" || r.stages === null || Array.isArray(r.stages)) problems.push(`${where}stages: expected an object`);

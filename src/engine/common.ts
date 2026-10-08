@@ -81,6 +81,8 @@ export interface WatchDeps {
   readonly view?: IssueView;
   // The steps an issue walks; absent means the bundled feature-to-pr.
   readonly workflow?: Workflow;
+  // Workflows a route names (routes.<type>.workflow), by name; an issue of that type runs its route's.
+  readonly routeWorkflows?: Readonly<Record<string, Workflow>>;
   // The clock cron triggers read; absent means the real one.
   readonly now?: () => Date;
 }

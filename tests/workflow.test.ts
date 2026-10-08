@@ -3,17 +3,18 @@
 // real issue on the engine, so the YAML is the pipeline, not a description of it.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { mergeConfig } from "../src/config";
+import { configProblems, mergeConfig, type RouteConfig } from "../src/config";
 import { parseWorkflow, type Workflow } from "../src/core/workflow";
 import { STEP_TYPES } from "../src/engine/steps";
 import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText, workflowFor } from "../src/engine/workflows";
+import { formatInventory, harnessReport } from "../src/harness";
 import { LABEL } from "../src/labels";
 import type { SetupRunner } from "../src/setup";
 import { FactoryState } from "../src/state";
-import { advanceIssue, type WatchDeps } from "../src/watch";
+import { advanceIssue, recoverInFlight, type WatchDeps } from "../src/watch";
 import { baseIssue, FakeGateRunner, FakeGit, FakeLeases, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const dirs: string[] = [];
@@ -135,7 +136,15 @@ class FakeShell implements SetupRunner {
 }
 
 // `base` is written to the clone (the base branch); `seed` to every new worktree.
-function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}, extra: Partial<WatchDeps> = {}) {
+type Stage = Parameters<MultiStageExecutor["push"]>[0];
+// `opts`: the issue's labels, config keys over the defaults, and each stage's outputs in run order.
+interface EngineOpts {
+  readonly labels?: string[];
+  readonly config?: Record<string, unknown>;
+  readonly outputs?: Partial<Record<Stage, Array<Record<string, string>>>>;
+}
+
+function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}, extra: Partial<WatchDeps> = {}, opts: EngineOpts = {}) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
@@ -143,19 +152,23 @@ function engine(workflow: Workflow, lintExit: number, base: Record<string, strin
     mkdirSync(dirname(join(cloneDir, name)), { recursive: true });
     writeFileSync(join(cloneDir, name), content);
   }
-  const github = new FakeGitHub([baseIssue(1, [LABEL.ready])]);
+  const github = new FakeGitHub([baseIssue(1, opts.labels ?? [LABEL.ready])]);
   const executor = new MultiStageExecutor();
   const setupRunner = new FakeShell(lintExit);
   const git = new FakeGit();
   git.seed = seed;
-  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow, ...extra };
-  const config = mergeConfig({ repo: "acme/widgets" });
-  const push = (stage: Parameters<MultiStageExecutor["push"]>[0], files: Record<string, string>) => executor.push(stage, 1, fixtureFor(stage, 1), files);
+  const gateRunner = new FakeGateRunner();
+  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner, holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow, ...extra };
+  const config = mergeConfig({ repo: "acme/widgets", ...opts.config });
+  const push = (stage: Stage, files: Record<string, string>) => {
+    for (const out of opts.outputs?.[stage] ?? [files]) executor.push(stage, 1, fixtureFor(stage, 1), out);
+  };
   push("triage", { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "x", confidence: 0.9 }) });
+  for (const out of opts.outputs?.plan ?? []) executor.push("plan", 1, fixtureFor("plan", 1), out);
   push("build", { "status-comment.md": "<!-- factory:status v1 -->\nb", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) });
   push("verify", { "verdict-comment.md": "<!-- factory:verdict v1 -->\nv", "verdict.json": JSON.stringify({ result: "pass", rounds: 1, findings: [] }) });
   push("pr", { "pr-body.md": "Did it.\nCloses #1" });
-  return { github, executor, setupRunner, run: () => advanceIssue(deps, config, github.issues.get(1)!) };
+  return { github, executor, setupRunner, gateRunner, deps, config, run: () => advanceIssue(deps, config, github.issues.get(1)!) };
 }
 
 describe("a custom workflow drives the issue", () => {
@@ -179,6 +192,99 @@ describe("a custom workflow drives the issue", () => {
     expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain("lint says no");
     expect(e.github.seenLabels).not.toContain(LABEL.verifying);
     expect(e.github.createdPrs).toHaveLength(0);
+  });
+});
+
+// The library: each bundled workflow parses, and each one's proof rung stops a seeded bad output.
+const BUNDLED = join(import.meta.dir, "..", "template", ".factory", "workflows");
+const bundledWorkflow = (name: string) => {
+  const r = parseWorkflowText(readFileSync(join(BUNDLED, `${name}.yml`), "utf8"));
+  if (!r.ok) throw new Error(r.problems.join("; "));
+  return r.workflow;
+};
+const BUILD = { "status-comment.md": "<!-- factory:status v1 -->\nb", "build.json": JSON.stringify({ status: "green", gate_line: "ok", rounds: 1 }) };
+const VERDICT = (result: "pass" | "reject") => ({ "verdict-comment.md": "<!-- factory:verdict v1 -->\nv", "verdict.json": JSON.stringify({ result, rounds: 1, findings: result === "reject" ? ["misses the bug"] : [] }) });
+const PLAN = { "plan-comment.md": "<!-- factory:plan v1 rev=1 -->\nplan", "plan.json": JSON.stringify({ risk: "low", revision: 1, files: ["a"], autoApproveEligible: true }) };
+const RED = "FACTORY_GATES: status=RED passed=0 failed=1 skipped=0 failed_gates=links";
+
+describe("the workflow library", () => {
+  test("every bundled workflow parses, and its name is its file's", () => {
+    const names = readdirSync(BUNDLED).filter((f) => f.endsWith(".yml")).map((f) => f.slice(0, -4));
+    expect(names).toEqual(expect.arrayContaining(["feature-to-pr", "bug-to-pr", "docs-to-pr", "approved-plan-to-pr"]));
+    for (const name of names) expect(bundledWorkflow(name).name).toBe(name);
+  });
+
+  test("bug-to-pr: no plan; a fix verify rejects goes back to build, and only the rebuilt one ships", async () => {
+    const e = engine(bundledWorkflow("bug-to-pr"), 0, {}, {}, {}, { outputs: { build: [BUILD, BUILD], verify: [VERDICT("reject"), VERDICT("pass")] } });
+    expect(await e.run()).toBe("shipped");
+    expect(e.github.seenLabels).not.toContain(LABEL.planning);
+    expect(e.executor.mcp.filter(([stage]) => stage === "build")).toHaveLength(2);
+    expect(e.github.createdPrs).toHaveLength(1);
+  });
+
+  test("docs-to-pr: no agent verify; red gates park the issue and no PR opens", async () => {
+    const e = engine(bundledWorkflow("docs-to-pr"), 0, {}, {}, {}, { outputs: { build: [BUILD, BUILD, BUILD] } });
+    e.gateRunner.line = RED;
+    expect(await e.run()).toBe("failed");
+    expect(e.github.seenLabels).not.toContain(LABEL.verifying);
+    expect(e.github.createdPrs).toHaveLength(0);
+  });
+
+  test("docs-to-pr: green gates ship without a verify run", async () => {
+    const e = engine(bundledWorkflow("docs-to-pr"), 0);
+    expect(await e.run()).toBe("shipped");
+    expect(e.github.seenLabels).not.toContain(LABEL.verifying);
+    expect(e.github.createdPrs).toHaveLength(1);
+  });
+
+  test("approved-plan-to-pr: a low-risk, auto-approvable plan still parks for a person", async () => {
+    const e = engine(bundledWorkflow("approved-plan-to-pr"), 0, {}, {}, {}, { outputs: { plan: [PLAN] }, config: { toggles: { autoApproveLowRisk: true } } });
+    await e.run();
+    expect(e.github.issues.get(1)!.labels.map((l) => l.name)).toEqual([LABEL.awaitingApproval]);
+    expect(e.github.seenLabels).not.toContain(LABEL.building);
+  });
+});
+
+describe("routes.<type>.workflow picks the workflow an issue runs", () => {
+  const routed = (labels: string[]) =>
+    engine(defaultWorkflow(), 0, {}, {}, { routeWorkflows: { "docs-to-pr": bundledWorkflow("docs-to-pr") } }, { labels, config: { routes: { docs: { workflow: "docs-to-pr" } } }, outputs: { plan: [PLAN] } });
+
+  test("an issue filed as docs runs docs-to-pr, says so, and records it on the thread", async () => {
+    const e = routed([LABEL.ready, "docs"]);
+    expect(await e.run()).toBe("shipped");
+    expect(e.github.seenLabels).not.toContain(LABEL.planning);
+    expect(e.github.seenLabels).not.toContain(LABEL.verifying);
+    expect(e.github.issues.get(1)!.comments.map((c) => c.body).join("\n")).toContain("Running workflow `docs-to-pr`");
+  });
+
+  test("an issue of another type runs the repo's workflow, with no comment", async () => {
+    const e = routed([LABEL.ready, "bug"]);
+    expect(await e.run()).toBe("shipped");
+    expect(e.github.seenLabels).toContain(LABEL.verifying);
+    expect(e.github.issues.get(1)!.comments.map((c) => c.body).join("\n")).not.toContain("Running workflow");
+  });
+
+  test("the recorded choice holds after pickup: a resumed issue stays on its workflow", async () => {
+    const e = routed([LABEL.ready, "docs"]);
+    const issue = e.github.issues.get(1)!;
+    issue.comments = [{ id: 9, author: "factory-bot", authorAssociation: "OWNER", body: '<!-- factory:data {"stage":"workflow","json":{"name":"docs-to-pr"}} -->', createdAt: "2026-01-01T00:00:00Z" }];
+    issue.labels = [{ name: LABEL.building }, { name: "docs" }];
+    expect(await recoverInFlight(e.deps, e.config)).toEqual([1]);
+    expect(e.github.seenLabels).not.toContain(LABEL.verifying);
+    expect(e.github.createdPrs).toHaveLength(1);
+  });
+
+  test("recovery finds an issue stuck on a label only a route's workflow has", async () => {
+    const quick = parseWorkflowText(CUSTOM);
+    if (!quick.ok) throw new Error(quick.problems.join("; "));
+    const e = engine(defaultWorkflow(), 0, {}, {}, { routeWorkflows: { "quick-fix": quick.workflow } }, { labels: ["factory:linting", "chore"], config: { routes: { chore: { workflow: "quick-fix" } } } });
+    e.github.issues.get(1)!.comments = [{ id: 9, author: "factory-bot", authorAssociation: "OWNER", body: '<!-- factory:data {"stage":"workflow","json":{"name":"quick-fix"}} -->', createdAt: "2026-01-01T00:00:00Z" }];
+    expect(await recoverInFlight(e.deps, e.config)).toEqual([1]);
+    expect(e.setupRunner.ran).toContain("make lint");
+  });
+
+  test("config: a route's workflow must be a name", () => {
+    expect(configProblems({ repo: "a/b", gates: [], routes: { docs: { workflow: "../x" } } }).join("\n")).toContain("routes.docs.workflow");
   });
 });
 
@@ -265,5 +371,58 @@ describe("leases: one worker advances an issue at a time", () => {
     expect(e.executor.mcp.map(([stage]) => stage)).toEqual(["triage", "build"]);
     expect(port.log).not.toContain("release 1 me");
     expect(port.table.get("1")!.holder).toBe("other");
+  });
+});
+
+describe("factory harness", () => {
+  const repo = (files: Record<string, string>) => {
+    const dir = mkdtempSync(join(tmpdir(), "factory-harness-"));
+    dirs.push(dir);
+    for (const [name, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, name)), { recursive: true });
+      writeFileSync(join(dir, name), text);
+    }
+    return dir;
+  };
+  const config = (routes: Record<string, RouteConfig> = {}) => mergeConfig({ repo: "acme/widgets", routes });
+
+  test("validate: the bundled set is clean, and a repo file overrides the runner's of the same name", async () => {
+    const dir = repo({ ".factory/workflows/docs-to-pr.yml": CUSTOM.replace("name: quick-fix", "name: docs-to-pr") });
+    const r = await harnessReport(dir, config({ docs: { workflow: "docs-to-pr" } }));
+    expect(r.problems).toEqual([]);
+    expect(r.entries.filter((e) => e.name === "docs-to-pr").map((e) => [e.source, e.routedTypes])).toEqual([["repo", ["docs"]]]);
+  });
+
+  test("validate: a broken file, a misnamed one and a route to nothing are each named", async () => {
+    const dir = repo({
+      ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n",
+      ".factory/workflows/misnamed.yml": CUSTOM,
+    });
+    const r = await harnessReport(dir, config({ docs: { workflow: "no-such" } }));
+    const text = r.problems.join("\n");
+    expect(text).toContain(".factory/workflows/broken.yml");
+    expect(text).toContain('misnamed.yml: name: is "quick-fix"');
+    expect(text).toContain("routes.docs.workflow");
+    expect(text).toContain("no-such");
+  });
+
+  test("inventory: steps in order, cron triggers, and who runs each", async () => {
+    const cron = `${CUSTOM.replace("name: quick-fix", "name: nightly")}on:\n  cron:\n    - schedule: "0 3 * * *"\n      title: Nightly deps\n`;
+    const dir = repo({ ".factory/workflows/nightly.yml": cron });
+    const lines = formatInventory(await harnessReport(dir, config({ chore: { workflow: "nightly" } }))).join("\n");
+    expect(lines).toContain("nightly (repo; types: chore)");
+    expect(lines).toContain("steps: triage -> build -> lint(check) -> verify -> pr");
+    expect(lines).toContain("cron: 0 3 * * * ");
+    expect(lines).toContain("feature-to-pr (runner; the repo's workflow)");
+  });
+
+  test("the CLI exits 4 on a problem and 0 when clean", () => {
+    const cli = join(import.meta.dir, "..", "src", "cli.ts");
+    const conf = JSON.stringify({ repo: "acme/widgets", gates: [{ name: "t", cmd: "true", required: true, role: "test" }] });
+    const run = (dir: string) => Bun.spawnSync(["bun", cli, "harness", "validate", "--repo-dir", dir], { stdout: "pipe", stderr: "pipe" });
+    expect(run(repo({ ".factory/config.json": conf })).exitCode).toBe(0);
+    const bad = run(repo({ ".factory/config.json": conf, ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n" }));
+    expect(bad.exitCode).toBe(4);
+    expect(bad.stdout.toString()).toContain("broken.yml");
   });
 });
