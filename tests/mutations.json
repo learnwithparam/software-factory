@@ -141,5 +141,10 @@
   {"name": "expr: || binds looser than &&", "file": "src/core/expr.ts", "find": "left = { op: \"||\", left, right: and() };", "replace": "left = { op: \"&&\", left, right: and() };", "test": "tests/expr.test.ts"},
   {"name": "engine: an edge's if: decides", "file": "src/engine/runner.ts", "find": "!e.if || Boolean(evalExpr(e.if, scope))", "replace": "true", "test": "tests/scenarios.test.ts"},
   {"name": "engine: a red check step parks", "file": "src/engine/steps.ts", "find": "if (out.code === 0) return", "replace": "if (true) return", "test": "tests/workflow.test.ts"},
-  {"name": "engine: approve resumes the park edge's approve step", "file": "src/watch.ts", "find": "return resumeAt(edge.approve);", "replace": "return resumeAt(edge.revise);", "test": "tests/scenarios.test.ts"}
+  {"name": "engine: approve resumes the park edge's approve step", "file": "src/watch.ts", "find": "return resumeAt(edge.approve);", "replace": "return resumeAt(edge.revise);", "test": "tests/scenarios.test.ts"},
+  {"name": "hexagon: core stays pure", "file": "src/core/workflow.ts", "find": "import { parseExpr, rootsOf, ExprError, type Expr } from \"./expr\";", "replace": "import { parseExpr, rootsOf, ExprError, type Expr } from \"./expr\";\nimport \"node:fs\";", "test": "tests/hexagon.test.ts"},
+  {"name": "hexagon: ports import only core and ports", "file": "src/ports/agent.ts", "find": "import type { AgentCommands } from \"../config\";", "replace": "import type { AgentCommands } from \"../github\";", "test": "tests/hexagon.test.ts"},
+  {"name": "hexagon: adapters stay apart", "file": "src/adapters/local/execution.ts", "find": "from \"../../ports/execution\";", "replace": "from \"../docker/execution\";", "test": "tests/hexagon.test.ts"},
+  {"name": "hexagon: engine reaches adapters through a port", "file": "src/engine/steps.ts", "find": "import { ShellSetupRunner } from \"../setup\";", "replace": "import { LocalExecution as ShellSetupRunner } from \"../adapters/local/execution\";", "test": "tests/hexagon.test.ts"},
+  {"name": "contract: execution keeps stderr apart", "file": "src/adapters/local/execution.ts", "find": "return { stdout, stderr, code };", "replace": "return { stdout: stdout + stderr, stderr, code };", "test": "tests/adapters.test.ts"}
 ]

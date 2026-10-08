@@ -7,21 +7,11 @@
 // never lands in a commit — makes this idempotent: a restart on the same
 // worktree does not re-run npm ci.
 
-export interface SetupRunner {
-  run(cmd: string, cwd: string): Promise<{ stdout: string; stderr: string; code: number }>;
-}
+import type { ExecutionPort } from "./ports/execution";
+import { LocalExecution } from "./adapters/local/execution";
 
-export class ShellSetupRunner implements SetupRunner {
-  async run(cmd: string, cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {
-    const proc = Bun.spawn(["bash", "-c", cmd], { cwd, stdout: "pipe", stderr: "pipe" });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { stdout, stderr, code };
-  }
-}
+export type SetupRunner = ExecutionPort;
+export const ShellSetupRunner = LocalExecution;
 
 export interface SetupResult {
   readonly ok: boolean;

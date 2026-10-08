@@ -21,7 +21,7 @@
 // real run, for the shape this parses.
 
 import { existsSync } from "node:fs";
-import type { GitHub } from "./github";
+import type { ScmPort } from "./github";
 import type { CommandRunner } from "./github";
 import { LABEL } from "./labels";
 
@@ -100,7 +100,7 @@ export function parseAuditFindings(json: string): ScanFinding[] {
 }
 
 export interface ScanDeps {
-  readonly github: GitHub;
+  readonly github: ScmPort;
   readonly runner: CommandRunner;
 }
 

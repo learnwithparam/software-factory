@@ -4,7 +4,7 @@
 // tests can assert on the plan without touching a real `gh`.
 
 import { readdir } from "node:fs/promises";
-import type { CommandRunner, GitHub } from "./github";
+import type { CommandRunner, ScmPort } from "./github";
 import { LABELS } from "./labels";
 
 export type ResetActionKind =
@@ -48,7 +48,7 @@ export class NotResettableError extends Error {
 }
 
 export interface ResetDeps {
-  readonly github: GitHub;
+  readonly github: ScmPort;
   readonly git: CommandRunner;
 }
 

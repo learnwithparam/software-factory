@@ -6,7 +6,7 @@
 import { outsideAllowedPaths } from "./boundary";
 import { capLessons, LESSONS_PATH } from "./context";
 import type { Git } from "./git";
-import type { GitHub } from "./github";
+import type { ScmPort } from "./github";
 import type { FactoryState, RetroRow } from "./state";
 
 // The one exemption from config.protectedPaths, and only for this branch
@@ -14,7 +14,7 @@ import type { FactoryState, RetroRow } from "./state";
 export const LEARNING_ALLOWED_PATHS = [".factory/memory/**", ".claude/skills/**"] as const;
 
 export interface LearnDeps {
-  readonly github: GitHub;
+  readonly github: ScmPort;
   readonly git: Git;
   readonly state: FactoryState;
   readonly cloneDir: string;

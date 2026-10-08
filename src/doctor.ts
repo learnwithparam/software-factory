@@ -1,7 +1,7 @@
 // `factory doctor [--fix]`: everything the loop needs before `factory watch`
 // starts, checked once instead of failing three stages in.
 
-import type { CommandRunner, GitHub } from "./github";
+import type { CommandRunner, ScmPort } from "./github";
 import { labelsFor } from "./labels";
 import type { RouteConfig } from "./config";
 import type { AgentConfig, StageAgents } from "./agents/types";
@@ -19,7 +19,7 @@ export interface DoctorCheck {
 }
 
 export interface DoctorDeps {
-  readonly github: GitHub;
+  readonly github: ScmPort;
   readonly git: CommandRunner;
   readonly which: (bin: string) => Promise<boolean>;
   // `<bin> --version` output, or undefined when it cannot be read.
@@ -298,7 +298,7 @@ export async function runDoctor(deps: DoctorDeps, ctx: DoctorContext): Promise<D
   return checks;
 }
 
-export async function fixDoctor(github: GitHub, repo: string, routes?: Readonly<Record<string, RouteConfig>>): Promise<void> {
+export async function fixDoctor(github: ScmPort, repo: string, routes?: Readonly<Record<string, RouteConfig>>): Promise<void> {
   for (const label of labelsFor(routes)) {
     await github.ensureLabel(repo, label.name, label.color, label.description);
   }

@@ -16,7 +16,8 @@ import { deriveIssueState } from "../derive";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
 import type { ProofGit } from "../proof";
-import type { GhIssue, GitHub } from "../github";
+import type { GhIssue } from "../github";
+import type { ScmPort } from "../ports/scm";
 import type { Git } from "../git";
 import type { Workflow } from "../core/workflow";
 import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
@@ -36,7 +37,7 @@ export type Outcome =
   | "waiting";
 
 export interface WatchDeps {
-  readonly github: GitHub;
+  readonly github: ScmPort;
   readonly git: Git;
   readonly state: FactoryState;
   readonly executor: Executor;

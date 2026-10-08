@@ -4,7 +4,7 @@
 
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { GitHub } from "./github";
+import { GitHub, type ScmPort } from "./github";
 import { GitCommandRunner, Git } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
@@ -361,7 +361,7 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
+function serveDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet);
@@ -448,7 +448,7 @@ async function cmdAttach(): Promise<void> {
 
 // Waits for the watcher to park the issue after a takeover, so the hand-back
 // retry lands on a parked issue and never races the stage it stopped.
-async function waitForLabel(github: GitHub, repo: string, n: number, label: string, timeoutMs = 60_000): Promise<boolean> {
+async function waitForLabel(github: ScmPort, repo: string, n: number, label: string, timeoutMs = 60_000): Promise<boolean> {
   const end = Date.now() + timeoutMs;
   for (;;) {
     const issue = await github.getIssue(repo, n);

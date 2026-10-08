@@ -9,7 +9,7 @@
 // LABEL.ready the poll its last blocker clears. Nothing here talks to a
 // worktree or a stage; it only reads issue state and swaps a label.
 
-import type { GhIssue, GitHub } from "./github";
+import type { GhIssue, ScmPort } from "./github";
 import { LABEL } from "./labels";
 
 const BLOCKED_BY_LINE = /^.*Blocked by:\s*(.+?)\s*$/im;
@@ -28,7 +28,7 @@ export function blockerNumbers(body: string): number[] {
 // work that doesn't exist. A blocker issue that can't be fetched (deleted,
 // wrong number) is treated as still open: never build on a reference the
 // factory can't verify.
-async function blockerIsClear(github: GitHub, repo: string, blockerNumber: number): Promise<boolean> {
+async function blockerIsClear(github: ScmPort, repo: string, blockerNumber: number): Promise<boolean> {
   const issue = await github.getIssue(repo, blockerNumber).catch(() => undefined);
   if (!issue) return false;
   return issue.state === "CLOSED" && issue.stateReason !== "NOT_PLANNED";
@@ -44,7 +44,7 @@ export interface BlockerResolution {
 // the set that may build this poll, applying every label move and the
 // one-time "why this is blocked" comment along the way.
 export async function resolveBlockers(
-  github: GitHub,
+  github: ScmPort,
   repo: string,
   ready: readonly GhIssue[],
   blocked: readonly GhIssue[],
@@ -83,7 +83,7 @@ export async function resolveBlockers(
   return { clear };
 }
 
-async function openBlockersOf(github: GitHub, repo: string, numbers: number[]): Promise<number[]> {
+async function openBlockersOf(github: ScmPort, repo: string, numbers: number[]): Promise<number[]> {
   const open: number[] = [];
   for (const n of numbers) {
     if (!(await blockerIsClear(github, repo, n))) open.push(n);
