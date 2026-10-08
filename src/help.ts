@@ -19,6 +19,7 @@ export const COMMANDS: { name: string; usage: string; does: string }[] = [
   { name: "doctor", usage: "doctor --repo-dir <path> [--fix]", does: "check the loop can run; --fix creates missing labels" },
   { name: "verify-agent", usage: "verify-agent <name> --repo-dir <path> --issue <N> [--out <dir>]", does: "run one issue on that agent, record a scrubbed fixture, print pass/fail, cost and tokens" },
   { name: "learn", usage: "learn (--repo-dir <path> | --repo <owner/name>)", does: "batch pending retro lessons and skill-edit proposals into one factory/learning-<date> PR" },
+  { name: "init", usage: "init [--repo-dir <path>] [--dry-run] [--force] [--pr]", does: "detect the repo's stack and write .factory/config.json gates, setup and commands; installs the template first if missing" },
   { name: "install", usage: "install <target-dir> [--dry-run] [--update] [--ci] [--agents a,b,c]", does: "install or update the template in a repo; --agents links skills into each agent dir" },
 ];
 

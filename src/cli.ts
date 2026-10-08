@@ -40,6 +40,9 @@ import { workflowFor } from "./engine/workflows";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { detectStack, diskFiles } from "./stack";
+import { describeStack, initConfig, isFilledIn } from "./init";
+import { repoFromRemoteUrl } from "./config";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -612,10 +615,7 @@ async function cmdInstall(): Promise<void> {
     ...(has("ci") ? ["--ci"] : []),
     ...(flag("agents") ? ["--agents", flag("agents")!] : []),
   ];
-  const script = resolve(import.meta.dir, "..", "install.sh");
-  const proc = Bun.spawn(["bash", script, target, ...passthrough], { stdout: "inherit", stderr: "inherit" });
-  const code = await proc.exited;
-  if (code !== 0) process.exit(code);
+  await runInstallScript(target, passthrough);
   if (has("dry-run")) return;
   // Labels are cheap and idempotent, so create them right after a real install
   // instead of making every repo run a separate `doctor --fix` first. Best
@@ -630,10 +630,59 @@ async function cmdInstall(): Promise<void> {
   }
 }
 
+async function runInstallScript(target: string, extra: string[] = []): Promise<void> {
+  const proc = Bun.spawn(["bash", resolve(import.meta.dir, "..", "install.sh"), target, ...extra], { stdout: "inherit", stderr: "inherit" });
+  const code = await proc.exited;
+  if (code !== 0) process.exit(code);
+}
+
+// `factory init`: install the template if it is missing, then write
+// .factory/config.json from what the repo's own files say. A filled-in
+// config is left alone unless --force. --pr opens it as one pull request.
+async function cmdInit(): Promise<void> {
+  const dir = resolve(flag("repo-dir") ?? ".");
+  const dry = has("dry-run");
+  if (!existsSync(join(dir, ".factory", "gates.sh")) && !dry) await runInstallScript(dir);
+  const stack = detectStack(diskFiles(dir));
+  for (const line of describeStack(stack)) console.log(`factory init: ${line}`);
+  const target = join(dir, ".factory", "config.json");
+  const current = existsSync(target) ? readFileSync(target, "utf8") : undefined;
+  if (isFilledIn(current) && !has("force")) {
+    console.log(`factory init: ${target} is already filled in; left alone (--force rewrites it)`);
+    return;
+  }
+  const remote = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: dir });
+  const repo = remote.exitCode === 0 ? repoFromRemoteUrl(remote.stdout.toString().trim()) : undefined;
+  const example = JSON.parse(readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "config.example.json"), "utf8")) as Record<string, unknown>;
+  const text = `${JSON.stringify(initConfig(example, stack, repo), null, 2)}\n`;
+  if (dry) {
+    process.stdout.write(text);
+    return;
+  }
+  await Bun.write(target, text);
+  console.log(`factory init: wrote ${target}${repo ? "" : " (no github origin remote: set \"repo\" by hand)"}`);
+  if (has("pr")) {
+    const git = (...a: string[]) => {
+      const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+      if (r.exitCode !== 0) throw new Error(`git ${a.join(" ")} failed: ${r.stderr.toString().trim()}`);
+    };
+    git("switch", "-c", "factory/init");
+    git("add", "-A", ".factory", ".claude", ".agents", "AGENTS.md");
+    git("commit", "-m", `factory: init for a ${stack.name} repo`);
+    git("push", "-u", "origin", "factory/init");
+    const pr = Bun.spawnSync(["gh", "pr", "create", "--head", "factory/init", "--title", "factory: init", "--body", describeStack(stack).map((l) => `- ${l}`).join("\n")], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+    if (pr.exitCode !== 0) throw new Error(`gh pr create failed: ${pr.stderr.toString().trim()}`);
+    console.log(`factory init: opened ${pr.stdout.toString().trim()}`);
+  }
+  console.log("factory init: next, fill the TODOs in .factory/charter.md, then run `factory doctor --repo-dir " + dir + "`");
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
       return cmdUp();
+    case "init":
+      return cmdInit();
     case "watch":
       return cmdWatch();
     case "run":

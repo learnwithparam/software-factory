@@ -239,7 +239,12 @@ instead (writing `.claude/settings.json.factory-new` for you to reconcile), and 
 
 Then make three repo-owned files yours:
 
-1. `.factory/config.json` (copy `config.example.json`). The runner refuses to start without it.
+1. `.factory/config.json`. `factory init --repo-dir ../your-repo` writes it: it reads the
+   lockfile, `package.json` scripts, `pyproject.toml`, `go.mod`, `Gemfile`, `Cargo.toml` or a
+   Makefile `check` target, and turns them into gates, setup commands and the commands the build
+   and verify stages may run. It installs the template first when it is missing, leaves a
+   filled-in config alone unless `--force`, and `--pr` opens the result as one pull request.
+   Or copy `config.example.json` by hand. The runner refuses to start without it.
 2. `.factory/charter.md`: what the agent may and may not do here. Replace every `TODO`.
 3. `.factory/gates.sh`: runs your checks from `config.gates` and prints one line the runner parses.
 
@@ -337,6 +342,7 @@ dependency bump), clone it to see the loop run against something real before wir
 
 | Command | Does |
 |---|---|
+| `factory init [--repo-dir <path>] [--dry-run] [--force] [--pr]` | detect the repo's stack and write `.factory/config.json`, installing the template first if missing |
 | `factory install <target-dir> [--dry-run] [--update] [--ci]` | install or update the template in a repo |
 | `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
 | `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window |

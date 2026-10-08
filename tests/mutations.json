@@ -239,5 +239,10 @@
   {"name": "config: an unknown gate role is refused", "file": "src/config.ts", "find": "if (typeof gate.role === \"string\" && !(GATE_ROLES as readonly string[]).includes(gate.role)) ", "replace": "if (false) ", "test": "tests/config.test.ts"},
   {"name": "proof: no test gate is unavailable, not skipped", "file": "src/proof.ts", "find": "if (!testCmd) return { status: \"unavailable\"", "replace": "if (!testCmd) return { status: \"skipped\"", "test": "tests/proof.test.ts"},
   {"name": "run summary: the proof line reaches the PR body", "file": "src/engine/steps.ts", "find": ", ctx, readProofStatus(worktree, issueNumber)),", "replace": ", ctx),", "test": "tests/proof.test.ts"},
-  {"name": "doctor: a config with no gates is flagged", "file": "src/doctor.ts", "find": "      ok: gateCount > 0,", "replace": "      ok: true,", "test": "tests/doctor.test.ts"}
+  {"name": "doctor: a config with no gates is flagged", "file": "src/doctor.ts", "find": "      ok: gateCount > 0,", "replace": "      ok: true,", "test": "tests/doctor.test.ts"},
+  {"name": "init: npm's placeholder test script is not a test", "file": "src/stack.ts", "find": "scripts.test && !NPM_PLACEHOLDER.test(scripts.test)", "replace": "scripts.test", "test": "tests/stack.test.ts"},
+  {"name": "init: the lockfile picks the package manager", "file": "src/stack.ts", "find": "files.exists(\"pnpm-lock.yaml\") ? \"pnpm\" : ", "replace": "", "test": "tests/stack.test.ts"},
+  {"name": "init: a Makefile check target wins", "file": "src/stack.ts", "find": "  if (targets.has(\"check\")) {", "replace": "  if (false) {", "test": "tests/stack.test.ts"},
+  {"name": "init: a filled-in config is left alone", "file": "src/cli.ts", "find": "  if (isFilledIn(current) && !has(\"force\")) {", "replace": "  if (false) {", "test": "tests/stack.test.ts"},
+  {"name": "init: the written config carries the detected gates", "file": "src/init.ts", "find": "    gates: stack.gates,\n", "replace": "", "test": "tests/stack.test.ts"}
 ]
