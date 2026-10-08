@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitCommandRunner } from "../src/git";
-import { cloneDirFor, ensureRepoClone } from "../src/repo";
+import { cloneDirFor, ensureRepoClone, GH_CREDENTIAL_HELPER } from "../src/repo";
 
 const roots: string[] = [];
 
@@ -76,6 +76,20 @@ describe("ensureRepoClone", () => {
     const dir = await ensureRepoClone(runner, "acme/widgets", { env, remoteUrl: bare });
     expect(dir).toBe(cloneDirFor("acme/widgets", env));
     expect(await Bun.file(join(dir, "README.md")).exists()).toBe(true);
+  });
+
+  test("the clone pushes through gh's login and nothing else, on first and later calls", async () => {
+    const root = tmpRoot();
+    const bare = await bareOrigin(root);
+    const env = { HOME: root, FACTORY_HOME: join(root, ".factory") };
+    const runner = new GitCommandRunner();
+    const dir = await ensureRepoClone(runner, "acme/widgets", { env, remoteUrl: bare });
+    // The empty entry resets whatever the system gitconfig set (osxkeychain), so gh's is the one that runs.
+    expect(await run(["config", "--local", "--get-all", "credential.helper"], dir)).toBe(`\n${GH_CREDENTIAL_HELPER}\n`);
+    // A clone made before v3.2 has no helper of its own; the next call gives it one.
+    await run(["config", "--local", "--unset-all", "credential.helper"], dir);
+    await ensureRepoClone(runner, "acme/widgets", { env, remoteUrl: bare });
+    expect(await run(["config", "--local", "--get-all", "credential.helper"], dir)).toBe(`\n${GH_CREDENTIAL_HELPER}\n`);
   });
 
   test("a second call fetches and fast-forwards instead of re-cloning", async () => {

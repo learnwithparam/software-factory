@@ -12,6 +12,7 @@ import type { IssueView } from "../tmux";
 import { clearStageArtifacts, validateStepJson, readStageArtifacts, runDir, type RetroArtifact, type VerdictArtifact } from "../artifacts";
 import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
 import { isHumanComment, parseChatOps } from "../chatops";
+import { mcpServersFor } from "../mcp";
 import { deriveIssueState } from "../derive";
 import { rehydrate } from "../rehydrate";
 import type { GateRunner } from "../gates";
@@ -34,6 +35,7 @@ export type Outcome =
   | "shipped"
   | "cancelled"
   | "lost-claim"
+  | "untrusted"
   | "waiting";
 
 export interface WatchDeps {
@@ -64,6 +66,8 @@ export interface WatchDeps {
   readonly view?: IssueView;
   // The steps an issue walks; absent means the bundled feature-to-pr.
   readonly workflow?: Workflow;
+  // The clock cron triggers read; absent means the real one.
+  readonly now?: () => Date;
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;
@@ -222,9 +226,14 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
-  extra: Pick<StageRunOptions, "resume"> = {},
+  extra: Pick<StageRunOptions, "resume"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
+  // Read from the clone of the base branch, never the worktree: an earlier step's agent can write
+  // the worktree, and a server entry is a command this step would launch. A missing name throws
+  // before anything is recorded or spent.
+  const { mcp: mcpNames, ...rest } = extra;
+  const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;
   // rehydrate before clearing: rehydrate only ever repopulates *earlier*
   // stages' artifacts from the thread, never this stage's own output, so the
   // order only matters for readability, not correctness — but clearing after
@@ -248,7 +257,8 @@ export async function runStage(
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
     ...files,
-    ...extra,
+    ...rest,
+    ...(mcp ? { mcp } : {}),
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();

@@ -31,6 +31,8 @@ export function stagePolicy(stage: StageName): StagePolicy {
 export interface StageContext {
   // A JSON Schema file for the agent's final message (only when opted in).
   readonly schemaFile?: string;
+  // The --mcp-config file holding this run's servers (only for a preset with `mcp: true`).
+  readonly mcpConfig?: string;
 }
 
 export interface StageInvocation {
@@ -67,6 +69,8 @@ export interface AgentPreset {
   // True when a read-only stage cannot write its files: the agent returns them
   // as its final message and the runner writes them (see reply.ts).
   readonly returnsArtifact?: boolean;
+  // Starts the MCP servers in ctx.mcpConfig. A step that names servers refuses any other agent.
+  readonly mcp?: true;
   parseLine(line: string): StageEvent[];
   // For a CLI whose events span lines: a fresh stateful parser per stage run (used instead of parseLine).
   newParser?(): (line: string) => StageEvent[];

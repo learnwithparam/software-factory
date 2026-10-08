@@ -90,8 +90,16 @@ The issue's label is the state. Everything else is derived from the thread.
 
 ## Where a human acts
 
-Always through GitHub state, which the runner polls every `pollIntervalSeconds`. Only `OWNER`,
-`MEMBER` and `COLLABORATOR` count.
+Always through GitHub state, which the runner polls every `pollIntervalSeconds`, or at once when a
+signed webhook arrives. A `factory:ready` label and a `/factory` command count only from someone
+with write, maintain or admin access to the repo; a `factory:ready` from anyone else is removed with
+a comment saying why. A free-text answer to a question counts from `OWNER`, `MEMBER` and
+`COLLABORATOR`.
+
+**Webhook (optional).** Set `FACTORY_WEBHOOK_SECRET` in the runner's environment and add a GitHub
+webhook to `https://<dashboard host>/webhook/github` with that secret and the issues, issue
+comment, pull request and review events. A delivery only wakes the poll; with no secret set the
+route answers 404 and the poll alone runs.
 
 | Channel | How |
 |---|---|
@@ -250,6 +258,18 @@ Config example:
   "maxToolCalls": 60
 }
 ```
+
+`profile` sets defaults for a company size; any key you set still wins.
+
+| `profile` | plan auto-approval | open factory PRs | merge |
+|---|---|---|---|
+| `solo` | low and medium risk | 3 | `auto` where merge policy allows |
+| `team` (the default's behaviour) | low risk | 5 | default |
+| `startup` | low risk | 10 | default |
+| `scaleup` | none, every plan waits | 10 | default |
+| `enterprise` | none, every plan waits | 10 | `off` |
+
+`riskPolicy.autoApproveMaxRisk` (`low` or `medium`) is the highest plan risk that auto-approves.
 
 Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) and `agentCommands`
 (`read`, `build`, `verify`: Bash patterns each stage may run, for example `["bun *", "make *"]` for

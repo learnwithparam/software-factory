@@ -12,6 +12,7 @@ import { buildContextPack } from "../context";
 import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
 import { plain } from "../display";
 import { takeoverMarker } from "../paths";
+import { McpError } from "../mcp";
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -134,10 +135,17 @@ export class CommandExecutor implements Executor {
     // The stop-artifact hook checks the stage's file against this before the agent stops.
     const spec = readOnly ? undefined : stopArtifactSpec(opts.stage, types);
     if (spec) writeFileSync(join(scratch, "artifact.schema.json"), JSON.stringify(spec));
+    // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
+    let mcpConfig: string | undefined;
+    if (opts.mcp && Object.keys(opts.mcp).length > 0) {
+      if (!agent.preset?.mcp || agent.config.command) throw new McpError(`${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`);
+      mcpConfig = join(scratch, "mcp.json");
+      writeFileSync(mcpConfig, JSON.stringify({ mcpServers: opts.mcp }));
+    }
     const skills = opts.type ? this.routes[opts.type]?.skills ?? [] : [];
     const contextPack = await buildContextPack(opts.stage, opts.issue, opts.cwd, { skills, contextFile: agent.preset?.contextFile });
     if (agent.preset?.ownsPrompt) {
-      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack));
+      ({ argv, stdin } = agent.preset.command(opts, agent.config, contextPack, { mcpConfig }));
     } else {
       const prompt = await renderPrompt(opts, readOnly, types, contextPack);
       if (agent.config.command) {

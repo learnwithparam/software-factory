@@ -25,6 +25,17 @@ async function run(runner: CommandRunner, args: string[], cwd?: string): Promise
   return result.stdout.trim();
 }
 
+// The runner's clone pushes through gh's own login. Without this it inherits
+// the machine's helper, and macOS's osxkeychain opens a dialog that a headless
+// run waits on forever (the v3.1 live run hung six minutes on its claim push).
+// The empty entry clears every inherited helper before gh's is added.
+export const GH_CREDENTIAL_HELPER = "!gh auth git-credential";
+
+async function useGhCredentials(runner: CommandRunner, dir: string): Promise<void> {
+  await run(runner, ["config", "--local", "--replace-all", "credential.helper", ""], dir);
+  await run(runner, ["config", "--local", "--add", "credential.helper", GH_CREDENTIAL_HELPER], dir);
+}
+
 export interface EnsureRepoCloneOptions {
   readonly env?: NodeJS.ProcessEnv;
   // Overrides the clone URL; tests point this at a local bare repo instead
@@ -43,8 +54,10 @@ export async function ensureRepoClone(
 
   if (!existsSync(`${dir}/.git`)) {
     await run(runner, ["clone", remoteUrl, dir]);
+    await useGhCredentials(runner, dir);
     return dir;
   }
+  await useGhCredentials(runner, dir);
 
   // Already cloned from an earlier container start: fetch and fast-forward
   // to whatever origin's default branch currently is, discarding any local

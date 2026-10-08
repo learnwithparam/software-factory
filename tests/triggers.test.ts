@@ -1,0 +1,145 @@
+import { describe, expect, test } from "bun:test";
+import { mergeConfig } from "../src/config";
+import { CRON_CATCHUP_MINUTES, cronMarker, fireCron } from "../src/engine/triggers";
+import { defaultWorkflow, parseWorkflowText } from "../src/engine/workflows";
+import { LABEL } from "../src/labels";
+import { FactoryState } from "../src/state";
+import { pollOnce } from "../src/watch";
+import { FakeGitHub } from "./harness";
+
+const REPO = "o/r";
+const BASE = `name: nightly
+steps:
+  triage:
+    uses: triage
+    label: factory:triaging
+    next: plan
+  plan:
+    uses: plan
+    label: factory:planning
+    next: pr
+  pr:
+    uses: pr
+    label: factory:in-review
+`;
+const withOn = (on: string) => BASE.replace("steps:", `on:\n${on}\nsteps:`);
+
+function nightly(on = `  cron:\n    - schedule: "0 2 * * *"\n      title: Nightly dependency check\n      body: Bump what is safe.`) {
+  const r = parseWorkflowText(withOn(on));
+  if (!r.ok) throw new Error(r.problems.join("\n"));
+  return r.workflow;
+}
+
+class Store {
+  kv = new Map<string, string>();
+  getSetting(k: string) {
+    return this.kv.get(k);
+  }
+  setSetting(k: string, v: string) {
+    this.kv.set(k, v);
+  }
+}
+
+describe("workflow on:", () => {
+  test("no on: means no triggers; the bundled workflow has none", () => {
+    expect(defaultWorkflow().triggers.cron).toEqual([]);
+  });
+
+  test("parses a cron trigger, UTC by default", () => {
+    const [t] = nightly().triggers.cron;
+    expect(t!.cron.src).toBe("0 2 * * *");
+    expect(t!.tz).toBe("UTC");
+    expect(t!.title).toBe("Nightly dependency check");
+  });
+
+  test.each([
+    [`  cron:\n    - schedule: "0 2 * *"\n      title: x`, /on\.cron\[0\]\.schedule: .*5 fields/],
+    [`  cron:\n    - schedule: "0 2 * * *"\n      tz: Moon/Base\n      title: x`, /on\.cron\[0\]\.tz: .*IANA/],
+    [`  cron:\n    - schedule: "0 2 * * *"`, /on\.cron\[0\]\.title: required/],
+    [`  cron:\n    - schedule: "0 2 * * *"\n      title: x\n      when: now`, /on\.cron\[0\]\.when: unknown key/],
+    [`  push: main`, /on\.push: unknown key/],
+    [`  cron: "0 2 * * *"`, /on\.cron: a list/],
+  ])("names the problem: %#", (on, msg) => {
+    const r = parseWorkflowText(withOn(on));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.problems.join("\n")).toMatch(msg);
+  });
+});
+
+describe("fireCron under a fake clock", () => {
+  const at = (iso: string) => new Date(iso);
+
+  test("files one ready issue in the matching minute, with its marker", async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    expect(await fireCron(gh, store, REPO, nightly(), at("2026-10-09T01:59:10Z"))).toEqual([]);
+    const filed = await fireCron(gh, store, REPO, nightly(), at("2026-10-09T02:00:30Z"));
+    expect(filed).toHaveLength(1);
+    const issue = gh.issues.get(filed[0]!)!;
+    expect(issue.title).toBe("Nightly dependency check");
+    expect(issue.labels.map((l) => l.name)).toEqual([LABEL.ready]);
+    expect(issue.body).toContain("Bump what is safe.");
+    expect(issue.body).toContain(cronMarker("nightly", 0));
+  });
+
+  test("a poll that skipped past the minute still catches it", async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    await fireCron(gh, store, REPO, nightly(), at("2026-10-09T01:58:00Z"));
+    // Next poll lands four minutes later; 02:00 was in between.
+    expect(await fireCron(gh, store, REPO, nightly(), at("2026-10-09T02:02:00Z"))).toHaveLength(1);
+  });
+
+  test("the same minute polled twice files once", async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    await fireCron(gh, store, REPO, nightly(), at("2026-10-09T01:59:00Z"));
+    await fireCron(gh, store, REPO, nightly(), at("2026-10-09T02:00:05Z"));
+    gh.issues.forEach((i) => (i.state = "CLOSED"));
+    expect(await fireCron(gh, store, REPO, nightly(), at("2026-10-09T02:00:50Z"))).toEqual([]);
+  });
+
+  test("an open issue from the same trigger blocks the next one; closing it unblocks", async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    const every = nightly(`  cron:\n    - schedule: "*/5 * * * *"\n      title: Sweep`);
+    await fireCron(gh, store, REPO, every, at("2026-10-09T02:04:00Z"));
+    expect(await fireCron(gh, store, REPO, every, at("2026-10-09T02:05:00Z"))).toHaveLength(1);
+    expect(await fireCron(gh, store, REPO, every, at("2026-10-09T02:10:00Z"))).toEqual([]);
+    gh.issues.forEach((i) => (i.state = "CLOSED"));
+    expect(await fireCron(gh, store, REPO, every, at("2026-10-09T02:15:00Z"))).toHaveLength(1);
+  });
+
+  test(`a long sleep catches up at most ${CRON_CATCHUP_MINUTES} minutes`, async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    await fireCron(gh, store, REPO, nightly(), at("2026-10-08T01:00:00Z"));
+    // 02:00 yesterday is long gone; 02:00 today is outside the window too.
+    expect(await fireCron(gh, store, REPO, nightly(), at("2026-10-09T03:30:00Z"))).toEqual([]);
+    expect(await fireCron(gh, store, REPO, nightly(), at("2026-10-10T02:30:00Z"))).toHaveLength(1);
+  });
+
+  test("first boot checks only the current minute, not the past hour", async () => {
+    const gh = new FakeGitHub([]);
+    expect(await fireCron(gh, new Store(), REPO, nightly(), at("2026-10-09T02:30:00Z"))).toEqual([]);
+    expect(await fireCron(gh, new Store(), REPO, nightly(), at("2026-10-09T02:00:00Z"))).toHaveLength(1);
+  });
+
+  test("the schedule reads its own zone", async () => {
+    const gh = new FakeGitHub([]);
+    const store = new Store();
+    const ist = nightly(`  cron:\n    - schedule: "0 9 * * *"\n      tz: Asia/Kolkata\n      title: Standup digest`);
+    expect(await fireCron(gh, store, REPO, ist, at("2026-10-09T09:00:00Z"))).toEqual([]);
+    expect(await fireCron(gh, store, REPO, ist, at("2026-10-10T03:30:00Z"))).toHaveLength(1);
+  });
+
+  test("the watcher's poll runs the configured workflow's schedule", async () => {
+    const gh = new FakeGitHub([]);
+    const state = new FactoryState(":memory:");
+    // Intake paused: the schedule still files its issue, which waits in factory:ready.
+    state.setToggle("auto_start", false);
+    const deps = { github: gh, state, workflow: nightly(), now: () => at("2026-10-09T02:00:00Z") } as never;
+    await pollOnce(deps, mergeConfig({ repo: REPO }));
+    expect([...gh.issues.values()].map((i) => i.title)).toEqual(["Nightly dependency check"]);
+  });
+});

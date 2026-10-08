@@ -328,3 +328,25 @@ describe("runDoctor agent versions", () => {
     expect(missing.detail).toContain("no .factory/workflows/no-such-flow.yml");
   });
 });
+
+describe("doctor: mcp: servers", () => {
+  const flow = "name: m\nsteps:\n  b: { uses: build, label: factory:building, mcp: [docs, tracker], next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const reading = (registry?: string): DoctorDeps => ({
+    ...deps(),
+    readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : path.endsWith(".factory/mcp.json") ? registry : undefined),
+  });
+  const check = async (registry?: string) => (await runDoctor(reading(registry), { ...ctx, workflow: "m" })).find((c) => c.name.startsWith("every mcp: server"));
+
+  test("every named server is in .factory/mcp.json", async () => {
+    expect((await check(JSON.stringify({ mcpServers: { docs: {}, tracker: {} } })))!.ok).toBe(true);
+  });
+  test("a name the registry lacks, or no registry, fails with the name", async () => {
+    const missing = (await check(JSON.stringify({ mcpServers: { docs: {} } })))!;
+    expect(missing.ok).toBe(false);
+    expect(missing.detail).toContain('"tracker" is not in .factory/mcp.json');
+    expect((await check(undefined))!.detail).toContain(".factory/mcp.json not found");
+  });
+  test("a workflow that names no server adds no check", async () => {
+    expect(await runDoctor(deps(), { ...ctx, workflow: "feature-to-pr" }).then((cs) => cs.find((c) => c.name.startsWith("every mcp:")))).toBeUndefined();
+  });
+});

@@ -13,6 +13,8 @@ export interface RiskPolicy {
   // Low risk (docs, test-only, a single non-protected module) is eligible for
   // auto-approve; the toggle in state.ts still has to be on.
   readonly autoApproveLowRisk: boolean;
+  // The highest plan risk that may skip the plan gate when the switch above is on.
+  readonly autoApproveMaxRisk: "low" | "medium";
 }
 
 export interface StageBudgets {
@@ -99,7 +101,23 @@ export interface FactoryConfig {
   readonly templateOverrides: readonly string[];
   // The workflow an issue runs: .factory/workflows/<name>.yml, else the runner's copy.
   readonly workflow: string;
+  // Defaults for a company size (PROFILES); any key set explicitly still wins.
+  readonly profile?: Profile;
 }
+
+export type Profile = "solo" | "team" | "startup" | "scaleup" | "enterprise";
+
+// What each profile changes from DEFAULT_CONFIG. "team" is the default's own
+// behaviour; the others trade autonomy for review as the company grows.
+// solo: auto-approve up to medium risk, auto-merge what merge-policy allows.
+// scaleup and enterprise: every plan waits for a human, nothing auto-merges.
+export const PROFILES: Readonly<Record<Profile, Partial<Pick<FactoryConfig, "riskPolicy" | "maxOpenFactoryPrs" | "merge">>>> = {
+  solo: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "medium" }, maxOpenFactoryPrs: 3, merge: { policy: "auto", autoPaths: [], maxFiles: 10, maxLines: 200 } },
+  team: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 5 },
+  startup: { riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10 },
+  scaleup: { riskPolicy: { autoApproveLowRisk: false, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10 },
+  enterprise: { riskPolicy: { autoApproveLowRisk: false, autoApproveMaxRisk: "low" }, maxOpenFactoryPrs: 10, merge: { policy: "off", autoPaths: [], maxFiles: 10, maxLines: 200 } },
+};
 
 export interface TmuxConfig {
   readonly enabled: boolean;
@@ -147,7 +165,7 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   repo: "",
   protectedPaths: [],
   postEditCommand: [],
-  riskPolicy: { autoApproveLowRisk: true },
+  riskPolicy: { autoApproveLowRisk: true, autoApproveMaxRisk: "low" },
   maxOpenFactoryPrs: 3,
   concurrency: 3,
   pollIntervalSeconds: 15,
@@ -172,18 +190,21 @@ export const DEFAULT_CONFIG: FactoryConfig = {
   workflow: "feature-to-pr",
 };
 
+// The one resolver: DEFAULT_CONFIG, then the profile's defaults, then what the repo set.
 export function mergeConfig(partial: Partial<FactoryConfig>): FactoryConfig {
+  const p = partial.profile ? PROFILES[partial.profile] : {};
   return {
     ...DEFAULT_CONFIG,
+    ...p,
     ...partial,
-    riskPolicy: { ...DEFAULT_CONFIG.riskPolicy, ...partial.riskPolicy },
+    riskPolicy: { ...DEFAULT_CONFIG.riskPolicy, ...p.riskPolicy, ...partial.riskPolicy },
     maxBudgetUsd: { ...DEFAULT_CONFIG.maxBudgetUsd, ...partial.maxBudgetUsd },
     agentCommands: { ...DEFAULT_CONFIG.agentCommands, ...partial.agentCommands },
     agents: { ...DEFAULT_CONFIG.agents, ...partial.agents },
     stages: { ...DEFAULT_CONFIG.stages, ...partial.stages },
     routes: { ...DEFAULT_CONFIG.routes, ...partial.routes },
     spend: { ...DEFAULT_CONFIG.spend, ...partial.spend },
-    merge: { ...DEFAULT_CONFIG.merge, ...partial.merge },
+    merge: { ...DEFAULT_CONFIG.merge, ...p.merge, ...partial.merge },
     holdout: { ...DEFAULT_CONFIG.holdout, ...partial.holdout },
     tmux: { ...DEFAULT_CONFIG.tmux, ...partial.tmux },
   };
@@ -221,6 +242,7 @@ const TOP_LEVEL: Record<keyof FactoryConfig | "riskCriteria", Kind> = {
   prRunSummary: "boolean",
   templateOverrides: "strings",
   workflow: "string",
+  profile: "string",
   riskCriteria: "object",
 };
 
@@ -254,7 +276,10 @@ export function configProblems(raw: unknown): string[] {
     const v = cfg[key];
     if (v !== undefined && kindOk(v, "object") && !Array.isArray(v)) checkKeys(v as Record<string, unknown>, shape, `${key}.`, problems);
   };
-  nested("riskPolicy", { autoApproveLowRisk: "boolean" });
+  nested("riskPolicy", { autoApproveLowRisk: "boolean", autoApproveMaxRisk: "string" });
+  const maxRisk = (cfg.riskPolicy as Record<string, unknown> | undefined)?.autoApproveMaxRisk;
+  if (maxRisk !== undefined && maxRisk !== "low" && maxRisk !== "medium") problems.push(`riskPolicy.autoApproveMaxRisk: expected "low" or "medium", got ${JSON.stringify(maxRisk)}`);
+  if (cfg.profile !== undefined && !Object.hasOwn(PROFILES, cfg.profile as string)) problems.push(`profile: expected one of ${Object.keys(PROFILES).join(", ")}, got ${JSON.stringify(cfg.profile)}`);
   nested("maxBudgetUsd", { triage: "positive", plan: "positive", build: "positive", verify: "positive", pr: "positive", retro: "positive" });
   nested("spend", { perIssueUsd: "positive", dailyUsd: "positive", maxUnreportedRuns: "posInt" });
   nested("merge", { policy: "string", autoPaths: "strings", maxFiles: "posInt", maxLines: "posInt" });

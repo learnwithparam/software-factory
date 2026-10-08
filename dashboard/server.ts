@@ -26,6 +26,13 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
+import { readCapped, readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
+
+// GitHub cannot hold a dashboard token, so this route authenticates by HMAC
+// instead (src/webhook.ts), and is the one public route reachable from off
+// the box once FACTORY_WEBHOOK_SECRET is set.
+const WEBHOOK_ROUTE = "POST /webhook/github";
+const webhookSecret = () => process.env[WEBHOOK_SECRET_ENV] ?? "";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FACTORY_DASHBOARD_PORT ?? 4100);
@@ -63,7 +70,7 @@ function cookie(req: Request, name: string): string {
 
 // The only routes reachable without a token. Everything else is default-deny;
 // tests/dashboard-routes.test.ts walks every route against this list.
-export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session"];
+export const PUBLIC_ROUTES: readonly string[] = ["GET /", "GET /assets", "POST /api/session", WEBHOOK_ROUTE];
 
 const ASSET_TYPES: Record<string, string> = { css: "text/css; charset=utf-8", js: "text/javascript; charset=utf-8", woff2: "font/woff2" };
 
@@ -305,6 +312,31 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
         const https = new URL(req.url).protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
         const secure = https ? "; Secure" : "";
         return json({ ok: true }, { headers: { "set-cookie": `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}` } });
+      },
+    },
+    {
+      method: "POST",
+      pattern: /^\/webhook\/github$/,
+      label: WEBHOOK_ROUTE,
+      handler: async (req) => {
+        const secret = webhookSecret();
+        if (!secret) return json({ error: "not found" }, { status: 404 });
+        if (Number(req.headers.get("content-length") ?? 0) > WEBHOOK_MAX_BYTES) return json({ error: "too large" }, { status: 413 });
+        const body = await readCapped(req.body, WEBHOOK_MAX_BYTES);
+        if (!body) return json({ error: "too large" }, { status: 413 });
+        if (!signatureMatches(secret, body, req.headers.get("x-hub-signature-256"))) return json({ error: "bad signature" }, { status: 401 });
+        let payload: unknown;
+        try {
+          payload = JSON.parse(new TextDecoder().decode(body));
+        } catch {
+          return json({ error: "body is not JSON" }, { status: 400 });
+        }
+        const d = readDelivery(req.headers, payload);
+        if (!d) return json({ error: "missing X-GitHub-Delivery or X-GitHub-Event" }, { status: 400 });
+        if (d.event === "ping") return json({ ok: true, pong: true });
+        if (!WAKING_EVENTS.has(d.event) || (repo && d.repo.toLowerCase() !== repo.toLowerCase())) return json({ ok: true, ignored: true }, { status: 202 });
+        const fresh = state.recordDelivery(d);
+        return json({ ok: true, recorded: fresh }, { status: fresh ? 201 : 200 });
       },
     },
     { method: "GET", pattern: /^\/api\/runs$/, label: "GET /api/runs", handler: () => json({ repo, runs: state.listRuns(repo || undefined).map(plainRun) }) },
@@ -580,7 +612,9 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     const route = routes.find((r) => r.method === req.method && r.pattern.test(url.pathname));
     const isPublic = route !== undefined && PUBLIC_ROUTES.includes(route.label);
 
-    if (!loopback && !DASHBOARD_TOKEN) {
+    // The webhook carries its own HMAC, so GitHub may reach it with no dashboard token set.
+    const signedWebhook = route?.label === WEBHOOK_ROUTE && webhookSecret() !== "";
+    if (!loopback && !DASHBOARD_TOKEN && !signedWebhook) {
       return json({ error: "refused: reachable from a non-loopback address with no FACTORY_DASHBOARD_TOKEN set" }, { status: 503 });
     }
     // Token, when set, guards every non-public route for every caller, so an

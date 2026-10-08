@@ -74,6 +74,10 @@ export interface MergeReadiness {
   readonly changesRequestedStale: boolean;
 }
 
+// A user's role on the repo, highest first. "none" when they are not a collaborator.
+export type RepoRole = "admin" | "maintain" | "write" | "triage" | "read" | "none";
+export const TRUSTED_ROLES: readonly RepoRole[] = ["admin", "maintain", "write"];
+
 export interface ScmPort {
   listIssuesByLabel(repo: string, label: string): Promise<GhIssue[]>;
   getIssue(repo: string, number: number): Promise<GhIssue>;
@@ -100,5 +104,8 @@ export interface ScmPort {
   listLabels(repo: string): Promise<string[]>;
   ensureLabel(repo: string, name: string, color: string, description: string): Promise<void>;
   currentLogin(): Promise<string>;
+  // Who last applied `label` to the issue; undefined if the history has no such event.
+  labeledBy(repo: string, number: number, label: string): Promise<string | undefined>;
+  roleOf(repo: string, login: string): Promise<RepoRole>;
   authStatus(): Promise<{ ok: boolean; detail: string }>;
 }

@@ -10,6 +10,7 @@ import type { Edge, Step, Workflow } from "../core/workflow";
 import { latestDataFor, parseDataMarkers } from "../derive";
 import type { GhIssue } from "../github";
 import { LABEL } from "../labels";
+import { McpError } from "../mcp";
 import { checkSpendCap, finish, moveLabel, OperatorTakeover, postComment, stopStep, type Outcome, type RunCtx, type WatchDeps } from "./common";
 import { STEP_TYPES } from "./steps";
 
@@ -65,6 +66,11 @@ export async function runWorkflow(
       step = to;
     }
   } catch (e) {
+    if (e instanceof McpError) {
+      // A server the step names is not in the worktree's .factory/mcp.json: nothing ran, so a retry after the fix is free.
+      await postComment(deps, config, issueNumber, `Stopped before ${step.id}: ${e.message}. Add it to .factory/mcp.json or drop it from the step, then \`/factory retry\`.`, { stage: "mcp", json: { step: step.id, problem: e.message } });
+      return await stopStep(deps, config, issueNumber, step.label, { status: "failed", reason: e.message });
+    }
     if (!(e instanceof OperatorTakeover)) throw e;
     // Not a failure and not a retry: the operator owns the session now, and
     // `/factory retry` (or `factory takeover`'s hand-back) re-enters this step.

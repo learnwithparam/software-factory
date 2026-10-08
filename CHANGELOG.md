@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.2.0
+
+Triggers, intake trust, company-size profiles and per-step MCP servers. Upgraders: a
+`factory:ready` label or a `/factory` command from someone without write access no longer starts
+anything; check that whoever drives the factory has write, maintain or admin on the repo.
+
+- `on: cron` in a workflow files a `factory:ready` issue at each matching minute (5 fields, an IANA
+  `tz`, UTC by default), catches up to 60 minutes after a missed poll, and files nothing while the
+  last one from the same trigger is open. See [docs/workflows.md](docs/workflows.md).
+- `POST /webhook/github` checks the `X-Hub-Signature-256` HMAC against `FACTORY_WEBHOOK_SECRET`
+  before reading anything, records one row per delivery id (bodies capped at 1 MiB) and wakes the
+  watcher at once. With no secret the route is 404 and the poll runs as before.
+- Intake trust: `factory:ready` counts only when the person who applied it has write, maintain or
+  admin; otherwise the label comes off with a comment. `/factory` commands, including `cancel`,
+  need the same role. Roles are cached for five minutes.
+- `profile`: `solo`, `team`, `startup`, `scaleup` or `enterprise` sets plan auto-approval, the open
+  PR cap and the merge policy; explicit keys still win. `riskPolicy.autoApproveMaxRisk` (`low` or
+  `medium`) is the highest plan risk that auto-approves, and the bundled `feature-to-pr` plan edge
+  reads it.
+- `mcp:` on a step names servers from the base branch's `.factory/mcp.json` (never the issue
+  worktree's, which an agent can write); that step's claude run loads only those
+  (`--mcp-config` with `--strict-mcp-config`) and may use their tools. A missing name fails the
+  issue before the step runs, and `factory doctor` checks every name.
+- The clone pushes through `gh`'s credential helper, so a headless run never waits on a keychain
+  dialog.
+
+Not in this release:
+
+- `emit` chaining between workflows, and a `labels:` mapping for a team's own label names.
+- Checks API progress (one check run per step).
+- The MCP notifier and event-source adapters, and `action: mcp`; the inbox chat channel stays a stub.
+- Cron dedupe through GitHub, so two watchers on one repo could each file the same scheduled issue
+  (v3.3, with the GitHub store).
+- Per-team back-pressure and org caps for `scaleup` and `enterprise` (v3.4).
+- Raising the plan's risk from a deterministic rating when the agent rates it lower.
+- `src/revision.ts` and `src/derive.ts` still take a revision's or answer's text from any
+  `COLLABORATOR` comment; only the command itself is role-checked.
+
 ## v3.1.0
 
 The pipeline is a YAML workflow, and the runner is split into a pure core, ports and adapters.

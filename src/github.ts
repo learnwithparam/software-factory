@@ -27,8 +27,8 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
-import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, ScmPort } from "./ports/scm";
-export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, ScmPort };
+import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort } from "./ports/scm";
+export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, RepoRole, ScmPort };
 
 class GhError extends Error {
   constructor(
@@ -135,6 +135,27 @@ export class GitHub implements ScmPort {
 
   async reopenIssue(repo: string, number: number): Promise<void> {
     await this.exec(["issue", "reopen", String(number), "--repo", repo]);
+  }
+
+  async labeledBy(repo: string, number: number, label: string): Promise<string | undefined> {
+    // --paginate with --jq prints one login per labelled event, oldest first.
+    const result = await this.exec([
+      "api",
+      "--paginate",
+      `repos/${repo}/issues/${number}/events`,
+      "--jq",
+      `.[] | select(.event == "labeled" and .label.name == ${JSON.stringify(label)}) | .actor.login`,
+    ]);
+    return result.stdout.trim().split("\n").filter(Boolean).at(-1);
+  }
+
+  async roleOf(repo: string, login: string): Promise<RepoRole> {
+    const result = await this.runner.run(["api", `repos/${repo}/collaborators/${encodeURIComponent(login)}/permission`, "--jq", ".role_name // .permission"]);
+    // 404: not a collaborator at all. Any other failure is not an answer, so it throws.
+    if (result.code !== 0 && /HTTP 404/.test(result.stderr)) return "none";
+    if (result.code !== 0) throw new GhError(["api", "collaborators/permission"], result);
+    const role = result.stdout.trim();
+    return (["admin", "maintain", "write", "triage", "read"] as const).find((r) => r === role) ?? "none";
   }
 
   async createIssue(repo: string, title: string, body: string, labels: string[]): Promise<number> {

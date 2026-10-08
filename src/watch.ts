@@ -40,6 +40,8 @@ import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
+import { fireCron } from "./engine/triggers";
+import { TRUSTED_ROLES, type RepoRole } from "./ports/scm";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
 
@@ -61,7 +63,46 @@ function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, st
   return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);
 }
 
+// Intake trust (P36): a label is a request to spend tokens and push a branch,
+// so it counts only from someone who could push that branch themselves.
+// Anyone else's factory:ready is taken off with a comment saying why.
+// One trust rule for labels and commands: write access or higher. A comment's
+// authorAssociation alone is not enough, since a read-only collaborator is a
+// COLLABORATOR too. Roles are cached for ROLE_CACHE_MS per SCM so a waiting
+// issue does not cost an API call every poll.
+export const ROLE_CACHE_MS = 5 * 60_000;
+const roleCache = new WeakMap<object, Map<string, { role: RepoRole; at: number }>>();
+async function roleOf(deps: WatchDeps, config: FactoryConfig, login: string): Promise<RepoRole> {
+  const cache = roleCache.get(deps.github) ?? new Map();
+  roleCache.set(deps.github, cache);
+  const key = `${config.repo}:${login}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < ROLE_CACHE_MS) return hit.role;
+  const role = await deps.github.roleOf(config.repo, login);
+  cache.set(key, { role, at: Date.now() });
+  return role;
+}
+
+async function commandIsTrusted(deps: WatchDeps, config: FactoryConfig, comment: GhComment): Promise<boolean> {
+  return TRUSTED_ROLES.includes(await roleOf(deps, config, comment.author));
+}
+
+async function readyIsTrusted(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<boolean> {
+  const by = await deps.github.labeledBy(config.repo, issue.number, LABEL.ready);
+  const role = by ? await roleOf(deps, config, by) : "none";
+  if (TRUSTED_ROLES.includes(role)) return true;
+  await deps.github.removeLabels(config.repo, issue.number, [LABEL.ready]);
+  await postComment(
+    deps,
+    config,
+    issue.number,
+    `\`${LABEL.ready}\` was removed: ${by ? `@${by} has the ${role} role here` : "the issue history does not say who applied it"}, and the factory starts only for people with write access or higher. A maintainer can add the label again to start it.`,
+  );
+  return false;
+}
+
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
+  if (!(await readyIsTrusted(issue, deps, config))) return "untrusted";
   const claimed = await deps.git.claim(deps.cloneDir, issue.number, config.base);
   if (!claimed) {
     // Another runner may have claimed it first, or `factory:ready` was
@@ -124,7 +165,7 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   const question = findQuestionComment(issue);
   if (!question) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, question.createdAt);
-  if (!reply) return "waiting";
+  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
   const derived = deriveIssueState(issue, workflowOf(deps));
@@ -142,7 +183,7 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   const plan = findPlanComment(issue);
   if (!plan) return undefined;
   const reply = latestTrustedCommentAfter(issue.comments, plan.createdAt);
-  if (!reply) return "waiting";
+  if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   const command = parseChatOps(reply.body);
   const worktree = worktreeFor(deps, issue.number);
 
@@ -169,8 +210,9 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
   const verb = parseChatOps(latest.body).type;
+  if (verb !== "cancel" && verb !== "retry") return undefined;
+  if (!(await commandIsTrusted(deps, config, latest))) return undefined;
   if (verb === "cancel") return cancelRun(issue, deps, config);
-  if (verb !== "retry") return undefined;
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
   if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;
@@ -241,7 +283,7 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
     .filter((c) => isHumanComment(c) && Date.parse(c.createdAt) > since)
     .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
     .at(-1);
-  if (latest) {
+  if (latest && (await commandIsTrusted(deps, config, latest))) {
     const command = parseChatOps(latest.body);
     if (command.type === "cancel") return cancelRun(issue, deps, config);
     const reviseTo = stepByLabel(workflowOf(deps), LABEL.inReview)?.revise;
@@ -320,6 +362,10 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;
   const intakeGated = autoStart && !stopIf && !budgetPaused;
+  // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
+  await fireCron(deps.github, deps.state, config.repo, workflowOf(deps), deps.now?.() ?? new Date()).catch((err) =>
+    console.error("factory watch: cron trigger failed", err),
+  );
   const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
@@ -403,22 +449,38 @@ export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): P
 // stage — was done. A shared `inFlight` set is what makes that safe instead
 // of a repeat of audit finding #2 (double-dispatch): an issue still being
 // worked by an earlier, still-running poll is invisible to a newer one.
-export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void): () => void {
+//
+// A webhook delivery (dashboard/server.ts records it in the same SQLite file,
+// from this process or the dashboard's own) polls straight away instead of
+// waiting out the interval.
+export const WEBHOOK_CHECK_MS = 2000;
+
+export function startWatch(deps: WatchDeps, config: FactoryConfig, onTick?: (r: PollResult) => void, webhookCheckMs = WEBHOOK_CHECK_MS): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const inFlight = new Set<number>();
+  let seenDelivery = deps.state.latestDelivery();
 
   function tick(): void {
     if (stopped) return;
+    if (timer) clearTimeout(timer);
     pollOnce(deps, config, inFlight)
       .then((result) => onTick?.(result))
       .catch((err) => console.error("factory watch: poll failed", err));
     timer = setTimeout(tick, config.pollIntervalSeconds * 1000);
   }
 
+  const webhooks = setInterval(() => {
+    const latest = deps.state.latestDelivery();
+    if (latest === seenDelivery) return;
+    seenDelivery = latest;
+    tick();
+  }, webhookCheckMs);
+
   tick();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    clearInterval(webhooks);
   };
 }
