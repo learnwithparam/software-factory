@@ -40,6 +40,14 @@ describe("the CI template", () => {
     }
   });
 
+  test("the scan job installs osv-scanner at a pinned version and checks its sha256 before running it", () => {
+    const scanJob = ci.slice(ci.indexOf("\n  scan:"), ci.indexOf("\n  manual:"));
+    expect(ci).toMatch(/OSV_SCANNER_VERSION: "\d+\.\d+\.\d+"/);
+    expect(ci).toMatch(/OSV_SCANNER_SHA256: [0-9a-f]{64}\n/);
+    expect(scanJob).toContain('sha256sum -c -');
+    expect(scanJob.indexOf("sha256sum -c -")).toBeLessThan(scanJob.indexOf("factory scan --repo-dir"));
+  });
+
   test("checks the target repo out with full history", () => {
     const targets = steps.filter((s) => /uses: actions\/checkout@/.test(s) && !/repository:/.test(s));
     expect(targets.length).toBe(4);

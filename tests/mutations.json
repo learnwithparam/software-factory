@@ -250,5 +250,13 @@
   {"name": "gates.sh: an always package runs untouched", "file": "template/.factory/gates.sh", "find": ".packages[$i].always // false", "replace": ".packages[$i].never // false", "test": "tests/gates.test.ts"},
   {"name": "gates.sh: uncommitted changes count as touching a package", "file": "template/.factory/gates.sh", "find": " git diff --name-only HEAD; git ls-files --others --exclude-standard;", "replace": "", "test": "tests/gates.test.ts"},
   {"name": "config: package gates count as gates", "file": "src/config.ts", "find": "return n(cfg.gates) + packages.reduce", "replace": "return n(cfg.gates) + 0 * packages.reduce", "test": "tests/config.test.ts"},
-  {"name": "config: a package path may not leave the repo", "file": "src/config.ts", "find": ".split(\"/\").includes(\"..\")", "replace": ".split(\"/\").includes(\"...\")", "test": "tests/config.test.ts"}
+  {"name": "config: a package path may not leave the repo", "file": "src/config.ts", "find": ".split(\"/\").includes(\"..\")", "replace": ".split(\"/\").includes(\"...\")", "test": "tests/config.test.ts"},
+  {"name": "scan: osv-scanner's no-lockfile exit is a skip, not an error", "file": "src/scan.ts", "find": "const OSV_NO_PACKAGES = 128;", "replace": "const OSV_NO_PACKAGES = 129;", "test": "tests/scan.test.ts"},
+  {"name": "scan: osv-scanner exit 1 means findings, not failure", "file": "src/scan.ts", "find": "const OSV_OK = new Set([0, 1]);", "replace": "const OSV_OK = new Set([0]);", "test": "tests/scan.test.ts"},
+  {"name": "scan: without osv-scanner a Bun project falls back to bun audit", "file": "src/scan.ts", "find": "if (osv.code !== 127)", "replace": "if (osv.code !== 126)", "test": "tests/scan.test.ts"},
+  {"name": "scan: a package in two lockfiles merges its advisories by id", "file": "src/scan.ts", "find": "advisories.set(v.id, {", "replace": "advisories.set(v.id + Math.random(), {", "test": "tests/scan.test.ts"},
+  {"name": "ci: the scan job checks osv-scanner's sha256", "file": "template-ci/factory.yml.example", "find": "          echo \"${OSV_SCANNER_SHA256}  $RUNNER_TEMP/bin/osv-scanner\" | sha256sum -c -\n", "replace": "", "test": "tests/release.test.ts"},
+  {"name": "port: a port another worktree holds is not handed out again", "file": "src/port.ts", "find": "held.has(port) && tries < 20", "replace": "false && tries < 20", "test": "tests/port.test.ts"},
+  {"name": "port: gates.sh runs with FACTORY_PORT", "file": "src/gates.ts", "find": "${port ? `FACTORY_PORT=${port} ` : \"\"}", "replace": "", "test": "tests/port.test.ts"},
+  {"name": "port: the stage's environment carries FACTORY_PORT", "file": "src/agents/executor.ts", "find": "        ...portEnv(opts.cwd),\n", "replace": "", "test": "tests/port.test.ts"}
 ]

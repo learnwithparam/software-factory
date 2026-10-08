@@ -9,11 +9,12 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseAuditFindings, scan, type ScanDeps } from "../src/scan";
+import { OSV_ARGV, parseAuditFindings, parseOsvFindings, scan, type ScanDeps } from "../src/scan";
 import { GitHub, type CommandResult, type CommandRunner, type GhIssue } from "../src/github";
 import { LABEL } from "../src/labels";
 
 const FIXTURE = readFileSync(join(import.meta.dir, "fixtures", "bun-audit-splitbill.json"), "utf8");
+const OSV_FIXTURE = readFileSync(join(import.meta.dir, "fixtures", "osv-splitbill.json"), "utf8");
 
 // A Bun project, as far as scan() checks: it never shells out to `bun audit`
 // without this marker (plan v2.6.2 item 6).
@@ -76,12 +77,18 @@ class FakeGitHub extends GitHub {
   }
 }
 
-class FakeBunRunner implements CommandRunner {
-  constructor(private readonly stdout: string) {}
-  async run(): Promise<CommandResult> {
-    return { stdout: this.stdout, stderr: "", code: 1 }; // bun audit exits non-zero when it finds advisories
+// Answers by program name; a program with no answer is not installed (127).
+class FakeRunner implements CommandRunner {
+  calls: string[][] = [];
+  constructor(private readonly answers: Record<string, CommandResult>) {}
+  async run(argv: string[]): Promise<CommandResult> {
+    this.calls.push(argv);
+    return this.answers[argv[0]!] ?? { stdout: "", stderr: "not installed", code: 127 };
   }
 }
+// bun audit exits non-zero when it finds advisories; so does osv-scanner (1).
+const bunOnly = (stdout = FIXTURE) => new FakeRunner({ bun: { stdout, stderr: "", code: 1 } });
+const osv = (stdout: string, code = 1) => new FakeRunner({ "osv-scanner": { stdout, stderr: "", code }, bun: { stdout: FIXTURE, stderr: "", code: 1 } });
 
 function issue(number: number, body: string): GhIssue {
   return { number, title: "seed", body, labels: [], comments: [] };
@@ -93,7 +100,7 @@ describe("scan()", () => {
     // marker (filed by hand as the workshop's seeded dependency issue), so a
     // live scan should only file nanoid.
     const github = new FakeGitHub([issue(6, "some body\n<!-- factory:scan id=audit:hono -->\nmore text")]);
-    const deps: ScanDeps = { github, runner: new FakeBunRunner(FIXTURE) };
+    const deps: ScanDeps = { github, runner: bunOnly() };
     const result = await scan(deps, "acme/widgets", bunProjectDir);
 
     expect(result.skipped).toHaveLength(1);
@@ -105,39 +112,67 @@ describe("scan()", () => {
 
   test("files both findings when nothing is open yet", async () => {
     const github = new FakeGitHub([]);
-    const deps: ScanDeps = { github, runner: new FakeBunRunner(FIXTURE) };
+    const deps: ScanDeps = { github, runner: bunOnly() };
     const result = await scan(deps, "acme/widgets", bunProjectDir);
     expect(result.filed).toHaveLength(2);
     expect(result.skipped).toHaveLength(0);
   });
 
-  test("only calls bun audit, never bun outdated (there is no outdated --json)", async () => {
-    const calls: string[][] = [];
-    class RecordingRunner implements CommandRunner {
-      async run(args: string[]): Promise<CommandResult> {
-        calls.push(args);
-        return { stdout: "{}", stderr: "", code: 0 };
-      }
-    }
-    const github = new FakeGitHub([]);
-    await scan({ github, runner: new RecordingRunner() }, "acme/widgets", bunProjectDir);
-    expect(calls).toEqual([["audit", "--json"]]);
+  test("without osv-scanner, a Bun project calls only bun audit, never bun outdated (there is no outdated --json)", async () => {
+    const runner = bunOnly("{}");
+    const result = await scan({ github: new FakeGitHub([]), runner }, "acme/widgets", bunProjectDir);
+    expect(runner.calls).toEqual([OSV_ARGV, ["bun", "audit", "--json"]]);
+    expect(result.source).toBe("bun audit");
   });
 
-  test("skips with a clear message on a repo with no bun.lock, never shelling out", async () => {
-    const calls: string[][] = [];
-    class RecordingRunner implements CommandRunner {
-      async run(args: string[]): Promise<CommandResult> {
-        calls.push(args);
-        return { stdout: "{}", stderr: "", code: 0 };
-      }
-    }
+  test("without osv-scanner, a repo with no bun.lock skips with a clear message, never running bun", async () => {
+    const runner = bunOnly();
     const noBunDir = mkdtempSync(join(tmpdir(), "factory-scan-py-"));
     const github = new FakeGitHub([]);
-    const result = await scan({ github, runner: new RecordingRunner() }, "acme/pyapp", noBunDir);
-    expect(result).toEqual({ filed: [], skipped: [], skippedReason: expect.stringContaining("bun.lock") });
-    expect(calls).toEqual([]);
+    const result = await scan({ github, runner }, "acme/pyapp", noBunDir);
+    expect(result).toEqual({ filed: [], skipped: [], skippedReason: expect.stringContaining("install osv-scanner") });
+    expect(runner.calls).toEqual([OSV_ARGV]);
     expect(github.created).toEqual([]);
     rmSync(noBunDir, { recursive: true, force: true });
+  });
+
+  test("osv-scanner wins when installed, on any repo, and bun is never run", async () => {
+    const runner = osv(OSV_FIXTURE);
+    const github = new FakeGitHub([issue(6, "<!-- factory:scan id=audit:hono -->")]);
+    const pyDir = mkdtempSync(join(tmpdir(), "factory-scan-osv-"));
+    const result = await scan({ github, runner }, "acme/widgets", pyDir);
+    rmSync(pyDir, { recursive: true, force: true });
+    expect(runner.calls).toEqual([OSV_ARGV]);
+    expect(result).toMatchObject({ source: "osv-scanner", filed: [expect.stringContaining("nanoid")], skipped: [expect.stringContaining("hono")] });
+  });
+
+  test("osv-scanner with no lockfile it reads, or an error, skips: its output is never read as zero findings", async () => {
+    expect((await scan({ github: new FakeGitHub([]), runner: osv("", 128) }, "a/b", bunProjectDir)).skippedReason).toContain("no lockfile");
+    const failed = await scan({ github: new FakeGitHub([]), runner: osv("", 2) }, "a/b", bunProjectDir);
+    expect(failed.skippedReason).toContain("osv-scanner failed (exit 2)");
+  });
+});
+
+describe("parseOsvFindings", () => {
+  test("the real splitbill capture: one finding per package, severity lowercased, same marker as bun audit", () => {
+    const findings = parseOsvFindings(OSV_FIXTURE);
+    expect(findings.map((f) => f.id)).toEqual(["audit:hono", "audit:nanoid"]);
+    const nanoid = findings[1]!;
+    expect(nanoid.title).toBe("4 advisories in nanoid (worst: high)");
+    expect(nanoid.body).toContain("<!-- factory:scan id=audit:nanoid -->");
+    expect(nanoid.body).toContain("from `osv-scanner`");
+  });
+
+  test("a package in two lockfiles is one finding, its advisories merged by id", () => {
+    const report = JSON.parse(OSV_FIXTURE);
+    report.results.push(structuredClone(report.results[0]));
+    const findings = parseOsvFindings(JSON.stringify(report));
+    expect(findings).toHaveLength(2);
+    expect(findings[1]!.title).toStartWith("4 advisories");
+  });
+
+  test("no results, and unparseable output, are no findings", () => {
+    expect(parseOsvFindings('{"results":[]}')).toEqual([]);
+    expect(parseOsvFindings("not json")).toEqual([]);
   });
 });

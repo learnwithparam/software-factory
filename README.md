@@ -295,6 +295,9 @@ gates run from its own directory, and only when the diff against `base` touches 
 path; `"always": true` runs them every time. Top-level `gates` always run. With no base to diff
 against, or a diff that touches no package, every package runs. The proof runs only a top-level
 test gate.
+Each worktree gets its own free port in `$FACTORY_PORT`, set for every stage and for `gates.sh`.
+An app that binds a port (a dev server, an end-to-end test) should read it, so builds of two
+issues at once never collide.
 `postEditCommand` (off by default) is an argv list the build stage runs after every edit, with
 `{file}` replaced by the edited path, for example `["bunx", "biome", "check", "--write", "--no-errors-on-unmatched", "{file}"]` (the flag keeps an edit to a file Biome skips, such as Markdown, from failing);
 a failure's output goes straight back to the agent. Unknown keys and a missing `repo` are errors, other missing fields take the defaults in
@@ -358,7 +361,7 @@ dependency bump), clone it to see the loop run against something real before wir
 | `factory tick [--repo-dir <path> \| --repo <owner/name>]` | one poll pass across every open issue, then exit (cron) |
 | `factory park --repo-dir <path> --issue <N> --reason <text>` | park an issue as `needs-human` from outside the loop |
 | `factory dashboard [--repo <owner/name>] [--port <n>]` | serve the board on :4100 |
-| `factory scan --repo-dir <path>` | file issues from `bun audit` findings, one per package. Bun/npm projects only |
+| `factory scan --repo-dir <path>` | file issues from `osv-scanner` findings, one per package, for any lockfile it reads; without osv-scanner, a Bun project falls back to `bun audit` |
 | `factory rebaseline --repo-dir <path> [--dry-run]` | move the baseline tag to the current base, keeping merged setup changes across reset |
 | `factory reset --repo-dir <path> [--dry-run]` | **destructive**: force-pushes the base branch to the baseline tag |
 

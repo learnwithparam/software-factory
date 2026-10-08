@@ -10,6 +10,7 @@ import type { ExecutionPort } from "./ports/execution";
 import type { GateResult, GateRunner } from "./ports/check";
 import { LocalExecution } from "./adapters/local/execution";
 import { gateCount } from "./config";
+import { worktreePort } from "./port";
 export type { GateResult, GateRunner };
 
 const LINE_RE = /FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+skipped=(\d+)\s+failed_gates=(\S*)/;
@@ -31,7 +32,8 @@ export function parseGateLine(output: string): GateResult | undefined {
 export class ShellGateRunner implements GateRunner {
   constructor(private readonly exec: ExecutionPort = new LocalExecution()) {}
   run(worktreeDir: string) {
-    return this.exec.run("bash .factory/gates.sh", worktreeDir);
+    const port = worktreePort(worktreeDir);
+    return this.exec.run(`${port ? `FACTORY_PORT=${port} ` : ""}bash .factory/gates.sh`, worktreeDir);
   }
 }
 

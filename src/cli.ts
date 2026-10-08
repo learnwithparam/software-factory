@@ -260,10 +260,11 @@ async function cmdInbox(): Promise<void> {
 async function cmdScan(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  // scan shells out to `bun audit`/`bun outdated`, not `git`: Bun projects only.
-  const bunRunner = {
-    run: async (a: string[], opts?: { cwd?: string }) => {
-      const proc = Bun.spawn(["bun", ...a], { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
+  // scan shells out to osv-scanner, or to `bun audit` without it: not `git`, so its own runner.
+  const runner = {
+    run: async (argv: string[], opts?: { cwd?: string }) => {
+      if (!Bun.which(argv[0]!)) return { stdout: "", stderr: `${argv[0]}: not installed`, code: 127 };
+      const proc = Bun.spawn(argv, { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
       const [stdout, stderr, code] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
@@ -272,12 +273,12 @@ async function cmdScan(): Promise<void> {
       return { stdout, stderr, code };
     },
   };
-  const result = await scan({ github: new GitHub(), runner: bunRunner }, config.repo, cloneDir);
+  const result = await scan({ github: new GitHub(), runner }, config.repo, cloneDir);
   if (result.skippedReason) {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;
   }
-  console.log(`factory scan: filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
+  console.log(`factory scan (${result.source}): filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
   for (const t of result.filed) console.log(`  + ${t}`);
 }
 
