@@ -164,5 +164,7 @@
   {"name": "cron trigger: catch-up is capped", "file": "src/engine/triggers.ts", "find": "Math.max(last, to - CRON_CATCHUP_MINUTES * MINUTE)", "replace": "last", "test": "tests/triggers.test.ts"},
   {"name": "cron trigger: remembers the last minute it checked", "file": "src/engine/triggers.ts", "find": "  store.setSetting(key, String(to));", "replace": "", "test": "tests/triggers.test.ts"},
   {"name": "cron trigger: the poll fires it", "file": "src/watch.ts", "find": "  await fireCron(deps.github", "replace": "  if (false) await fireCron(deps.github", "test": "tests/triggers.test.ts"},
-  {"name": "workflow: on.cron tz is checked", "file": "src/core/workflow.ts", "find": "      wallClock(new Date(0), tz);\n", "replace": "", "test": "tests/triggers.test.ts"}
+  {"name": "workflow: on.cron tz is checked", "file": "src/core/workflow.ts", "find": "      wallClock(new Date(0), tz);\n", "replace": "", "test": "tests/triggers.test.ts"},
+  {"name": "clone: inherited credential helpers are cleared", "file": "src/repo.ts", "find": "  await run(runner, [\"config\", \"--local\", \"--replace-all\", \"credential.helper\", \"\"], dir);\n", "replace": "", "test": "tests/repo.test.ts"},
+  {"name": "clone: an existing clone is fixed too", "file": "src/repo.ts", "find": "    return dir;\n  }\n  await useGhCredentials(runner, dir);\n", "replace": "    return dir;\n  }\n", "test": "tests/repo.test.ts"}
 ]
