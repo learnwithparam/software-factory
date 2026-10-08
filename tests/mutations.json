@@ -132,5 +132,6 @@
   {"name": "merge: refuse odd file modes", "file": "src/merge-policy.ts", "find": "if (oddModes.length > 0) {", "replace": "if (false) {", "test": "tests/boundary.test.ts"},
   {"name": "merge: refuse binary files", "file": "src/merge-policy.ts", "find": "if (binaries.length > 0) {", "replace": "if (false) {", "test": "tests/boundary.test.ts"},
   {"name": "diffStat: renames split into both paths", "file": "src/git.ts", "find": "[\"diff\", \"--numstat\", \"--no-renames\", \"-z\", range]", "replace": "[\"diff\", \"--numstat\", \"-M\", \"-z\", range]", "test": "tests/git.test.ts"},
-  {"name": "diffStat: judges the given head", "file": "src/git.ts", "find": "const range = `origin/${base}...${head}`;", "replace": "const range = `origin/${base}...HEAD`;", "test": "tests/git.test.ts"}
+  {"name": "diffStat: judges the given head", "file": "src/git.ts", "find": "const range = `origin/${base}...${head}`;", "replace": "const range = `origin/${base}...HEAD`;", "test": "tests/git.test.ts"},
+  {"name": "executor: timeout kills the process group", "file": "src/agents/executor.ts", "find": "process.kill(-proc.pid, \"SIGKILL\");", "replace": "proc.kill();", "test": "tests/ported/machinist/runner.test.ts"}
 ]
