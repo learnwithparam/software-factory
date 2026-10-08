@@ -5,12 +5,14 @@
 // `runtime.check`, and a check step's own `runtime:`, pick one by name.
 
 import { DockerExecution, type DockerSpec } from "./adapters/docker/execution";
+import { HttpSandboxExecution, type HttpSandboxSpec } from "./adapters/http-sandbox/execution";
 import { LocalExecution } from "./adapters/local/execution";
 import { LwprExecution, type LwprSpec } from "./adapters/lwpr/execution";
 import { SshExecution, type SshSpec } from "./adapters/ssh/execution";
+import { CMD, WrapExecution, type WrapSpec } from "./adapters/wrap/execution";
 import type { ExecutionPort } from "./ports/execution";
 
-export type RuntimeSpec = { readonly kind: "local" } | DockerSpec | SshSpec | LwprSpec;
+export type RuntimeSpec = { readonly kind: "local" } | DockerSpec | SshSpec | LwprSpec | WrapSpec | HttpSandboxSpec;
 
 export const BUILTIN_RUNTIMES: Readonly<Record<string, RuntimeSpec>> = { local: { kind: "local" }, lwpr: { kind: "lwpr" } };
 
@@ -21,7 +23,16 @@ const SHAPES: Readonly<Record<RuntimeSpec["kind"], { required: readonly string[]
   docker: { required: ["image"], fields: { image: "string", network: "string", memory: "string", cpus: "posInt", pids: "posInt", runtime: "string" } },
   ssh: { required: ["host", "dir"], fields: { host: "string", dir: "string", exclude: "strings" } },
   lwpr: { required: [], fields: { app: "string", timeoutMin: "posInt", setup: "boolean" } },
+  wrap: { required: ["argv"], fields: { argv: "strings" } },
+  http: { required: ["url"], fields: { url: "string", tokenEnv: "string", exclude: "strings" } },
 };
+
+// What a field's shape cannot say.
+function kindProblems(at: string, s: Record<string, unknown>): string[] {
+  if (s.kind === "wrap" && Array.isArray(s.argv) && s.argv.filter((a) => a === CMD).length !== 1) return [`${at}.argv: needs "${CMD}" as exactly one element, where the bash command goes`];
+  if (s.kind === "http" && typeof s.url === "string" && !/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(s.url)) return [`${at}.url: https (plain http only to localhost), since the worktree is sent to it`];
+  return [];
+}
 
 function fieldOk(v: unknown, f: Field): boolean {
   if (f === "string") return typeof v === "string" && v.length > 0;
@@ -51,6 +62,7 @@ export function runtimeProblems(raw: unknown, where = "runtimes"): string[] {
       if (!f) problems.push(`${at}.${k}: unknown key for ${s.kind} (allowed: kind, ${Object.keys(shape.fields).join(", ")})`);
       else if (!fieldOk(v, f)) problems.push(`${at}.${k}: expected ${f}, got ${JSON.stringify(v)}`);
     }
+    problems.push(...kindProblems(at, s));
   }
   return problems;
 }
@@ -61,6 +73,8 @@ export function executionFor(spec: RuntimeSpec): ExecutionPort {
     case "docker": return new DockerExecution(spec);
     case "ssh": return new SshExecution(spec);
     case "lwpr": return new LwprExecution(spec);
+    case "wrap": return new WrapExecution(spec);
+    case "http": return new HttpSandboxExecution(spec);
   }
 }
 

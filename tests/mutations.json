@@ -223,5 +223,11 @@
   {"name": "daemon: systemd % is not a specifier", "file": "src/daemon.ts", "find": ".replace(/%/g, \"%%\")", "replace": "", "test": "tests/daemon.test.ts"},
   {"name": "daemon: systemd restarts the loop when it exits", "file": "src/daemon.ts", "find": "Restart=always\n", "replace": "Restart=on-failure\n", "test": "tests/daemon.test.ts"},
   {"name": "daemon: a reinstall tolerates nothing loaded yet", "file": "src/daemon.ts", "find": "    const bootout = platform === \"launchd\" && i === 0;\n", "replace": "    const bootout = false && i === 0;\n", "test": "tests/daemon.test.ts"},
-  {"name": "daemon: a refused load fails the install", "file": "src/daemon.ts", "find": "    if (r.exitCode !== 0 && !bootout) throw", "replace": "    if (false) throw", "test": "tests/daemon.test.ts"}
+  {"name": "daemon: a refused load fails the install", "file": "src/daemon.ts", "find": "    if (r.exitCode !== 0 && !bootout) throw", "replace": "    if (false) throw", "test": "tests/daemon.test.ts"},
+  {"name": "wrap: {cwd} is replaced wherever it appears", "file": "src/adapters/wrap/execution.ts", "find": "a.replaceAll(\"{cwd}\", cwd)", "replace": "a", "test": "tests/runtimes.test.ts"},
+  {"name": "wrap: argv needs {cmd} exactly once", "file": "src/runtimes.ts", "find": ".length !== 1) return", "replace": ".length < 1) return", "test": "tests/runtimes.test.ts"},
+  {"name": "http sandbox: .git is never sent", "file": "src/adapters/http-sandbox/execution.ts", "find": "[\".git\", ...(spec.exclude", "replace": "[...(spec.exclude", "test": "tests/runtimes.test.ts"},
+  {"name": "http sandbox: plain http only to this machine, not a lookalike host", "file": "src/runtimes.ts", "find": "[:/]/.test(s.url)", "replace": "/.test(s.url)", "test": "tests/runtimes.test.ts"},
+  {"name": "http sandbox: a missing token stops before sending the worktree", "file": "src/adapters/http-sandbox/execution.ts", "find": "    if (this.spec.tokenEnv && !token) return fail", "replace": "    if (false) return fail", "test": "tests/runtimes.test.ts"},
+  {"name": "http sandbox: a malformed answer is not a result", "file": "src/adapters/http-sandbox/execution.ts", "find": "typeof r.stdout === \"string\" && typeof r.stderr === \"string\" && Number.isInteger(r.code)", "replace": "true", "test": "tests/runtimes.test.ts"}
 ]

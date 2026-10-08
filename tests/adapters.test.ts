@@ -9,9 +9,12 @@ import { afterAll, beforeAll } from "bun:test";
 import { DockerExecution } from "../src/adapters/docker/execution";
 import { GitLeases } from "../src/adapters/git-lease/lease";
 import { GitHubSpend } from "../src/adapters/github-store/spend";
+import { HttpSandboxExecution } from "../src/adapters/http-sandbox/execution";
 import { LocalExecution } from "../src/adapters/local/execution";
 import { LwprExecution } from "../src/adapters/lwpr/execution";
 import { SshExecution } from "../src/adapters/ssh/execution";
+import { WrapExecution } from "../src/adapters/wrap/execution";
+import { startSandbox } from "./fixtures/http-sandbox";
 import type { ExecResult, ExecutionPort } from "../src/ports/execution";
 import { executionContract } from "./ports/execution.contract";
 import { leaseContract } from "./ports/lease.contract";
@@ -54,6 +57,17 @@ function gitLeases() {
   return { port: clone(), peer: clone };
 }
 
+// The http runtime against the protocol's reference server, on loopback.
+function httpSandbox(): () => void {
+  return () =>
+    describe("against the reference sandbox server", () => {
+      let sandbox: ReturnType<typeof startSandbox>;
+      beforeAll(() => (sandbox = startSandbox("s3cret")));
+      afterAll(() => sandbox.stop());
+      executionContract("http", () => new HttpSandboxExecution({ kind: "http", url: sandbox.url, tokenEnv: "SANDBOX_TOKEN" }, { SANDBOX_TOKEN: "s3cret" }));
+    });
+}
+
 const REGISTRY: Record<string, () => void> = {
   "git-lease": () => leaseContract("git-lease", gitLeases),
   "github-store": () =>
@@ -64,6 +78,9 @@ const REGISTRY: Record<string, () => void> = {
   local: () => executionContract("local", () => new LocalExecution()),
   docker: onFakePath(() => executionContract("docker", () => new DockerExecution({ kind: "docker", image: "img" }))),
   lwpr: onFakePath(() => executionContract("lwpr", () => new LwprExecution())),
+  // A launcher that is just `env`: the argv templating is what is under test.
+  wrap: () => executionContract("wrap", () => new WrapExecution({ kind: "wrap", argv: ["env", "FACTORY_WRAPPED=1", "bash", "-c", "{cmd}"] })),
+  "http-sandbox": httpSandbox(),
   ssh: onFakePath(() => executionContract("ssh", () => new SshExecution({ kind: "ssh", host: "box", dir: join(tmpdir(), `factory-ssh-${process.pid}`) }))),
 };
 

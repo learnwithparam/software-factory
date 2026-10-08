@@ -36,7 +36,7 @@ describe("daemon", () => {
     expect(plist).toContain("<string>/w/a b&amp;c&lt;d&gt;\"e\"%f</string>");
     expect(plist).not.toMatch(/&(?!amp;|lt;|gt;)/);
     for (const key of ["<key>RunAtLoad</key><true/>", "<key>KeepAlive</key><true/>"]) expect(plist).toContain(key);
-    expect([...plist.matchAll(/<key>(\w+)<\/key><string>/g)].map((m) => m[1]).filter((k) => k === k.toUpperCase())).toEqual(["PATH", "HOME"]);
+    expect([...plist.matchAll(/<key>(\w+)<\/key><string>/g)].map((m) => m[1]!).filter((k) => k === k.toUpperCase())).toEqual(["PATH", "HOME"]);
     if (process.platform === "darwin") {
       const dir = mkdtempSync(join(tmpdir(), "plist-"));
       await Bun.write(join(dir, "a.plist"), plist);
