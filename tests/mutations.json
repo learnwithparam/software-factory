@@ -229,5 +229,8 @@
   {"name": "http sandbox: .git is never sent", "file": "src/adapters/http-sandbox/execution.ts", "find": "[\".git\", ...(spec.exclude", "replace": "[...(spec.exclude", "test": "tests/runtimes.test.ts"},
   {"name": "http sandbox: plain http only to this machine, not a lookalike host", "file": "src/runtimes.ts", "find": "[:/]/.test(s.url)", "replace": "/.test(s.url)", "test": "tests/runtimes.test.ts"},
   {"name": "http sandbox: a missing token stops before sending the worktree", "file": "src/adapters/http-sandbox/execution.ts", "find": "    if (this.spec.tokenEnv && !token) return fail", "replace": "    if (false) return fail", "test": "tests/runtimes.test.ts"},
-  {"name": "http sandbox: a malformed answer is not a result", "file": "src/adapters/http-sandbox/execution.ts", "find": "typeof r.stdout === \"string\" && typeof r.stderr === \"string\" && Number.isInteger(r.code)", "replace": "true", "test": "tests/runtimes.test.ts"}
+  {"name": "http sandbox: a malformed answer is not a result", "file": "src/adapters/http-sandbox/execution.ts", "find": "typeof r.stdout === \"string\" && typeof r.stderr === \"string\" && Number.isInteger(r.code)", "replace": "true", "test": "tests/runtimes.test.ts"},
+  {"name": "spend: the ledger label is created on a repo that predates it", "file": "src/adapters/github-store/spend.ts", "find": "      await this.scm.ensureLabel(this.repo, label.name, label.color, label.description);\n", "replace": "", "test": "tests/adapters.test.ts"},
+  {"name": "daemon: systemd path settings are bare, not quoted", "file": "src/daemon.ts", "find": "WorkingDirectory=${unitPath(spec.workdir)}", "replace": "WorkingDirectory=${unitArg(spec.workdir)}", "test": "tests/daemon.test.ts"},
+  {"name": "daemon: % in a systemd log path is doubled", "file": "src/daemon.ts", "find": "StandardOutput=append:${unitPath(join(", "replace": "StandardOutput=append:${(join(", "test": "tests/daemon.test.ts"}
 ]

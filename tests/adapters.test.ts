@@ -73,6 +73,7 @@ const REGISTRY: Record<string, () => void> = {
   "github-store": () =>
     spendContract("github-store", () => {
       const github = new FakeGitHub([1, 2, 3, 4].map((n) => baseIssue(n, [])));
+      github.repoLabels = new Set(); // a repo set up before the ledger label existed
       return { store: new GitHubSpend(github, "a/b", "me"), worker: (holder) => new GitHubSpend(github, "a/b", holder) };
     }),
   local: () => executionContract("local", () => new LocalExecution()),

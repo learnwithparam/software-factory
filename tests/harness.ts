@@ -63,7 +63,13 @@ export class FakeGitHub extends GitHub {
     return this.roles.get(login) ?? "none";
   }
 
+  // When set, the repo's labels as gh sees them: createIssue rejects one that is missing, as gh
+  // does, and ensureLabel adds it. Unset, every label exists.
+  repoLabels?: Set<string>;
+
   override async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
+    const missing = this.repoLabels && labels.find((l) => !this.repoLabels!.has(l));
+    if (missing) throw new Error(`could not add label: '${missing}' not found`);
     const number = Math.max(0, ...this.issues.keys()) + 1;
     this.issues.set(number, { number, title, body, labels: labels.map((name) => ({ name })), comments: [] });
     return number;
@@ -167,7 +173,9 @@ export class FakeGitHub extends GitHub {
     return [];
   }
 
-  override async ensureLabel(): Promise<void> {}
+  override async ensureLabel(_repo: string, name: string): Promise<void> {
+    this.repoLabels?.add(name);
+  }
   override async currentLogin(): Promise<string> {
     return "factory-bot";
   }

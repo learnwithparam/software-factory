@@ -51,6 +51,9 @@ describe("daemon", () => {
     const unit = systemdUnit(spec());
     expect(unit).toContain('ExecStart="/opt/bun" "/src/cli.ts" "up" "--repo-dir" "/w/a b&c<d>\\"e\\"%%f"\n');
     expect(unit).toContain("Restart=always\n");
+    // Path settings take the path bare: quotes would become part of it.
+    expect(unit).toContain('WorkingDirectory=/w/a b&c<d>"e"%%f\n');
+    expect(systemdUnit({ ...spec(), logDir: "/l/50%" })).toContain("StandardOutput=append:/l/50%%/factory-acme-web-co.log\n");
     expect(unit).toContain('Environment="PATH=/opt/bin:/usr/bin" "HOME=/home/u"\n');
     expect(unit).toContain("WantedBy=default.target\n");
   });

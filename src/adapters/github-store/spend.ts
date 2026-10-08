@@ -12,7 +12,7 @@
 // at once is harmless too: readers sum every open ledger issue.
 
 import type { GitHub } from "../../github";
-import { LABEL } from "../../labels";
+import { LABEL, LABELS } from "../../labels";
 import type { GhComment } from "../../ports/scm";
 import type { SpendEntry, SpendStore, SpendTotal } from "../../ports/spend";
 
@@ -55,7 +55,7 @@ function restId(c: GhComment): number | undefined {
   return typeof c.id === "number" ? c.id : undefined;
 }
 
-type Scm = Pick<GitHub, "getIssue" | "commentIssue" | "editComment" | "listIssuesByLabel" | "createIssue">;
+type Scm = Pick<GitHub, "getIssue" | "commentIssue" | "editComment" | "listIssuesByLabel" | "createIssue" | "ensureLabel">;
 
 export class GitHubSpend implements SpendStore {
   private readonly ids = new Map<string, number>();
@@ -88,6 +88,11 @@ export class GitHubSpend implements SpendStore {
   private async ledgerIssue(): Promise<number> {
     if (this.ledger !== undefined) return this.ledger;
     const open = await this.scm.listIssuesByLabel(this.repo, LABEL.ledger);
+    if (!open[0]) {
+      // A repo set up before v3.3 has no ledger label, and gh will not create an issue with a missing one.
+      const label = LABELS.find((l) => l.name === LABEL.ledger)!;
+      await this.scm.ensureLabel(this.repo, label.name, label.color, label.description);
+    }
     this.ledger = open[0]?.number ?? (await this.scm.createIssue(this.repo, "Factory spend ledger", "Each worker keeps one comment per UTC day here with its spend. The factory reads them for spend.dailyUsd; please leave this issue open.", [LABEL.ledger]));
     return this.ledger;
   }

@@ -64,7 +64,9 @@ export function launchdPlist(spec: DaemonSpec): string {
 
 // systemd splits ExecStart on spaces and reads C-style escapes inside double
 // quotes; `%` is a specifier, so it is doubled.
-const unitArg = (s: string): string => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/%/g, "%%")}"`;
+const unitArg = (s: string): string => `"${unitPath(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+// A path setting (WorkingDirectory, append:) is taken as is, quotes included, so only % is escaped.
+const unitPath = (s: string): string => s.replace(/%/g, "%%");
 
 export function systemdUnit(spec: DaemonSpec): string {
   return `[Unit]
@@ -73,12 +75,12 @@ After=network-online.target
 
 [Service]
 ExecStart=${spec.argv.map(unitArg).join(" ")}
-WorkingDirectory=${unitArg(spec.workdir)}
+WorkingDirectory=${unitPath(spec.workdir)}
 Environment=${unitArg(`PATH=${spec.path}`)} ${unitArg(`HOME=${spec.home}`)}
 Restart=always
 RestartSec=30
-StandardOutput=append:${join(spec.logDir, `${daemonName(spec.repo)}.log`)}
-StandardError=append:${join(spec.logDir, `${daemonName(spec.repo)}.log`)}
+StandardOutput=append:${unitPath(join(spec.logDir, `${daemonName(spec.repo)}.log`))}
+StandardError=append:${unitPath(join(spec.logDir, `${daemonName(spec.repo)}.log`))}
 
 [Install]
 WantedBy=default.target
