@@ -56,15 +56,18 @@ runs; [docs/workflows.md](docs/workflows.md) has the format.
 | **CI (GitHub Actions)** | `factory install <target-dir> --ci`, rename the written `factory.yml.example` to `factory.yml`, set repo variable `FACTORY_MODE=actions` | repo secrets `FACTORY_GH_TOKEN` (fine-grained PAT or GitHub App token, a plain `GITHUB_TOKEN`-authored PR never re-triggers this repo's own CI) and `ANTHROPIC_API_KEY` | none, every run starts from nothing and rebuilds from the issue thread | the issue thread itself, or point a local `factory dashboard --repo owner/name` at it as a cockpit |
 
 Every mode drives `advanceIssue()` (`src/watch.ts`) through the same three entry points:
-`watch`/`up` poll it in a loop, `factory run --issue N` advances one issue once (what a CI step
+`watch`/`up` poll it in a loop, `factory run --issue N` (or `--pr N`, for an event on a PR) advances one issue once (what a CI step
 calls), and `factory tick` makes a single pass across every open issue (what a cron trigger calls
 instead of holding a process open). `factory park --issue N --reason <text>` parks an issue as
 `needs-human` from outside the loop, a CI failure step calls this when a timeout or runner crash
 happened in a way nothing inside the loop caught.
 
-**Only one mode should drive a given repo at a time.** Two drivers (Actions and your laptop) both
-react to the same labels; the claim CAS stops a double build but not the noise. With
-`FACTORY_MODE=actions` set locally, `factory doctor` checks that the workflow file exists.
+**Any number of drivers can share a repo.** A worker takes a lease on the repo's remote before it
+walks an issue's steps, and spend is kept on the issue and a `factory:ledger` issue, so laptops,
+VMs and Actions jobs never run one issue twice and share the same caps.
+[docs/runtimes.md](docs/runtimes.md) explains both. It also covers where gates and `check` steps
+run (Docker, ssh, lwpr, a microVM or a hosted sandbox) and `factory daemon install`, which runs
+`up` in the background at login.
 
 `--repo-dir <path>` (local: the clone already exists) and `--repo <owner/name>` (VM/CI: nothing is
 on disk yet) both work on `up`/`watch`/`run`/`tick`, the second clones under

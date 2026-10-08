@@ -7,8 +7,8 @@
 #      GITHUB_TOKEN-authored PR never triggers this repo's own CI, which
 #      defeats the point) and ANTHROPIC_API_KEY
 #   3. set the repo VARIABLE FACTORY_MODE=actions (Settings > Secrets and
-#      variables > Actions > Variables). Only one mode should drive a repo at
-#      a time, so do not also run a local watcher against it.
+#      variables > Actions > Variables). A local watcher may drive the same
+#      repo too: issue leases and the spend ledger live on GitHub.
 #
 # Every action is pinned to a commit SHA, with its tag in a comment: a tag can
 # be moved to new code, a SHA cannot (tests/release.test.ts enforces this).
@@ -42,7 +42,7 @@ on:
         required: false
 
 env:
-  FACTORY_RUNNER_REF: v3.2.0 # pinned software-factory release; bump deliberately
+  FACTORY_RUNNER_REF: v3.3.0 # pinned software-factory release; bump deliberately
   FACTORY_RUNNER_REPO: learnwithparam/software-factory
   CLAUDE_CODE_VERSION: "2.1.286" # pinned claude, same version the Dockerfile installs
   # Pins for every agent. The "Install agents" step installs the ones named in the repo VARIABLE

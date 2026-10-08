@@ -16,6 +16,7 @@ and where it goes next. `config.workflow` names it (default `feature-to-pr`). Th
 | `reject` | where a rejection goes; required on `verify` |
 | `revise` | where `/factory revise` goes when the issue is parked on this step's label |
 | `run` | a `check` step's shell command; exit 0 moves on, anything else parks the issue as failed |
+| `runtime` | where a `check` step's command runs, by name ([runtimes.md](runtimes.md)); default `runtime.check` in config, else `local` |
 | `mcp` | MCP server names from `.factory/mcp.json` this step's agent may use; not on a `check` step |
 
 An edge is `{ to: <step> }` or `{ park: awaiting-approval, approve: <step>, revise: <step> }`,

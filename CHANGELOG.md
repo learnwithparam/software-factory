@@ -1,5 +1,48 @@
 # Changelog
 
+## v3.3.0
+
+Remote and async execution, with GitHub as the store that every worker shares. Upgraders: nothing
+to change. The first stage that finishes creates one `factory:ledger` issue in the repo; leave it
+open.
+
+- Runtimes: `runtime.gates` and `runtime.check` in config, and `runtime:` on a `check` step, run
+  those commands on a named runtime:
+  - `local`;
+  - `docker` (read-only, no capabilities, capped, no network by default; gVisor via `runtime`);
+  - `ssh` (rsync, then run on the host);
+  - `lwpr`;
+  - `wrap` (any launcher, such as a Firecracker microVM, podman or nsjail);
+  - `http` (a hosted sandbox behind a small JSON protocol, with a reference server).
+
+  `FACTORY_HOME/machine.json` `runtimes` defines them. See [docs/runtimes.md](docs/runtimes.md).
+- Leases: a worker takes `refs/factory/lease/<issue>` on the remote before it walks an issue's
+  steps, and renews it every 10 s. Others reclaim it 30 s after it lapses. The push is a
+  fast-forward-only compare-and-swap, so two racing workers cannot both hold an issue.
+- Spend on GitHub: every stage's cost goes to its worker's marker comment on the issue and its
+  daily comment on the `factory:ledger` issue. Caps read the larger of that and the local cache, so
+  a second machine or a CI job sees the same totals, and a lost write never lifts a cap.
+- `factory daemon install|uninstall`: `factory up` at login, restarted on exit, as a launchd agent
+  or a systemd user unit. It holds no secrets.
+- CI template:
+  - actions are pinned to commit SHAs (a test enforces this);
+  - checkouts fetch full history;
+  - a comment or review on a PR runs the issue that PR works on (`factory run --pr N`), and
+    `pull_request_review` is a trigger;
+  - event data reaches scripts only through env.
+
+Not in this release:
+
+- Agent steps (triage, plan, build, verify, pr) on a remote runtime; they run where the factory
+  runs. Only gates and `check` steps move.
+- The `ssh`, `wrap` and `http` runtimes are tested against stand-ins and a reference server, not
+  against a live VM, a Firecracker host or a hosted sandbox vendor.
+- A Claude Code cloud routine that runs `factory tick` on a schedule, and `factory dispatch` driving
+  the Actions template one step per job.
+- A health probe per runtime in `factory doctor`; it checks names, not reachability.
+- Transcripts and artifacts to a shared blob store; they stay on the machine that ran the stage.
+- Cron dedupe through GitHub: two watchers could each still file one scheduled issue.
+
 ## v3.2.0
 
 Triggers, intake trust, company-size profiles and per-step MCP servers. Upgraders: a
