@@ -13,8 +13,8 @@ import { defaultWorkflow, EXPR_ROOTS, loadWorkflow, parseWorkflowText, workflowF
 import { LABEL } from "../src/labels";
 import type { SetupRunner } from "../src/setup";
 import { FactoryState } from "../src/state";
-import { advanceIssue } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import { advanceIssue, type WatchDeps } from "../src/watch";
+import { baseIssue, FakeGateRunner, FakeGit, FakeLeases, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -135,7 +135,7 @@ class FakeShell implements SetupRunner {
 }
 
 // `base` is written to the clone (the base branch); `seed` to every new worktree.
-function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}) {
+function engine(workflow: Workflow, lintExit: number, base: Record<string, string> = {}, seed: Record<string, string> = {}, extra: Partial<WatchDeps> = {}) {
   const workspacesDir = mkdtempSync(join(tmpdir(), "factory-ws-"));
   const cloneDir = mkdtempSync(join(tmpdir(), "factory-clone-"));
   dirs.push(workspacesDir, cloneDir);
@@ -148,7 +148,7 @@ function engine(workflow: Workflow, lintExit: number, base: Record<string, strin
   const setupRunner = new FakeShell(lintExit);
   const git = new FakeGit();
   git.seed = seed;
-  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow };
+  const deps = { github, git, state: new FactoryState(":memory:"), executor, gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir, setupRunner, workflow, ...extra };
   const config = mergeConfig({ repo: "acme/widgets" });
   const push = (stage: Parameters<MultiStageExecutor["push"]>[0], files: Record<string, string>) => executor.push(stage, 1, fixtureFor(stage, 1), files);
   push("triage", { "triage-comment.md": "<!-- factory:triage v1 -->\nt", "triage.json": JSON.stringify({ disposition: "proceed", type: "bug", risk: "low", done_when: "x", files_expected: ["a"], gate_level: "x", confidence: 0.9 }) });
@@ -206,5 +206,64 @@ describe("a step's mcp: reaches only that step's run", () => {
     const e = engine(parsed.workflow, 0, registry({ docs }), registry(planted));
     expect(await e.run()).toBe("shipped");
     expect(e.executor.mcp.find(([stage]) => stage === "build")![1]).toEqual({ docs });
+  });
+});
+
+describe("a check step runs on its named runtime", () => {
+  const parsed = parseWorkflowText(CUSTOM.replace('run: "make lint",', 'run: "make lint", runtime: box,'));
+  if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+
+  test("the command goes to that runtime, not the local shell, and its result counts", async () => {
+    const box = new FakeShell(2);
+    const e = engine(parsed.workflow, 0, {}, {}, { runtimes: { box } });
+    expect(await e.run()).toBe("failed");
+    expect(box.ran).toEqual(["make lint"]);
+    expect(e.setupRunner.ran).not.toContain("make lint");
+  });
+
+  test("a name this machine lacks fails the issue", async () => {
+    const e = engine(parsed.workflow, 0);
+    expect(await e.run()).toBe("failed");
+    expect(e.github.issues.get(1)!.comments.at(-1)!.body).toContain('no runtime "box"');
+  });
+});
+
+describe("leases: one worker advances an issue at a time", () => {
+  const parsed = parseWorkflowText(CUSTOM);
+  if (!parsed.ok) throw new Error(parsed.problems.join("; "));
+  const wf = parsed.workflow;
+  const as = (port: FakeLeases, extra: Partial<WatchDeps> = {}) => ({ leases: { port, holder: "me", held: new Map(), opts: { everyMs: 5 } }, ...extra });
+
+  test("an issue another worker holds is left alone", async () => {
+    const port = new FakeLeases();
+    await port.acquire("1", "other", 30_000, Date.now());
+    const e = engine(wf, 0, {}, {}, as(port));
+    expect(await e.run()).toBe("waiting");
+    expect(e.executor.mcp).toEqual([]);
+  });
+
+  test("held for the whole run, released after", async () => {
+    const port = new FakeLeases();
+    const e = engine(wf, 0, {}, {}, as(port));
+    expect(await e.run()).toBe("shipped");
+    expect(port.log[0]).toBe("acquire 1 me");
+    expect(port.log.at(-1)).toBe("release 1 me");
+    expect(port.table.get("1")!.expiresAt).toBe(0);
+  });
+
+  test("a lease lost mid-run stops at the next step boundary and is not released", async () => {
+    const port = new FakeLeases();
+    const stealing = { run: async () => {
+      port.table.set("1", { holder: "other", expiresAt: Date.now() + 60_000 });
+      await Bun.sleep(40);
+      return { stdout: "", stderr: "", code: 0 };
+    } };
+    const flow = parseWorkflowText(CUSTOM.replace('run: "make lint",', 'run: "make lint", runtime: box,'));
+    if (!flow.ok) throw new Error(flow.problems.join("; "));
+    const e = engine(flow.workflow, 0, {}, {}, as(port, { runtimes: { box: stealing } }));
+    expect(await e.run()).toBe("waiting");
+    expect(e.executor.mcp.map(([stage]) => stage)).toEqual(["triage", "build"]);
+    expect(port.log).not.toContain("release 1 me");
+    expect(port.table.get("1")!.holder).toBe("other");
   });
 });

@@ -3,9 +3,10 @@
 // stays testable without a child process.
 
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
+import { homedir, hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { GitHub, type ScmPort } from "./github";
-import { GitCommandRunner, Git } from "./git";
+import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
 import { loadConfig, type FactoryConfig } from "./config";
@@ -24,17 +25,21 @@ import { runDoctor, fixDoctor } from "./doctor";
 import { loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
 import { versionOf, which } from "./probes";
-import { workspacesDir as defaultWorkspacesDir, defaultStatePath, livePath, transcriptPath } from "./paths";
+import { workspacesDir as defaultWorkspacesDir, defaultStatePath, factoryHome, livePath, transcriptPath } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
 import { readLive, resumeArgv, stopRunningStage, takeoverBanner } from "./takeover";
 import { LABEL } from "./labels";
 import { ensureRepoClone } from "./repo";
+import { daemonPlatform, installDaemon, uninstallDaemon } from "./daemon";
 import { helpText } from "./help";
 import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
 import { workflowFor } from "./engine/workflows";
+import { GitLeases } from "./adapters/git-lease/lease";
+import { GitHubSpend } from "./adapters/github-store/spend";
+import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -90,15 +95,24 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
 // gate runner — one place, not three copies to drift (audit finding #1).
 async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
+  const workflow = await workflowFor(cloneDir, config);
+  const machineConfig = loadMachineConfig();
+  const runtimes = runtimesFrom(machineConfig.runtimes);
+  const unknown = unknownRuntimes(runtimeRefs(config, workflow.steps), runtimes);
+  if (unknown.length) throw new Error(unknown.join("\n"));
+  const github = new GitHub();
+  // This process, as leases and the spend ledger name it.
+  const holder = `${hostname()}-${process.pid}`;
   return {
-    workflow: await workflowFor(cloneDir, config),
+    workflow,
+    runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
-    github: new GitHub(),
+    github,
     git: new Git(new GitCommandRunner()),
     state: new FactoryState(flag("db") ?? process.env.FACTORY_DB_PATH ?? defaultStatePath(process.env, config.repo)),
     executor: new CommandExecutor(config.agents, config.stages, config.routes),
-    gateRunner: new ShellGateRunner(),
+    gateRunner: new ShellGateRunner(runtimes[config.runtime?.gates ?? "local"]),
     holdoutRunner: new ShellHoldoutRunner(),
     rechecker: new DiffAnchorRechecker(),
     proofGit: new ShellProofGit(),
@@ -108,7 +122,12 @@ async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<
     // Real cross-process leases: every real CLI invocation (watch, run, tick)
     // shares this machine's FACTORY_HOME/machine.db, so a second repo's
     // watcher on the same machine is respected (plan v2.7.0 item 5).
-    machine: { leases: new MachineLeases(), config: loadMachineConfig(), spend: new MachineSpend() },
+    machine: { leases: new MachineLeases(), config: machineConfig, spend: new MachineSpend() },
+    // Issue leases on the repo's own remote, so watchers on other machines,
+    // CI jobs and cloud routines driving the same repo never run one issue twice.
+    leases: { port: new GitLeases(cloneDir), holder, held: new Map() },
+    // Spend on the issue and the ledger issue, so caps hold across all of them too.
+    spend: new GitHubSpend(github, config.repo, holder),
   };
 }
 
@@ -141,11 +160,24 @@ async function cmdWatch(): Promise<void> {
 // One issue, one pass, then exit — what a CI step calls (`factory run --issue
 // N --repo-dir .`), and the stateless counterpart to `watch`'s long-lived
 // poll (plan's "Core refactor" advanceIssue entry point).
+// `--issue N`, or `--pr N` for an event on a PR (a comment or a review), which
+// names the PR, not the issue it works on. Undefined: a PR about no one issue.
+async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promise<number | undefined> {
+  const pr = Number(flag("pr"));
+  if (pr) return issueOfPr(await github.getPr(repo, pr));
+  const issue = Number(flag("issue"));
+  if (!issue) throw new UsageError(`${cmd}: --issue <N> or --pr <N> is required`);
+  return issue;
+}
+
 async function cmdRun(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = Number(flag("issue"));
-  if (!issueNumber) throw new UsageError("run: --issue <N> is required");
+  const issueNumber = await issueFromFlags(new GitHub(), config.repo, "run");
+  if (issueNumber === undefined) {
+    console.log(`factory run: PR #${flag("pr")} is not about one issue; nothing to do.`);
+    return;
+  }
   const deps = await buildWatchDeps(cloneDir, config);
   const issue = await deps.github.getIssue(config.repo, issueNumber);
   const outcome = await advanceIssue(deps, config, issue);
@@ -173,10 +205,10 @@ async function cmdTick(): Promise<void> {
 async function cmdPark(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = Number(flag("issue"));
   const reason = flag("reason") ?? "parked by CI (no reason given)";
-  if (!issueNumber) throw new UsageError("park: --issue <N> is required");
   const github = new GitHub();
+  const issueNumber = await issueFromFlags(github, config.repo, "park");
+  if (issueNumber === undefined) return;
   const issue = await github.getIssue(config.repo, issueNumber);
   const runningLabels: string[] = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
   const current = issue.labels.map((l) => l.name).find((n) => runningLabels.includes(n));
@@ -340,6 +372,8 @@ async function cmdDoctor(): Promise<void> {
       templateSkills: templateSkills(),
       templateOverrides: config.templateOverrides,
       workflow: config.workflow,
+      runtime: config.runtime,
+      runtimeNames: Object.keys(runtimesFrom(loadMachineConfig().runtimes)),
       tmux: config.tmux.enabled,
       legacyStatePath: defaultStatePath(process.env),
       legacyWorkspacesDir: defaultWorkspacesDir(process.env),
@@ -459,6 +493,32 @@ async function waitForLabel(github: ScmPort, repo: string, n: number, label: str
     if (Date.now() > end) return false;
     await Bun.sleep(2000);
   }
+}
+
+// `daemon install|uninstall`: `factory up` for this repo in the background,
+// at login, restarted when it exits (src/daemon.ts).
+async function cmdDaemon(): Promise<void> {
+  const action = args[1];
+  if (action !== "install" && action !== "uninstall") throw new UsageError("daemon: usage: factory daemon (install | uninstall) (--repo-dir <path> | --repo <owner/name>)");
+  const platform = daemonPlatform(process.platform);
+  if (!platform) throw new Error(`daemon: no launchd or systemd on ${process.platform}; run \`factory up\` under your own supervisor`);
+  const cloneDir = await resolveCloneDir();
+  const config = await loadConfig(cloneDir);
+  const home = homedir();
+  const uid = process.getuid?.() ?? 0;
+  const runner = { run: async (argv: readonly string[]) => {
+    const p = Bun.spawn([...argv], { stdout: "ignore", stderr: "pipe" });
+    return { exitCode: await p.exited, stderr: await new Response(p.stderr).text() };
+  } };
+  if (action === "uninstall") {
+    console.log(`factory daemon: removed ${await uninstallDaemon(platform, home, config.repo, uid, runner)}`);
+    return;
+  }
+  const pass = ["db", "workspaces"].flatMap((f) => (flag(f) ? [`--${f}`, flag(f)!] : []));
+  const argv = [process.execPath, Bun.main, "up", "--repo-dir", cloneDir, ...pass];
+  const logDir = join(factoryHome(), "logs");
+  const file = await installDaemon(platform, { repo: config.repo, argv, workdir: cloneDir, logDir, path: process.env.PATH ?? "/usr/bin:/bin", home }, uid, runner);
+  console.log(`factory daemon: ${platform} runs \`factory up\` for ${config.repo} from ${file}; logs in ${logDir}`);
 }
 
 async function cmdTakeover(): Promise<void> {
@@ -606,6 +666,8 @@ async function main(): Promise<void> {
       return cmdAttach();
     case "takeover":
       return cmdTakeover();
+    case "daemon":
+      return cmdDaemon();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

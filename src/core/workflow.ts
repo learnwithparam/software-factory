@@ -25,6 +25,8 @@ export interface Step {
   readonly run?: string;
   // The MCP servers (names in .factory/mcp.json) an agent step starts with.
   readonly mcp?: readonly string[];
+  // A `check` step's runtime by name, over config.runtime.check.
+  readonly runtime?: string;
 }
 
 // `on: cron:` files an issue labelled factory:ready on a schedule, which the
@@ -56,7 +58,7 @@ export interface StepKind {
   readonly agent?: boolean;
 }
 
-const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "mcp"]);
+const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run", "mcp", "runtime"]);
 const TOP_KEYS = new Set(["name", "description", "on", "limits", "steps"]);
 const ON_KEYS = new Set(["cron"]);
 const CRON_KEYS = new Set(["schedule", "tz", "title", "body"]);
@@ -155,6 +157,10 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
     if (s.reject !== undefined && !kind?.rejects) problems.push(`${where}.reject: a ${uses} step never rejects`);
     if (kind?.command && (typeof s.run !== "string" || !s.run.trim())) problems.push(`${where}.run: required, the command a ${uses} step runs`);
     if (s.run !== undefined && kind && !kind.command) problems.push(`${where}.run: a ${uses} step takes no command`);
+    if (s.runtime !== undefined) {
+      if (typeof s.runtime !== "string" || !/^[\w-]{1,64}$/.test(s.runtime)) problems.push(`${where}.runtime: a runtime name (local, lwpr, or one in machine.json)`);
+      else if (kind && !kind.command) problems.push(`${where}.runtime: a ${uses} step runs no command`);
+    }
     const mcp = s.mcp;
     if (mcp !== undefined) {
       if (!Array.isArray(mcp) || !mcp.every((n) => typeof n === "string" && /^[\w-]{1,64}$/.test(n))) problems.push(`${where}.mcp: a list of server names from .factory/mcp.json`);
@@ -170,6 +176,7 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
       ...(typeof s.revise === "string" ? { revise: s.revise } : {}),
       ...(typeof s.run === "string" ? { run: s.run } : {}),
       ...(Array.isArray(mcp) && mcp.length > 0 ? { mcp: mcp as string[] } : {}),
+      ...(typeof s.runtime === "string" ? { runtime: s.runtime } : {}),
     };
   }
 

@@ -16,6 +16,9 @@ export interface GhIssue {
 
 export interface GhComment {
   id: number;
+  // `gh` gives a node id in `id`; the REST id an edit needs is the
+  // #issuecomment-N in the url. Fakes set a numeric `id` and no url.
+  url?: string;
   author: string;
   authorAssociation: string;
   body: string;

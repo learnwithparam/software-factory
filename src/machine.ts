@@ -11,10 +11,13 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cpus, freemem } from "node:os";
 import { dirname } from "node:path";
 import { factoryHome } from "./paths";
+import { type RuntimeSpec, runtimeProblems } from "./runtimes";
 
 export interface MachineConfig {
   readonly slots: number;
   readonly dailyUsd?: number;
+  // Named places a gate or check command can run; see src/runtimes.ts.
+  readonly runtimes?: Readonly<Record<string, RuntimeSpec>>;
 }
 
 const DEFAULT_SLOTS = 2;
@@ -46,7 +49,11 @@ export function loadMachineConfig(env: NodeJS.ProcessEnv = process.env): Machine
   if (raw.dailyUsd !== undefined && !(typeof raw.dailyUsd === "number" && raw.dailyUsd > 0)) {
     throw new Error(`${path}: "dailyUsd" must be a positive number, got ${JSON.stringify(raw.dailyUsd)}`);
   }
-  return { slots, dailyUsd: raw.dailyUsd as number | undefined };
+  if (raw.runtimes !== undefined) {
+    const problems = runtimeProblems(raw.runtimes, `${path}: runtimes`);
+    if (problems.length) throw new Error(problems.join("\n"));
+  }
+  return { slots, dailyUsd: raw.dailyUsd as number | undefined, ...(raw.runtimes ? { runtimes: raw.runtimes as Record<string, RuntimeSpec> } : {}) };
 }
 
 // Advice only (`factory doctor` prints it, nothing enforces it): roughly one

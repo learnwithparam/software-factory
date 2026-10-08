@@ -27,10 +27,11 @@ import {
   ensureWorktreeReady,
   finish,
   labelsOf,
+  leased,
   postComment,
+  repoSpendToday,
   runQueuedRetros,
   runRetro,
-  startOfTodayUtc,
   worktreeFor,
   type Outcome,
   type RunCtx,
@@ -60,7 +61,10 @@ function labelOf(deps: WatchDeps, stepId: string): string {
 }
 
 function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, stepId: string, worktree: string, ctx?: RunCtx): Promise<Outcome> {
-  return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);
+  // With leases on, only the lease holder walks the steps: a second worker
+  // (another machine, a CI job) gets "waiting", and a dead worker's issue is
+  // reclaimed by whoever resumes it after the TTL.
+  return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx));
 }
 
 // Intake trust (P36): a label is a request to spend tokens and push a branch,
@@ -357,7 +361,7 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   // an issue already in flight keeps going, since checkSpendCap parks it on
   // its own next stage if the cap is still hit then (plan v2.7.0 item 7).
   const repoDailyUsd = config.spend.dailyUsd;
-  const repoDailyCapHit = repoDailyUsd !== undefined && deps.state.spendSummary(config.repo, startOfTodayUtc()).costUsd >= repoDailyUsd;
+  const repoDailyCapHit = repoDailyUsd !== undefined && (await repoSpendToday(deps, config)).costUsd >= repoDailyUsd;
   const machineDailyUsd = deps.machine?.config.dailyUsd;
   const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;

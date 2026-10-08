@@ -2,7 +2,7 @@
 // An adapter's test calls this with a factory for a fresh instance.
 
 import { expect, test } from "bun:test";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExecutionPort } from "../../src/ports/execution";
@@ -23,9 +23,16 @@ export function executionContract(name: string, make: () => ExecutionPort): void
       expect(r).toEqual({ stdout: "out\n", stderr: "err\n", code: 3 });
     }));
 
-  test(`${name}: runs in cwd`, () =>
+  // A remote runtime runs on a copy elsewhere, so the contract is the files, not the path.
+  test(`${name}: sees the worktree's files`, () =>
     withDir(async (dir) => {
-      expect((await make().run("pwd", dir)).stdout.trim()).toBe(dir);
+      writeFileSync(join(dir, "marker.txt"), "here\n");
+      expect(await make().run("cat marker.txt", dir)).toEqual({ stdout: "here\n", stderr: "", code: 0 });
+    }));
+
+  test(`${name}: quotes survive the trip`, () =>
+    withDir(async (dir) => {
+      expect((await make().run(`echo "it's" 'a "test"' $((1+2))`, dir)).stdout).toBe(`it's a "test" 3\n`);
     }));
 
   test(`${name}: the command line is bash, pipes and && included`, () =>

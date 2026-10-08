@@ -11,9 +11,11 @@ import { DEFAULT_CONFIG, mergeConfig } from "../src/config";
 import { runDir } from "../src/artifacts";
 import { OPERATOR_TAKEOVER, type StageName, type StageRunResult } from "../src/executor";
 import { FactoryState } from "../src/state";
-import { LABEL } from "../src/labels";
+import { LABEL, PARKED_LABELS, STATE_LABELS } from "../src/labels";
+import { GitHubSpend } from "../src/adapters/github-store/spend";
+import { EPOCH, startOfTodayUtc } from "../src/engine/common";
 import { advanceIssue, pollOnce, recoverInFlight } from "../src/watch";
-import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
+import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeLeases, FakeHoldoutRunner, fixtureFor, MultiStageExecutor } from "./harness";
 
 const seen = new Set<string>();
 const initialLabels = new Map<object, string[]>();
@@ -180,6 +182,27 @@ describe("approval paths", () => {
     c.github.say(1, "/factory retry");
     expect(await c.step()).toBe("shipped");
     expect(c.state.listStageRuns("acme/widgets", { issue: 1 }).map((r) => r.stage)).toEqual(["triage", "plan", "build", "build", "verify", "pr"]);
+    done(c);
+  });
+
+  test("4d. spend on GitHub: the caps it gives equal SQLite's, unknown costs included", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    const usage = { tokensIn: 1000, tokensOut: 100, tokensCached: 400, costUsd: 0, costReported: false };
+    c.push("triage", triage(), { ...usage, model: "gpt-not-priced" });
+    c.push("plan", plan("low"), { ...usage, model: "claude-haiku-4-5" });
+    c.push("build", build(), { ...usage, costUsd: 1.5, costReported: true, model: "gpt-not-priced" });
+    c.push("verify", verdict("pass"), { ...usage, costUsd: 0.25, costReported: true, model: "gpt-not-priced" });
+    c.push("pr", pr());
+    const spend = new GitHubSpend(c.github, "acme/widgets", "me");
+    expect(await advanceIssue({ ...c.deps, spend }, c.config, c.github.issues.get(1)!)).toBe("shipped");
+    const local = c.state.spendSummary("acme/widgets", EPOCH, 1);
+    expect(local.costUsd).toBeGreaterThan(1.75);
+    expect(local.unreportedRuns).toBe(1);
+    expect(await spend.issue(1)).toEqual(local);
+    expect(await spend.since(startOfTodayUtc())).toEqual(c.state.spendSummary("acme/widgets", startOfTodayUtc()));
+    // A fresh worker on another machine, with an empty SQLite, reads the same caps.
+    expect(await new GitHubSpend(c.github, "acme/widgets", "other").issue(1)).toEqual(local);
     done(c);
   });
 
@@ -631,6 +654,24 @@ describe("in-review and claim paths", () => {
     done(c);
   });
 
+  test("20b. with leases, recovery leaves an issue a live worker holds and reclaims one whose worker died", async () => {
+    const c = setup([LABEL.building]);
+    c.github.issues.get(1)!.comments = [
+      { id: 1, author: "bot", authorAssociation: "OWNER", body: `<!-- factory:data ${JSON.stringify({ stage: "plan", json: { risk: "low" } })} -->`, createdAt: "2026-01-01T00:00:00Z" },
+    ];
+    build_to_pr(c);
+    const port = new FakeLeases();
+    const deps = { ...c.deps, leases: { port, holder: "me", held: new Map() } };
+    await port.acquire("1", "other", 30_000, Date.now());
+    await recoverInFlight(deps, c.config);
+    expect(labels(c.github, 1)).toEqual([LABEL.building]);
+    port.table.set("1", { holder: "other", expiresAt: Date.now() - 1 });
+    await recoverInFlight(deps, c.config);
+    expect(labels(c.github, 1)).toEqual([LABEL.inReview]);
+    expect(port.log.at(-1)).toBe("release 1 me");
+    done(c);
+  });
+
   test("21. STOP_IF stops new pickups but not approvals on existing runs", async () => {
     const c = setup([LABEL.ready], { maxOpenFactoryPrs: 3 });
     for (const [i, head] of ["factory/issue-90", "factory/issue-91", "factory/issue-92"].entries()) {
@@ -859,6 +900,6 @@ describe("blocker gate", () => {
 });
 
 test("every state and parked label is reached by a scenario", () => {
-  const unreached = Object.values(LABEL).filter((l) => l !== LABEL.monitor && !seen.has(l));
+  const unreached = [...STATE_LABELS, ...PARKED_LABELS].filter((l) => !seen.has(l));
   expect(unreached).toEqual([]);
 });

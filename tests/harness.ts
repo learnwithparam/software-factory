@@ -3,6 +3,8 @@
 // Git hold a private CommandRunner field, so a plain object can't satisfy the
 // type; subclassing and overriding every public method is the honest fake.
 
+import { mayTake, type LeaseRecord } from "../src/core/lease";
+import type { LeasePort } from "../src/ports/lease";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
@@ -61,7 +63,13 @@ export class FakeGitHub extends GitHub {
     return this.roles.get(login) ?? "none";
   }
 
+  // When set, the repo's labels as gh sees them: createIssue rejects one that is missing, as gh
+  // does, and ensureLabel adds it. Unset, every label exists.
+  repoLabels?: Set<string>;
+
   override async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
+    const missing = this.repoLabels && labels.find((l) => !this.repoLabels!.has(l));
+    if (missing) throw new Error(`could not add label: '${missing}' not found`);
     const number = Math.max(0, ...this.issues.keys()) + 1;
     this.issues.set(number, { number, title, body, labels: labels.map((name) => ({ name })), comments: [] });
     return number;
@@ -81,6 +89,12 @@ export class FakeGitHub extends GitHub {
 
   override async findPrByHead(_repo: string, head: string): Promise<GhPr | undefined> {
     return this.prs.find((p) => p.state === "open" && p.headRefName === head);
+  }
+
+  override async getPr(_repo: string, number: number): Promise<GhPr> {
+    const pr = this.prs.find((p) => p.number === number);
+    if (!pr) throw new Error(`no such PR #${number}`);
+    return pr;
   }
 
   override async prFeedback(): Promise<GhComment[]> {
@@ -159,7 +173,9 @@ export class FakeGitHub extends GitHub {
     return [];
   }
 
-  override async ensureLabel(): Promise<void> {}
+  override async ensureLabel(_repo: string, name: string): Promise<void> {
+    this.repoLabels?.add(name);
+  }
   override async currentLogin(): Promise<string> {
     return "factory-bot";
   }
@@ -377,3 +393,20 @@ export class MultiStageExecutor {
   }
 }
 
+
+// One shared lease table, held to tests/ports/lease.contract.ts.
+export class FakeLeases implements LeasePort {
+  readonly table = new Map<string, LeaseRecord>();
+  readonly log: string[] = [];
+  async acquire(key: string, holder: string, ttlMs: number, now: number): Promise<boolean> {
+    if (!mayTake(this.table.get(key), holder, now)) return false;
+    this.table.set(key, { holder, expiresAt: now + ttlMs });
+    this.log.push(`acquire ${key} ${holder}`);
+    return true;
+  }
+  async release(key: string, holder: string): Promise<void> {
+    if (this.table.get(key)?.holder !== holder) return;
+    this.table.set(key, { holder, expiresAt: 0 });
+    this.log.push(`release ${key} ${holder}`);
+  }
+}

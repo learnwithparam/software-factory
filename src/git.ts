@@ -10,6 +10,7 @@ import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CommandResult, CommandRunner } from "./github";
+import type { GhPr } from "./ports/scm";
 import type { ChangedFile } from "./merge-policy";
 
 async function spawnGit(args: string[], cwd?: string, env?: Record<string, string>): Promise<CommandResult> {
@@ -44,6 +45,15 @@ export class GitCommandRunner implements CommandRunner {
     }
     return spawnGit(args, opts?.cwd, opts?.env);
   }
+}
+
+// The issue a PR works on: the factory's own branch name first, else the one
+// issue the PR closes. Undefined for a PR that is not about exactly one issue.
+export function issueOfPr(pr: Pick<GhPr, "headRefName" | "closingIssuesReferences">): number | undefined {
+  const own = /^factory\/issue-(\d+)$/.exec(pr.headRefName)?.[1];
+  if (own) return Number(own);
+  const closes = pr.closingIssuesReferences ?? [];
+  return closes.length === 1 ? closes[0]!.number : undefined;
 }
 
 export class Git {

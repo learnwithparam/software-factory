@@ -350,3 +350,17 @@ describe("doctor: mcp: servers", () => {
     expect(await runDoctor(deps(), { ...ctx, workflow: "feature-to-pr" }).then((cs) => cs.find((c) => c.name.startsWith("every mcp:")))).toBeUndefined();
   });
 });
+
+describe("doctor: runtimes", () => {
+  const flow = "name: m\nsteps:\n  l: { uses: check, label: factory:linting, run: make lint, runtime: gpu, next: p }\n  p: { uses: pr, label: factory:in-review }\n";
+  const reading: DoctorDeps = { ...deps(), readFile: async (path) => (path.endsWith("workflows/m.yml") ? flow : undefined) };
+  const check = async (runtimeNames: string[], workflow = "m") =>
+    (await runDoctor(reading, { ...ctx, workflow, runtime: { gates: "lwpr" }, runtimeNames })).find((c) => c.name.startsWith("every runtime"));
+
+  test("a name this machine has passes; one it lacks fails with the name", async () => {
+    expect((await check(["local", "lwpr", "gpu"]))!.ok).toBe(true);
+    const missing = (await check(["local", "lwpr"]))!;
+    expect(missing.ok).toBe(false);
+    expect(missing.detail).toContain('steps.l.runtime: no runtime "gpu"');
+  });
+});
