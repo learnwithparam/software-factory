@@ -176,5 +176,6 @@
   {"name": "webhook: the secret opens only its route", "file": "dashboard/server.ts", "find": "route?.label === WEBHOOK_ROUTE && webhookSecret() !== \"\"", "replace": "webhookSecret() !== \"\"", "test": "tests/webhook.test.ts"},
   {"name": "webhook: a delivery wakes the watcher", "file": "src/watch.ts", "find": "    seenDelivery = latest;\n    tick();\n", "replace": "    seenDelivery = latest;\n", "test": "tests/webhook.test.ts"},
   {"name": "trust: a retry needs write access", "file": "src/watch.ts", "find": "  if (!(await commandIsTrusted(deps, config, latest))) return undefined;\n", "replace": "", "test": "tests/intake-trust.test.ts"},
-  {"name": "webhook: a chunked body is cut at the cap", "file": "src/webhook.ts", "find": "    if (size > max) {", "replace": "    if (false) {", "test": "tests/intake-trust.test.ts"}
+  {"name": "webhook: a chunked body is cut at the cap", "file": "src/webhook.ts", "find": "    if (size > max) {", "replace": "    if (false) {", "test": "tests/intake-trust.test.ts"},
+  {"name": "trust: a cancel needs write access", "file": "src/watch.ts", "find": "  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "replace": "  if (verb === \"cancel\") return cancelRun(issue, deps, config);\n  if (verb !== \"cancel\" && verb !== \"retry\") return undefined;\n", "test": "tests/intake-trust.test.ts"}
 ]

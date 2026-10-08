@@ -210,9 +210,9 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const latest = issue.comments.filter((c) => isHumanComment(c)).at(-1);
   if (!latest) return undefined;
   const verb = parseChatOps(latest.body).type;
-  if (verb === "cancel") return cancelRun(issue, deps, config);
-  if (verb !== "retry") return undefined;
+  if (verb !== "cancel" && verb !== "retry") return undefined;
   if (!(await commandIsTrusted(deps, config, latest))) return undefined;
+  if (verb === "cancel") return cancelRun(issue, deps, config);
   // A retry counts once: the runner acknowledges it below, so a run that parks again without a comment cannot replay it.
   const lastRunner = issue.comments.filter((c) => c.body.includes("<!-- factory:")).at(-1);
   if (lastRunner && Date.parse(lastRunner.createdAt) >= Date.parse(latest.createdAt)) return undefined;

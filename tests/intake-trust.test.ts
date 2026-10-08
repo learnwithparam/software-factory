@@ -84,18 +84,24 @@ describe("GitHub.labeledBy and roleOf", () => {
 
 describe("commands need write access too", () => {
   // A read or triage collaborator still shows as COLLABORATOR on the comment.
-  function parked(role: RepoRole) {
+  function parked(role: RepoRole, command = "/factory retry") {
     const [cloneDir, workspacesDir] = [mkdtempSync(join(tmpdir(), "trust-clone-")), mkdtempSync(join(tmpdir(), "trust-ws-"))];
     dirs.push(cloneDir, workspacesDir);
     const github = new FakeGitHub([baseIssue(1, [LABEL.failed])]);
     github.roles.set("human", role);
     const deps = { github, git: new FakeGit(), state: new FactoryState(":memory:"), executor: new MultiStageExecutor(), gateRunner: new FakeGateRunner(), holdoutRunner: new FakeHoldoutRunner(), cloneDir, workspacesDir };
-    github.say(1, "/factory retry", "COLLABORATOR");
+    github.say(1, command, "COLLABORATOR");
     return { github, run: () => advanceIssue(deps, mergeConfig({ repo: "acme/widgets" }), github.issues.get(1)!) };
   }
 
   test.each(["read", "triage"] as const)("a %s collaborator's /factory retry is ignored", async (role) => {
     const { github, run } = parked(role);
+    expect(await run()).toBe("waiting");
+    expect(labels(github)).toEqual([LABEL.failed]);
+  });
+
+  test.each(["read", "triage"] as const)("a %s collaborator's /factory cancel is ignored", async (role) => {
+    const { github, run } = parked(role, "/factory cancel");
     expect(await run()).toBe("waiting");
     expect(labels(github)).toEqual([LABEL.failed]);
   });
