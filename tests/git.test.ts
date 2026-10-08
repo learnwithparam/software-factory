@@ -13,7 +13,7 @@ setDefaultTimeout(30_000);
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Git, GitCommandRunner, sparseCheckoutPatterns } from "../src/git";
+import { Git, GitCommandRunner, issueOfPr, sparseCheckoutPatterns } from "../src/git";
 
 const roots: string[] = [];
 
@@ -272,5 +272,16 @@ describe("Git.excludeFromSparseCheckout", () => {
     await git.excludeFromSparseCheckout(root, []);
     expect(existsSync(join(root, "README.md"))).toBe(true);
     expect(existsSync(join(root, ".git", "info", "sparse-checkout"))).toBe(false);
+  });
+});
+
+describe("issueOfPr", () => {
+  test("a factory branch names its issue", () => {
+    expect(issueOfPr({ headRefName: "factory/issue-42", closingIssuesReferences: [{ number: 7 }] })).toBe(42);
+  });
+  test("any other PR resolves to the one issue it closes, or to none", () => {
+    expect(issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }] })).toBe(7);
+    expect(issueOfPr({ headRefName: "fix-thing", closingIssuesReferences: [{ number: 7 }, { number: 8 }] })).toBeUndefined();
+    expect(issueOfPr({ headRefName: "factory/issue-42-extra" })).toBeUndefined();
   });
 });

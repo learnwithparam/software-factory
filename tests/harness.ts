@@ -85,6 +85,12 @@ export class FakeGitHub extends GitHub {
     return this.prs.find((p) => p.state === "open" && p.headRefName === head);
   }
 
+  override async getPr(_repo: string, number: number): Promise<GhPr> {
+    const pr = this.prs.find((p) => p.number === number);
+    if (!pr) throw new Error(`no such PR #${number}`);
+    return pr;
+  }
+
   override async prFeedback(): Promise<GhComment[]> {
     return this.prComments;
   }

@@ -6,7 +6,7 @@ import { accessSync, constants, existsSync, readdirSync, readFileSync } from "no
 import { hostname } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { GitHub, type ScmPort } from "./github";
-import { GitCommandRunner, Git } from "./git";
+import { GitCommandRunner, Git, issueOfPr } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
 import { loadConfig, type FactoryConfig } from "./config";
@@ -159,11 +159,24 @@ async function cmdWatch(): Promise<void> {
 // One issue, one pass, then exit — what a CI step calls (`factory run --issue
 // N --repo-dir .`), and the stateless counterpart to `watch`'s long-lived
 // poll (plan's "Core refactor" advanceIssue entry point).
+// `--issue N`, or `--pr N` for an event on a PR (a comment or a review), which
+// names the PR, not the issue it works on. Undefined: a PR about no one issue.
+async function issueFromFlags(github: GitHub, repo: string, cmd: string): Promise<number | undefined> {
+  const pr = Number(flag("pr"));
+  if (pr) return issueOfPr(await github.getPr(repo, pr));
+  const issue = Number(flag("issue"));
+  if (!issue) throw new UsageError(`${cmd}: --issue <N> or --pr <N> is required`);
+  return issue;
+}
+
 async function cmdRun(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = Number(flag("issue"));
-  if (!issueNumber) throw new UsageError("run: --issue <N> is required");
+  const issueNumber = await issueFromFlags(new GitHub(), config.repo, "run");
+  if (issueNumber === undefined) {
+    console.log(`factory run: PR #${flag("pr")} is not about one issue; nothing to do.`);
+    return;
+  }
   const deps = await buildWatchDeps(cloneDir, config);
   const issue = await deps.github.getIssue(config.repo, issueNumber);
   const outcome = await advanceIssue(deps, config, issue);
@@ -191,10 +204,10 @@ async function cmdTick(): Promise<void> {
 async function cmdPark(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const issueNumber = Number(flag("issue"));
   const reason = flag("reason") ?? "parked by CI (no reason given)";
-  if (!issueNumber) throw new UsageError("park: --issue <N> is required");
   const github = new GitHub();
+  const issueNumber = await issueFromFlags(github, config.repo, "park");
+  if (issueNumber === undefined) return;
   const issue = await github.getIssue(config.repo, issueNumber);
   const runningLabels: string[] = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying, LABEL.inReview];
   const current = issue.labels.map((l) => l.name).find((n) => runningLabels.includes(n));

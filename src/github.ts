@@ -203,6 +203,11 @@ export class GitHub implements ScmPort {
     return JSON.parse(result.stdout || "[]");
   }
 
+  async getPr(repo: string, number: number): Promise<GhPr> {
+    const result = await this.exec(["pr", "view", String(number), "--repo", repo, "--json", "number,url,state,headRefName,isDraft,closingIssuesReferences"]);
+    return JSON.parse(result.stdout);
+  }
+
   async findPrByHead(repo: string, head: string): Promise<GhPr | undefined> {
     const prs = await this.listPrs(repo, { state: "open" });
     return prs.find((p) => p.headRefName === head);
