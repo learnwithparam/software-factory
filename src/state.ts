@@ -401,11 +401,12 @@ export class FactoryState {
       .run({ $repo: repo, $issue: issue, $verdict: verdict });
   }
 
-  // The newest resumable session for an issue, for `factory takeover`.
-  lastSession(repo: string, issue: number): Pick<StageRun, "stage" | "agent"> & { session_id: string } | undefined {
+  // The newest resumable session for an issue, for `factory takeover`, or of
+  // one stage, for a rebuild that picks up where the last build left off.
+  lastSession(repo: string, issue: number, stage?: Stage): Pick<StageRun, "stage" | "agent"> & { session_id: string } | undefined {
     return (this.db
-      .query("SELECT stage, agent, session_id FROM stage_runs WHERE repo = $repo AND issue = $issue AND session_id IS NOT NULL ORDER BY id DESC LIMIT 1")
-      .get({ $repo: repo, $issue: issue }) ?? undefined) as (Pick<StageRun, "stage" | "agent"> & { session_id: string }) | undefined;
+      .query("SELECT stage, agent, session_id FROM stage_runs WHERE repo = $repo AND issue = $issue AND session_id IS NOT NULL AND ($stage IS NULL OR stage = $stage) ORDER BY id DESC LIMIT 1")
+      .get({ $repo: repo, $issue: issue, $stage: stage ?? null }) ?? undefined) as (Pick<StageRun, "stage" | "agent"> & { session_id: string }) | undefined;
   }
 
   // Keyset pagination on id, like listEvents: pass the last id seen.

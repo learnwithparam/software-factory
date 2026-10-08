@@ -26,6 +26,7 @@ import type { GhIssue } from "../github";
 import { LABEL, typesFor } from "../labels";
 import type { Step, StepKind, Workflow } from "../core/workflow";
 import {
+  failureTail,
   finish,
   moveLabel,
   postComment,
@@ -132,11 +133,20 @@ const plan: StepType = {
   },
 };
 
+// A rebuild after a reject resumes the last build session, told why it came
+// back; a first build, or one whose agent kept no session, starts fresh.
+function rebuildFrom(sc: StepCtx): { resume?: { sessionId: string; failure: string } } {
+  const failure = sc.ctx.failure;
+  delete sc.ctx.failure;
+  const last = failure === undefined ? undefined : sc.deps.state.lastSession(sc.config.repo, sc.issue.number, "build");
+  return last && failure !== undefined ? { resume: { sessionId: last.session_id, failure } } : {};
+}
+
 const build: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
-    const result = await runStage(deps, config, issue, "build", worktree);
+    const result = await runStage(deps, config, issue, "build", worktree, rebuildFrom(sc));
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
     const problem = built.problem;
@@ -212,6 +222,7 @@ const verify: StepType = {
       // Red evidence is a build problem, not something for the verifier to judge.
       if (fresh.status !== "GREEN") {
         ctx.rejectRound += 1;
+        ctx.failure = failureTail(fresh.raw);
         if (ctx.rejectRound > maxRejects) {
           await moveLabel(deps, config, issueNumber, step.label, LABEL.failed);
           finish(deps, config, issueNumber, "failed", `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`);
@@ -231,6 +242,7 @@ const verify: StepType = {
       const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
       if (!holdout.ok) {
         ctx.rejectRound += 1;
+        ctx.failure = failureTail(`Holdout tests failed:\n${holdout.detail}`);
         await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, { stage: "verify", json: { holdout: holdout.detail } });
         if (ctx.rejectRound > maxRejects) {
           await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
@@ -280,6 +292,7 @@ const verify: StepType = {
     if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
     if (json.result === "reject") {
       ctx.rejectRound += 1;
+      ctx.failure = failureTail(art.comment ?? JSON.stringify(json.findings, null, 2));
       if (ctx.rejectRound > maxRejects) {
         await moveLabel(deps, config, issueNumber, step.label, LABEL.needsHuman);
         await runRetro(deps, config, issue, "gave-up");

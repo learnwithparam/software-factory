@@ -56,6 +56,17 @@ async function bareOrigin(root: string): Promise<string> {
 }
 
 describe("ensureRepoClone", () => {
+  test("clones from github.com, or from the Enterprise host GH_HOST names", async () => {
+    const root = tmpRoot();
+    for (const [gh, url] of [[undefined, "https://github.com/acme/widgets.git"], ["ghe.acme.io", "https://ghe.acme.io/acme/widgets.git"]] as const) {
+      const calls: string[][] = [];
+      const runner = { run: async (args: string[]) => (calls.push(args), { code: 0, stdout: "", stderr: "" }) };
+      const env = { HOME: root, FACTORY_HOME: join(root, gh ?? "dotcom"), ...(gh ? { GH_HOST: gh } : {}) };
+      await ensureRepoClone(runner, "acme/widgets", { env });
+      expect(calls[0]!.slice(0, 2)).toEqual(["clone", url]);
+    }
+  });
+
   test("clones into FACTORY_HOME/repos on first call", async () => {
     const root = tmpRoot();
     const bare = await bareOrigin(root);

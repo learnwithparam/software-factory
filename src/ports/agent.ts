@@ -44,6 +44,9 @@ export interface StageRunOptions {
   // local recording), and the live file names the running process for takeover.
   readonly transcriptFile?: string;
   readonly liveFile?: string;
+  // A rebuild continues the last build's session with the tail of why it was
+  // sent back. Only an agent that keeps sessions (the claude preset) uses it.
+  readonly resume?: { readonly sessionId: string; readonly failure: string };
 }
 
 // The killedReason a `factory takeover` stop gets. watch.ts parks on it

@@ -6,7 +6,7 @@ import { holdoutEnabled, type FactoryConfig } from "../config";
 import type { HoldoutRunner } from "../holdout";
 import { TRUNCATION_KIND } from "../event-budget";
 import { costFor } from "../pricing";
-import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunResult } from "../executor";
+import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunOptions, type StageRunResult } from "../executor";
 import { renderRunSummary } from "../run-summary";
 import type { IssueView } from "../tmux";
 import { clearStageArtifacts, validateStepJson, readStageArtifacts, runDir, type RetroArtifact, type VerdictArtifact } from "../artifacts";
@@ -222,6 +222,7 @@ export async function runStage(
   issue: GhIssue,
   stage: StageName,
   worktree: string,
+  extra: Pick<StageRunOptions, "resume"> = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
   // rehydrate before clearing: rehydrate only ever repopulates *earlier*
@@ -247,6 +248,7 @@ export async function runStage(
     agentCommands: config.agentCommands,
     type: issueType(config.routes, labelsOf(issue)),
     ...files,
+    ...extra,
   });
   for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
   const finishedAt = new Date();
@@ -382,6 +384,16 @@ export async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumb
 export interface RunCtx {
   rejectRound: number;
   questionRound: number;
+  // Why the last attempt was sent back, for the rebuild that follows a reject.
+  failure?: string;
+}
+
+// How much of a failure a rebuild sees: the end of it, where the error is.
+export const FAILURE_TAIL_BYTES = 12 * 1024;
+
+export function failureTail(text: string): string {
+  const bytes = Buffer.from(text);
+  return bytes.length <= FAILURE_TAIL_BYTES ? text : bytes.subarray(bytes.length - FAILURE_TAIL_BYTES).toString().replace(/^\uFFFD+/, "");
 }
 
 export const EPOCH = "1970-01-01T00:00:00.000Z";

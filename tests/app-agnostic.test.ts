@@ -68,6 +68,16 @@ describe("remote URLs", () => {
     expect(repoFromRemoteUrl("/tmp/some/bare.git")).toBeUndefined();
     expect(repoFromRemoteUrl("https://gitlab.com/acme/pyapp.git")).toBeUndefined();
   });
+
+  test("a GitHub Enterprise remote parses when GH_HOST names its host, and only then", () => {
+    const ghe = { GH_HOST: "ghe.acme.io" };
+    expect(repoFromRemoteUrl("https://ghe.acme.io/acme/pyapp.git", ghe)).toBe("acme/pyapp");
+    expect(repoFromRemoteUrl("git@ghe.acme.io:acme/pyapp.git", ghe)).toBe("acme/pyapp");
+    expect(repoFromRemoteUrl("ssh://git@ghe.acme.io/acme/pyapp", ghe)).toBe("acme/pyapp");
+    expect(repoFromRemoteUrl("https://gheXacme.io/acme/pyapp.git", ghe)).toBeUndefined();
+    expect(repoFromRemoteUrl("https://ghe.acme.io/acme/pyapp.git", {})).toBeUndefined();
+    expect(repoFromRemoteUrl("https://github.com/acme/pyapp.git", ghe)).toBeUndefined();
+  });
 });
 
 describe("a Python repo on a trunk branch", () => {

@@ -6,6 +6,7 @@
 
 import { existsSync } from "node:fs";
 import { PRESETS } from "./agents/presets";
+import { githubHost } from "./repo";
 import type { AgentConfig, StageAgents } from "./agents/types";
 
 export interface RiskPolicy {
@@ -391,9 +392,11 @@ export async function loadConfig(targetRepoDir: string): Promise<FactoryConfig> 
   return config;
 }
 
-// owner/name from a github.com https or ssh remote URL; anything else (a file path, another host) is not ours to judge.
-export function repoFromRemoteUrl(url: string): string | undefined {
-  const m = url.trim().match(/^(?:https?:\/\/(?:[^@/]+@)?github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/);
+// owner/name from an https or ssh remote URL on the GitHub host (github.com, or
+// GH_HOST's Enterprise server); anything else (a file path, another host) is not ours to judge.
+export function repoFromRemoteUrl(url: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const host = githubHost(env).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = url.trim().match(new RegExp(`^(?:https?://(?:[^@/]+@)?${host}/|git@${host}:|ssh://git@${host}/)([^/\\s]+)/([^/\\s]+?)(?:\\.git)?/?$`));
   return m ? `${m[1]}/${m[2]}` : undefined;
 }
 

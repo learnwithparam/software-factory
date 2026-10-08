@@ -18,6 +18,7 @@ import { STAGE_DISALLOWED_TOOLS, STAGE_GUIDANCE, STAGE_TOOLS, stageSettings } fr
 import { FactoryState } from "../src/state";
 import { LABEL } from "../src/labels";
 import { processReadyIssue } from "../src/watch";
+import { FAILURE_TAIL_BYTES, failureTail } from "../src/engine/common";
 import { baseIssue, FakeGateRunner, FakeGit, FakeGitHub, FakeHoldoutRunner } from "./harness";
 
 const STAGES: StageName[] = ["triage", "plan", "build", "verify", "pr", "retro"];
@@ -51,6 +52,22 @@ describe("claude preset", () => {
       for (const t of ["Bash", "Read", "Write", "Skill"]) expect(STAGE_TOOLS[stage], stage).toContain(t);
     }
     expect(PRESETS.claude!.command(opts, { preset: "claude" }, "").argv).toEqual(["claude", ...claudeArgs(opts)]);
+  });
+
+  test("a rebuild forks the last build session and is told why it came back", () => {
+    const opts = { stage: "build" as const, issue: 12, cwd: "/w", maxBudgetUsd: 5 };
+    const resumed = claudeArgs({ ...opts, resume: { sessionId: "s-1", failure: "gate red: test" } });
+    expect(resumed.slice(0, 6)).toEqual(["-p", "/factory-build 12\n\nThe last attempt was sent back. The tail of why:\n\ngate red: test", "--resume", "s-1", "--fork-session", "--output-format"]);
+    expect(resumed.slice(5)).toEqual(claudeArgs(opts).slice(2));
+  });
+
+  test("a rebuild sees the last 12 KiB of the failure, where the error is", () => {
+    expect(failureTail("short")).toBe("short");
+    const long = `${"x".repeat(FAILURE_TAIL_BYTES)}THE ERROR`;
+    expect(failureTail(long)).toHaveLength(FAILURE_TAIL_BYTES);
+    expect(failureTail(long).endsWith("THE ERROR")).toBe(true);
+    // A cut through a multi-byte character drops the broken half rather than send U+FFFD.
+    expect(failureTail(`${"é".repeat(FAILURE_TAIL_BYTES)}`).startsWith("é")).toBe(true);
   });
 
   test("a configured model is added and nothing else changes", () => {
