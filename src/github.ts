@@ -27,77 +27,8 @@ export class GhCommandRunner implements CommandRunner {
   }
 }
 
-export interface GhIssue {
-  number: number;
-  title: string;
-  body: string;
-  labels: { name: string }[];
-  comments: GhComment[];
-  // Only populated by getIssue (blockers.ts is the one caller that needs
-  // them); listIssuesByLabel and listOpenIssues leave both undefined.
-  state?: "OPEN" | "CLOSED";
-  stateReason?: string | null;
-}
-
-export interface GhComment {
-  id: number;
-  author: string;
-  authorAssociation: string;
-  body: string;
-  createdAt: string;
-}
-
-export interface CreatePrOptions {
-  repo: string;
-  base: string;
-  head: string;
-  title: string;
-  body: string;
-  draft?: boolean;
-}
-
-export interface GhPr {
-  number: number;
-  url: string;
-  state: string;
-  headRefName: string;
-  isDraft: boolean;
-  closingIssuesReferences?: { number: number }[];
-}
-
-export interface CiCheck {
-  readonly name?: string;
-  readonly context?: string;
-  readonly status?: string;
-  readonly state?: string;
-  readonly conclusion?: string;
-}
-
-export interface PrStatus {
-  readonly state: "open" | "closed" | "merged";
-  readonly headRefOid: string;
-  readonly closingIssuesReferences: readonly { number: number }[];
-  readonly statusCheckRollup: readonly CiCheck[];
-}
-
-// merge-policy.ts's readiness snapshot (src/merge-policy.ts). mergeable and
-// reviewDecision come straight off `gh pr view`; hasUnresolvedReviewThreads
-// needs a separate GraphQL call, since neither `gh pr view` nor `gh pr
-// checks` exposes thread resolution.
-export interface MergeReadiness {
-  readonly state: "open" | "closed" | "merged";
-  readonly isDraft: boolean;
-  readonly baseRefName: string;
-  readonly headRefOid: string;
-  readonly mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
-  readonly reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | "";
-  readonly hasUnresolvedReviewThreads: boolean;
-  // Every CHANGES_REQUESTED review is against a commit the head has since
-  // moved past (v2.9.0 item 3, from assembler's unmerged fix branch, idea
-  // only, no code copied): a reviewer who asked for changes on an old commit
-  // no longer blocks a PR that has since been updated.
-  readonly changesRequestedStale: boolean;
-}
+import type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, ScmPort } from "./ports/scm";
+export type { GhIssue, GhComment, CreatePrOptions, GhPr, CiCheck, PrStatus, MergeReadiness, ScmPort };
 
 class GhError extends Error {
   constructor(
@@ -108,7 +39,7 @@ class GhError extends Error {
   }
 }
 
-export class GitHub {
+export class GitHub implements ScmPort {
   constructor(private readonly runner: CommandRunner = new GhCommandRunner()) {}
 
   private async exec(args: string[]): Promise<CommandResult> {

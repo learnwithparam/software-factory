@@ -383,6 +383,24 @@ describe("failure paths", () => {
     done(c);
   });
 
+  test("11b. a rebuild after a reject resumes the last build session, told why it came back", async () => {
+    const c = setup([LABEL.ready]);
+    c.state.setToggle("auto_approve_low_risk", true);
+    c.push("triage", triage());
+    c.push("plan", plan("low"));
+    c.push("build", build(), { sessionId: "s-build-1" });
+    c.push("verify", { ...verdict("reject"), "verdict-comment.md": "<!-- factory:verdict v1 -->\nthe empty list still throws" }, { sessionId: "s-verify-1" });
+    c.push("build", build(), { sessionId: "s-build-2" });
+    c.push("verify", verdict("pass"));
+    c.push("pr", pr());
+    expect(await c.step()).toBe("shipped");
+    // Runs in order: triage, plan, build, verify, the rebuild, verify, pr.
+    expect(c.executor.resumed[4]).toEqual({ sessionId: "s-build-1", failure: "<!-- factory:verdict v1 -->\nthe empty list still throws" });
+    // Only the rebuild resumes: triage, plan, the first build and every verify start fresh.
+    expect(c.executor.resumed.filter(Boolean)).toHaveLength(1);
+    done(c);
+  });
+
   test("12. a protected path in the diff parks before any push", async () => {
     const c = setup([LABEL.ready], { protectedPaths: ["src/auth/**"] });
     c.state.setToggle("auto_approve_low_risk", true);

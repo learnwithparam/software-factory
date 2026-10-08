@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { fixDoctor, runDoctor, type DoctorDeps } from "../src/doctor";
 import { GitHub, type CommandResult, type CommandRunner } from "../src/github";
 import { LABELS, labelsFor } from "../src/labels";
+import { parseWorkflowText } from "../src/engine/workflows";
 
 class FakeGitHub extends GitHub {
   constructor(private readonly auth: { ok: boolean; detail: string }) {
@@ -265,6 +266,16 @@ describe("fixDoctor", () => {
     expect(github.ensured.some((l) => l.name === "content")).toBe(true);
   });
 
+  test("a workflow's own step label is created, the shipped ones are not duplicated", async () => {
+    const github = new TrackingGitHub();
+    const wf = parseWorkflowText("name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n");
+    if (!wf.ok) throw new Error(wf.problems.join("; "));
+    await fixDoctor(github, "acme/widgets", undefined, wf.workflow);
+    expect(github.ensured.map((l) => l.name).sort()).toEqual([...LABELS.map((l) => l.name), "factory:linting"].sort());
+    const missing = await runDoctor({ ...deps(), readFile: async (p) => (p.endsWith("q.yml") ? "name: q\nsteps:\n  b: { uses: build, label: factory:building, next: lint }\n  lint: { uses: check, label: factory:linting, run: make lint, next: p }\n  p: { uses: pr, label: factory:in-review }\n" : undefined) }, { ...ctx, workflow: "q" });
+    expect(missing.find((c) => c.name === "all factory labels exist")!.detail).toContain("factory:linting");
+  });
+
   test("with no routes, ensures exactly LABELS", async () => {
     const github = new TrackingGitHub();
     await fixDoctor(github, "acme/widgets");
@@ -301,5 +312,19 @@ describe("runDoctor agent versions", () => {
       expect(checks.filter((c) => !c.ok && !c.warn), preset.name).toEqual([]);
     }
   });
-});
 
+  test("the configured workflow: the bundled one passes, a broken repo copy or a missing name fails", async () => {
+    const reading = (repoFile?: string): DoctorDeps => ({
+      ...deps(),
+      readFile: async (path) => (path.startsWith("/tmp/x/.factory/workflows/") ? repoFile : Bun.file(path).text().catch(() => undefined)),
+    });
+    const check = async (d: DoctorDeps, workflow: string) => (await runDoctor(d, { ...ctx, workflow })).find((c) => c.name === `workflow ${workflow} is valid`)!;
+    expect((await check(reading(), "feature-to-pr")).ok).toBe(true);
+    const broken = await check(reading("name: x\nsteps:\n  a: { uses: nope, label: l }\n"), "feature-to-pr");
+    expect(broken.ok).toBe(false);
+    expect(broken.detail).toContain('"nope" is not a step type');
+    const missing = await check(reading(), "no-such-flow");
+    expect(missing.ok).toBe(false);
+    expect(missing.detail).toContain("no .factory/workflows/no-such-flow.yml");
+  });
+});

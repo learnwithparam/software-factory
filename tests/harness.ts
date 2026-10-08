@@ -5,7 +5,7 @@
 
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ReplayExecutor, type StageName, type StageRunResult } from "../src/executor";
+import { ReplayExecutor, type StageName, type StageRunOptions, type StageRunResult } from "../src/executor";
 import { runDir } from "../src/artifacts";
 import { GitHub, type CreatePrOptions, type GhComment, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { Git } from "../src/git";
@@ -330,7 +330,11 @@ export class MultiStageExecutor {
     this.queue.set(key, arr);
   }
 
-  async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number }) {
+  // What each run was asked to resume, in order: a rebuild's session and failure tail.
+  readonly resumed: Array<StageRunOptions["resume"]> = [];
+
+  async runStage(opts: { stage: StageName; issue: number; cwd: string; maxBudgetUsd: number; resume?: StageRunOptions["resume"] }) {
+    this.resumed.push(opts.resume);
     const key = `${opts.stage}:${opts.issue}`;
     const arr = this.queue.get(key);
     const next = arr?.shift();

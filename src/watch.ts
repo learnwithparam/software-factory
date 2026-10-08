@@ -11,104 +11,37 @@
 // on a different machine can all resume any issue.
 
 import { resolveBlockers } from "./blockers";
-import { holdoutEnabled, type FactoryConfig } from "./config";
-import { runHoldout, type HoldoutRunner } from "./holdout";
+import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
-import { TRUNCATION_KIND } from "./event-budget";
-import { costFor } from "./pricing";
-import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunResult } from "./executor";
-import { renderRunSummary } from "./run-summary";
-import type { IssueView } from "./tmux";
-import {
-  clearStageArtifacts,
-  stepStop,
-  validateStepJson,
-  validateVerdict,
-  readGateEvidence,
-  writeGateEvidence,
-  readStageArtifacts,
-  runDir,
-  type BuildArtifact,
-  type PlanArtifact,
-  type RetroArtifact,
-  type TriageArtifact,
-  type VerdictArtifact,
-} from "./artifacts";
-import { hasBlocking, isChecked, keepSupported, type Rechecker } from "./recheck";
+import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
 import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
 import { deriveIssueState } from "./derive";
-import { rehydrate } from "./rehydrate";
-import { runGates, type GateRunner } from "./gates";
-import { runProof, type ProofGit, type ProofResult } from "./proof";
-import { touchesProtectedPath } from "./boundary";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
-import type { GhComment, GhIssue, GitHub } from "./github";
-import type { Git } from "./git";
-import { ensureSetup, ShellSetupRunner, type SetupRunner } from "./setup";
-import { FactoryState, type RetroTrigger, type Stage } from "./state";
-import { LABEL, issueType, typesFor } from "./labels";
-import { effectiveSlots, type MachineConfig, type MachineLeases, type MachineSpend } from "./machine";
+import type { GhComment, GhIssue } from "./github";
+import { LABEL } from "./labels";
+import { effectiveSlots } from "./machine";
+import { stepByLabel, type Workflow } from "./core/workflow";
+import {
+  ensureWorktreeReady,
+  finish,
+  labelsOf,
+  postComment,
+  runQueuedRetros,
+  runRetro,
+  startOfTodayUtc,
+  worktreeFor,
+  type Outcome,
+  type RunCtx,
+  type WatchDeps,
+} from "./engine/common";
+import { parkEdgeOf, runWorkflow } from "./engine/runner";
+import { STEP_TYPES } from "./engine/steps";
+import { defaultWorkflow } from "./engine/workflows";
 
-export type { Stage };
-export type Outcome =
-  | "needs-info"
-  | "awaiting-approval"
-  | "needs-human"
-  | "failed"
-  | "shipped"
-  | "cancelled"
-  | "lost-claim"
-  | "waiting";
+export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
-const STAGE_LABEL: Record<Stage, string> = {
-  triage: LABEL.triaging,
-  plan: LABEL.planning,
-  build: LABEL.building,
-  verify: LABEL.verifying,
-  pr: LABEL.inReview,
-};
-
-const MAX_VERIFY_REJECTS = 2;
-const MAX_QUESTION_ROUNDS = 2;
-const RUNNING_LABELS = [LABEL.triaging, LABEL.planning, LABEL.building, LABEL.verifying] as const;
-
-export interface WatchDeps {
-  readonly github: GitHub;
-  readonly git: Git;
-  readonly state: FactoryState;
-  readonly executor: Executor;
-  readonly gateRunner: GateRunner;
-  readonly holdoutRunner: HoldoutRunner;
-  // A tool-free second look at must/should findings; absent means findings stand as written.
-  readonly rechecker?: Rechecker;
-  // Runs the proof:test revert check before verify and writes proof.json; absent means verify does it by hand.
-  readonly proofGit?: ProofGit;
-  readonly cloneDir: string;
-  readonly workspacesDir: string;
-  // Runs config.setup once per worktree; defaults to a real shell so tests
-  // can inject a fake instead of actually running `npm ci`.
-  readonly setupRunner?: SetupRunner;
-  // Absent means this process alone decides concurrency (config.concurrency,
-  // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
-  // a machine-wide lease, so a second watcher (another repo, same
-  // FACTORY_HOME) sharing this machine's slots is respected too (plan
-  // v2.7.0 item 5).
-  readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
-  // Where a stage streams its transcript and its pid/session (`factory takeover`). Absent: neither is written.
-  readonly runFiles?: { transcript(issue: number): string; live(issue: number): string };
-  // A live window per issue (tmux). Only a viewer: a failure here never fails a stage.
-  readonly view?: IssueView;
-}
-
-// Thrown by runStage when an operator stopped the agent to take it over;
-// runFromStage parks the issue instead of counting a failure.
-class OperatorTakeover extends Error {
-  constructor(readonly stage: Stage) {
-    super(`operator takeover during ${stage}`);
-  }
-}
 
 export interface PollResult {
   readonly paused: boolean;
@@ -116,687 +49,16 @@ export interface PollResult {
   readonly processed: number[];
 }
 
-function worktreeFor(deps: WatchDeps, issue: number): string {
-  return `${deps.workspacesDir}/issue-${issue}`;
+function workflowOf(deps: WatchDeps): Workflow {
+  return deps.workflow ?? defaultWorkflow();
 }
 
-function labelsOf(issue: Pick<GhIssue, "labels">): string[] {
-  return issue.labels.map((l) => l.name);
+function labelOf(deps: WatchDeps, stepId: string): string {
+  return workflowOf(deps).steps[stepId]!.label;
 }
 
-// Every label transition names its own "from" — always the label the caller
-// just set (the loop's own `stage` variable, or the specific parked label a
-// resume function is leaving) — rather than guessing at the issue's current
-// label list, which is what let a restarted process reconstruct the wrong
-// state (audit finding #21).
-async function moveLabel(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, to: string): Promise<void> {
-  await deps.github.setStateLabel(config.repo, issueNumber, [from], to);
-}
-
-// The one place every resume path prepares a worktree: creates it if needed,
-// then primes it with config.setup (idempotent). A setup failure parks the
-// issue with the command output attached instead of handing a stage a
-// worktree with no dependencies installed (plan v2.6.2 item 4).
-async function ensureWorktreeReady(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issueNumber: number,
-  worktree: string,
-  fromLabel: string,
-): Promise<boolean> {
-  await deps.git.ensureWorktree(deps.cloneDir, worktree, issueNumber);
-  // Every resume path funnels through here, so this is the one place that has
-  // to hide holdout paths for triage, plan, build, verify and pr alike.
-  if (holdoutEnabled(config.holdout)) await deps.git.excludeFromSparseCheckout(worktree, config.holdout.paths);
-  const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
-  if (result.ok) return true;
-  await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
-  await postComment(deps, config, issueNumber, `Setup failed in the worktree, so this parked instead of starting a stage:\n\n\`\`\`\n${result.log.slice(-4000)}\n\`\`\``);
-  finish(deps, config, issueNumber, "needs-human", "setup failed");
-  return false;
-}
-
-function withDataMarker(body: string, stage: string, json: unknown): string {
-  return `${body}\n\n<!-- factory:data ${JSON.stringify({ stage, json })} -->`;
-}
-
-async function postComment(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issueNumber: number,
-  body: string,
-  dataTag?: { stage: string; json: unknown },
-): Promise<void> {
-  if (!body.trim()) return;
-  // No marker means it would read as an OWNER-authored human comment.
-  const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body.includes("<!-- factory:") ? body : `${body}\n\n<!-- factory:notice -->`;
-  await deps.github.commentIssue(config.repo, issueNumber, full);
-}
-
-// Drop the must/should findings the diff does not support. A reject that loses
-// every blocking finding becomes uncertain (a human looks), never a silent pass.
-async function recheckFindings(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  worktree: string,
-  verdict: VerdictArtifact,
-): Promise<{ verdict: VerdictArtifact; note: string }> {
-  const checked = verdict.findings.filter(isChecked);
-  const supported = await deps.rechecker!.supported(checked, await deps.git.diff(worktree, config.base));
-  if (supported === undefined) return { verdict, note: "" };
-  const { kept, dropped } = keepSupported(verdict.findings, supported);
-  if (dropped.length === 0) return { verdict, note: "" };
-  const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
-  const list = dropped.map((f) => `- ${f.what}`).join("\n");
-  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}` };
-}
-
-// Build's status-comment.md is the one comment the runner keeps and edits in
-// place. Its id comes from SQLite when this process ran the earlier rounds,
-// or — for a resumed/restarted run — from the thread itself, so a restart
-// never posts a duplicate status comment (audit finding #21).
-async function upsertStatusComment(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issue: GhIssue,
-  body: string,
-  json?: unknown,
-): Promise<void> {
-  if (!body.trim()) return;
-  const full = json !== undefined ? withDataMarker(body, "build", json) : body;
-  const run = deps.state.getRun(config.repo, issue.number);
-  const existingId = run?.status_comment_id ?? deriveIssueState(issue).statusCommentId;
-  if (existingId) {
-    await deps.github.editComment(config.repo, existingId, full);
-    deps.state.updateRun(config.repo, issue.number, { status_comment_id: existingId });
-    return;
-  }
-  const id = await deps.github.commentIssue(config.repo, issue.number, full);
-  if (id !== undefined) deps.state.updateRun(config.repo, issue.number, { status_comment_id: id });
-}
-
-function finish(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issueNumber: number,
-  status: "needs-info" | "awaiting-approval" | "needs-human" | "failed" | "shipped" | "cancelled",
-  reason?: string,
-): void {
-  deps.state.updateRun(config.repo, issueNumber, { status, reason: reason ?? null });
-  // Parked issues keep their window, so the operator can still read it.
-  if (deps.view && (status === "shipped" || status === "cancelled" || status === "failed")) {
-    deps.view.close(issueNumber).catch((e) => console.error(`[tmux] close #${issueNumber}: ${e}`));
-  }
-}
-
-// Skills never call `gh` (only the runner talks to GitHub), so the current
-// issue thread is handed to them as a file: they read it instead of fetching
-// it themselves. Written fresh before every stage so a resumed stage sees any
-// new trusted reply.
-async function writeIssueSnapshot(worktree: string, issue: GhIssue): Promise<void> {
-  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
-}
-
-// Why a stage produced nothing: a kill, then a refused tool call (named, so a
-// permission gap reads as one), then anything `claude` printed to stderr.
-function stageFailure(result: StageRunResult, fallback: string): string;
-function stageFailure(result: StageRunResult): string | undefined;
-function stageFailure(result: StageRunResult, fallback?: string): string | undefined {
-  const denied = result.permissionDenials.length ? `permission denied: ${result.permissionDenials.join("; ")}` : undefined;
-  return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
-}
-
-// The agent's own cost wins; otherwise price the tokens. No price means the
-// cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
-function priceResult(result: StageRunResult): { cached: number; costUsd: number | null; usageComplete: boolean } {
-  const cached = result.tokensCached ?? 0;
-  const priced =
-    result.costReported === false
-      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
-      : result.costUsd;
-  const usageComplete = result.usageComplete !== false && priced !== undefined;
-  const costUsd = usageComplete ? (priced ?? null) : null;
-  return { cached, costUsd, usageComplete };
-}
-
-async function runStage(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issue: GhIssue,
-  stage: StageName,
-  worktree: string,
-): Promise<StageRunResult> {
-  const issueNumber = issue.number;
-  // rehydrate before clearing: rehydrate only ever repopulates *earlier*
-  // stages' artifacts from the thread, never this stage's own output, so the
-  // order only matters for readability, not correctness — but clearing after
-  // guarantees this stage never starts with a stale copy of its own last
-  // attempt (audit finding #9).
-  await rehydrate(worktree, issue);
-  await writeIssueSnapshot(worktree, issue);
-  await clearStageArtifacts(worktree, issueNumber, stage);
-
-  deps.state.upsertRun({ issue: issueNumber, repo: config.repo, title: issue.title, stage: stage as Stage, status: "running" });
-  const run = deps.state.getRun(config.repo, issueNumber)!;
-  const files = await stageFiles(deps, issueNumber);
-  const startedAt = new Date();
-  const result = await deps.executor.runStage({
-    stage,
-    issue: issueNumber,
-    cwd: worktree,
-    maxBudgetUsd: config.maxBudgetUsd[stage],
-    timeoutMinutes: config.stageTimeoutMinutes,
-    maxToolCalls: config.maxToolCalls,
-    agentCommands: config.agentCommands,
-    type: issueType(config.routes, labelsOf(issue)),
-    ...files,
-  });
-  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
-  const finishedAt = new Date();
-  const { cached, costUsd, usageComplete } = priceResult(result);
-  deps.state.recordStageRun({
-    repo: config.repo,
-    issue: issueNumber,
-    stage: stage as Stage,
-    agent: result.agent ?? "claude", // ReplayExecutor reports none
-    model: result.model ?? null,
-    started_at: startedAt.toISOString(),
-    finished_at: finishedAt.toISOString(),
-    duration_ms: finishedAt.getTime() - startedAt.getTime(),
-    tool_calls: result.toolCalls,
-    tokens_in: result.tokensIn,
-    tokens_out: result.tokensOut,
-    tokens_cached: cached,
-    cost_usd: costUsd,
-    usage_complete: usageComplete ? 1 : 0,
-    exit_code: result.exitCode,
-    killed_reason: result.killedReason ?? null,
-    session_id: result.sessionId ?? null,
-  });
-  if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
-  deps.state.updateRun(config.repo, issueNumber, {
-    tool_calls: run.tool_calls + result.toolCalls,
-    tokens_in: run.tokens_in + result.tokensIn,
-    tokens_out: run.tokens_out + result.tokensOut,
-    cost_usd: run.cost_usd + (costUsd ?? 0),
-  });
-  if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
-  return result;
-}
-
-// The transcript and live-file paths for a stage, and the issue's window
-// opened on the transcript. Both are optional; a view error is only logged.
-async function stageFiles(deps: WatchDeps, issueNumber: number): Promise<{ transcriptFile?: string; liveFile?: string }> {
-  if (!deps.runFiles) return {};
-  const transcriptFile = deps.runFiles.transcript(issueNumber);
-  if (deps.view) {
-    await deps.view.show(issueNumber, transcriptFile).catch((e) => console.error(`[tmux] show #${issueNumber}: ${e}`));
-  }
-  return { transcriptFile, liveFile: deps.runFiles.live(issueNumber) };
-}
-
-// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
-// rejected, or given up on after verify rejections). Never goes through
-// runStage: that wrapper's upsertRun would put an already-terminal run back
-// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary
-// sums stage_runs, not runs, so the spend caps still see it via recordStageRun).
-// `existingId` is set only when a row was queued earlier (the dashboard's
-// operator-merge route, which has no Executor to run this itself) and is now
-// being drained by runQueuedRetros; the three watch.ts triggers queue and run
-// in the same call.
-async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, outcome: RetroTrigger, existingId?: number): Promise<void> {
-  const id = existingId ?? deps.state.queueRetro(config.repo, issue.number, outcome);
-  const issueNumber = issue.number;
-  const worktree = worktreeFor(deps, issueNumber);
-  try {
-    await rehydrate(worktree, issue);
-    await writeIssueSnapshot(worktree, issue);
-    await clearStageArtifacts(worktree, issueNumber, "retro");
-    const startedAt = new Date();
-    const result = await deps.executor.runStage({
-      stage: "retro",
-      issue: issueNumber,
-      cwd: worktree,
-      maxBudgetUsd: config.maxBudgetUsd.retro,
-      timeoutMinutes: config.stageTimeoutMinutes,
-      maxToolCalls: config.maxToolCalls,
-      agentCommands: config.agentCommands,
-      ...(deps.runFiles ? { transcriptFile: deps.runFiles.transcript(issueNumber), liveFile: deps.runFiles.live(issueNumber) } : {}),
-    });
-    const finishedAt = new Date();
-    const { cached, costUsd, usageComplete } = priceResult(result);
-    deps.state.recordStageRun({
-      repo: config.repo,
-      issue: issueNumber,
-      stage: "retro" as Stage,
-      agent: result.agent ?? "claude",
-      model: result.model ?? null,
-      started_at: startedAt.toISOString(),
-      finished_at: finishedAt.toISOString(),
-      duration_ms: finishedAt.getTime() - startedAt.getTime(),
-      tool_calls: result.toolCalls,
-      tokens_in: result.tokensIn,
-      tokens_out: result.tokensOut,
-      tokens_cached: cached,
-      cost_usd: costUsd,
-      usage_complete: usageComplete ? 1 : 0,
-      exit_code: result.exitCode,
-      killed_reason: result.killedReason ?? null,
-      session_id: result.sessionId ?? null,
-    });
-    if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
-    const art = await readStageArtifacts(worktree, issueNumber, "retro");
-    deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
-  } catch (err) {
-    console.error(`retro failed for #${issue.number}:`, err);
-    deps.state.completeRetro(id, undefined, "failed");
-  }
-}
-
-// Drains rows the dashboard's operator-merge route queued but could not run
-// itself. Called once per pollOnce tick.
-async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): Promise<void> {
-  for (const row of deps.state.listQueuedRetros(config.repo)) {
-    try {
-      const issue = await deps.github.getIssue(config.repo, row.issue);
-      await runRetro(deps, config, issue, row.outcome, row.id);
-    } catch (err) {
-      console.error(`queued retro failed for #${row.issue}:`, err);
-      deps.state.completeRetro(row.id, undefined, "failed");
-    }
-  }
-}
-
-// A stage's JSON, or why it cannot be used: an unknown field is refused, and
-// an `outcome` of blocked or failed stops the run where the agent said it did.
-type StepStage = "triage" | "plan" | "build";
-function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown, types?: readonly string[]): { json?: T; problem?: string } {
-  if (raw === undefined) return {};
-  const checked = validateStepJson(stage, raw, types);
-  return checked.ok ? { json: raw as T } : { problem: checked.reason };
-}
-
-async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, stop: { status: "needs-human" | "failed"; reason: string }): Promise<Outcome> {
-  await moveLabel(deps, config, issueNumber, from, stop.status === "failed" ? LABEL.failed : LABEL.needsHuman);
-  finish(deps, config, issueNumber, stop.status, stop.reason);
-  return stop.status;
-}
-
-interface RunCtx {
-  rejectRound: number;
-  questionRound: number;
-}
-
-const EPOCH = "1970-01-01T00:00:00.000Z";
-
-function startOfTodayUtc(): string {
-  return `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
-}
-
-// Checked before every stage (plan v2.7.0 item 7): an issue's own lifetime
-// spend and unreported-run count, this repo's spend today, and — when a
-// machine is configured — the whole machine's spend today. The first
-// breached cap wins and its message is what parks the issue.
-function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): string | undefined {
-  const { perIssueUsd, dailyUsd, maxUnreportedRuns } = config.spend;
-  const perIssue = deps.state.spendSummary(config.repo, EPOCH, issueNumber);
-  if (perIssueUsd !== undefined && perIssue.costUsd >= perIssueUsd) {
-    return `this issue has spent $${perIssue.costUsd.toFixed(2)}, at or over its perIssueUsd cap of $${perIssueUsd.toFixed(2)}`;
-  }
-  if (maxUnreportedRuns !== undefined && perIssue.unreportedRuns >= maxUnreportedRuns) {
-    return `this issue has ${perIssue.unreportedRuns} stage run(s) with unknown cost, at or over the maxUnreportedRuns cap of ${maxUnreportedRuns}`;
-  }
-  const repoToday = deps.state.spendSummary(config.repo, startOfTodayUtc());
-  if (dailyUsd !== undefined && repoToday.costUsd >= dailyUsd) {
-    return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
-  }
-  const machineDailyUsd = deps.machine?.config.dailyUsd;
-  if (machineDailyUsd !== undefined) {
-    const machineToday = deps.machine!.spend.todayUsd();
-    if (machineToday >= machineDailyUsd) {
-      return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
-    }
-  }
-  return undefined;
-}
-
-// The heart of the loop: drives one issue forward from `startStage` until it
-// hits a stopping point (needs-info, awaiting-approval, needs-human, failed,
-// shipped). Called for a fresh factory:ready pickup, a resume, or a retry —
-// `ctx` carries the round counts recovered by deriveIssueState so a resumed
-// run doesn't reset the needs-info/reject caps to zero.
-async function runFromStage(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issue: GhIssue,
-  startStage: Stage,
-  worktree: string,
-  ctx: RunCtx = { rejectRound: 0, questionRound: 0 },
-): Promise<Outcome> {
-  try {
-    return await driveFromStage(deps, config, issue, startStage, worktree, ctx);
-  } catch (e) {
-    if (!(e instanceof OperatorTakeover)) throw e;
-    // Not a failure and not a retry: the operator owns the session now, and
-    // `/factory retry` (or `factory takeover`'s hand-back) re-enters this stage.
-    await moveLabel(deps, config, issue.number, STAGE_LABEL[e.stage], LABEL.needsHuman);
-    await postComment(
-      deps,
-      config,
-      issue.number,
-      `Taken over by an operator during ${e.stage}. Comment \`/factory retry\` to hand it back; the factory resumes at ${e.stage} with whatever is in the worktree.`,
-      { stage: "takeover", json: { stage: e.stage } },
-    );
-    finish(deps, config, issue.number, "needs-human", OPERATOR_TAKEOVER);
-    return "needs-human";
-  }
-}
-
-async function driveFromStage(
-  deps: WatchDeps,
-  config: FactoryConfig,
-  issue: GhIssue,
-  startStage: Stage,
-  worktree: string,
-  ctx: RunCtx,
-): Promise<Outcome> {
-  const issueNumber = issue.number;
-  let stage: Stage = startStage;
-
-  for (;;) {
-    const overBudget = checkSpendCap(deps, config, issueNumber);
-    if (overBudget) {
-      await postComment(deps, config, issueNumber, `Parked: ${overBudget}.`, { stage: "budget", json: { reason: overBudget } });
-      return stopStep(deps, config, issueNumber, STAGE_LABEL[stage], { status: "needs-human", reason: overBudget });
-    }
-
-    if (stage === "triage") {
-      // Someone else's open PR already closes this issue: don't spend tokens on a second fix.
-      const own = deps.git.branchName(issueNumber);
-      const taken = await deps.github.prForIssue(config.repo, issueNumber, { excludeHead: own });
-      if (taken) {
-        await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
-        finish(deps, config, issueNumber, "needs-human", `open PR #${taken.number} already closes this issue`);
-        return "needs-human";
-      }
-      const result = await runStage(deps, config, issue, "triage", worktree);
-      const art = await readStageArtifacts(worktree, issueNumber, "triage");
-      const { json, problem } = stageJson<TriageArtifact>("triage", art.json, typesFor(config.routes));
-      if (result.exitCode !== 0 || !json) {
-        await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "triage produced no valid triage.json"));
-        return "failed";
-      }
-      const triageStop = stepStop(json);
-      if (triageStop) return stopStep(deps, config, issueNumber, LABEL.triaging, triageStop);
-      if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "triage", json });
-      if (json.disposition === "refused" || json.disposition === "duplicate") {
-        await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
-        finish(deps, config, issueNumber, "needs-human", json.disposition);
-        return "needs-human";
-      }
-      if (json.disposition === "needs-info") {
-        if (ctx.questionRound >= MAX_QUESTION_ROUNDS) {
-          await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsHuman);
-          finish(deps, config, issueNumber, "needs-human", `unresolved after ${ctx.questionRound} rounds of questions`);
-          return "needs-human";
-        }
-        ctx.questionRound += 1;
-        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "triage" } });
-        await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.needsInfo);
-        finish(deps, config, issueNumber, "needs-info");
-        return "needs-info";
-      }
-      await moveLabel(deps, config, issueNumber, LABEL.triaging, LABEL.planning);
-      stage = "plan";
-      continue;
-    }
-
-    if (stage === "plan") {
-      const result = await runStage(deps, config, issue, "plan", worktree);
-      const art = await readStageArtifacts(worktree, issueNumber, "plan");
-      const { json, problem } = stageJson<PlanArtifact>("plan", art.json);
-      // A plan stage that crashes (or writes nothing) used to fall through
-      // to "not eligible" and park as awaiting-approval with no plan comment
-      // to approve against — stuck forever (audit finding #10).
-      if (result.exitCode !== 0 || !json) {
-        await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.failed);
-        finish(deps, config, issueNumber, "failed", problem ?? stageFailure(result, "plan produced no valid plan.json"));
-        return "failed";
-      }
-      const planStop = stepStop(json);
-      if (planStop) return stopStep(deps, config, issueNumber, LABEL.planning, planStop);
-      if (json.status === "needs-info") {
-        if (ctx.questionRound >= MAX_QUESTION_ROUNDS) {
-          await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.needsHuman);
-          finish(deps, config, issueNumber, "needs-human", `unresolved after ${ctx.questionRound} rounds of questions`);
-          return "needs-human";
-        }
-        ctx.questionRound += 1;
-        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "plan" } });
-        await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.needsInfo);
-        finish(deps, config, issueNumber, "needs-info");
-        return "needs-info";
-      }
-      if (art.comment) await postComment(deps, config, issueNumber, art.comment, { stage: "plan", json });
-      const autoApproveToggle = deps.state.getToggle("auto_approve_low_risk", config.riskPolicy.autoApproveLowRisk);
-      const eligible = json.risk === "low" && json.autoApproveEligible && autoApproveToggle;
-      if (!eligible) {
-        await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.awaitingApproval);
-        finish(deps, config, issueNumber, "awaiting-approval");
-        return "awaiting-approval";
-      }
-      await moveLabel(deps, config, issueNumber, LABEL.planning, LABEL.building);
-      stage = "build";
-      continue;
-    }
-
-    if (stage === "build") {
-      const result = await runStage(deps, config, issue, "build", worktree);
-      const art = await readStageArtifacts(worktree, issueNumber, "build");
-      const built = stageJson<BuildArtifact>("build", art.json);
-      const problem = built.problem;
-      // The runner owns the attempt count: the agent's copy of the file is cleared every round.
-      const json = built.json && { ...built.json, rounds: deps.state.listStageRuns(config.repo, { issue: issueNumber }).filter((r) => r.stage === "build").length };
-      const buildStop = stepStop(json);
-      if (buildStop) return stopStep(deps, config, issueNumber, LABEL.building, buildStop);
-
-      // The agent's own "needs-info" is a legitimate escape hatch (not a
-      // crash), matched to the runner's exact spelling (audit finding #5:
-      // the skill used to say `needs_info`).
-      if (json?.status === "needs-info") {
-        if (ctx.questionRound >= MAX_QUESTION_ROUNDS) {
-          await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsHuman);
-          finish(deps, config, issueNumber, "needs-human", `unresolved after ${ctx.questionRound} rounds of questions`);
-          return "needs-human";
-        }
-        ctx.questionRound += 1;
-        if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, json);
-        if (art.question) await postComment(deps, config, issueNumber, art.question, { stage: "question", json: { round: ctx.questionRound, stage: "build" } });
-        await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsInfo);
-        finish(deps, config, issueNumber, "needs-info");
-        return "needs-info";
-      }
-
-      // The runner grades the build, not the agent (audit finding #11): run
-      // the target's own gates.sh here and trust only its FACTORY_GATES line.
-      const gate = await runGates(deps.gateRunner, worktree);
-      if (art.comment) await upsertStatusComment(deps, config, issue, art.comment, { build: json ?? null, gate });
-
-      if (result.exitCode !== 0 || !json || gate.status !== "GREEN") {
-        await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.failed);
-        deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
-        const reason =
-          problem ?? stageFailure(result) ??
-          `gates ${gate.status.toLowerCase()}${gate.failedGates.length ? `: ${gate.failedGates.join(", ")}` : ""}`;
-        finish(deps, config, issueNumber, "failed", reason);
-        return "failed";
-      }
-
-      // The runner commits — the build skill's own instructions say so, but
-      // nothing enforced it before (audit finding #4). `.factory/runs/` is
-      // excluded; it's the stage handoff, never meant to land in the repo.
-      await deps.git.commitAll(worktree, `factory: build #${issueNumber}`);
-
-      // Defense in depth behind the guard hook: a Bash-made edit to a
-      // protected path never reaches Edit/Write, so the hook never sees it
-      // (audit finding #12). Diff the branch itself before pushing anything.
-      const changed = await deps.git.changedFiles(worktree, config.base);
-      // `.factory/**` is already unconditionally protected below (ALWAYS_PROTECTED_PATHS),
-      // covering the default holdout location; this adds any holdout path a
-      // repo configured outside it.
-      const protectedPaths = holdoutEnabled(config.holdout) ? [...config.protectedPaths, ...config.holdout.paths] : config.protectedPaths;
-      const hits = touchesProtectedPath(changed, protectedPaths);
-      if (hits.length) {
-        await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.needsHuman);
-        finish(deps, config, issueNumber, "needs-human", `touched protected path(s): ${hits.join(", ")}`);
-        return "needs-human";
-      }
-
-      deps.state.updateRun(config.repo, issueNumber, { gate_line: gate.raw });
-      await writeGateEvidence(worktree, issueNumber, { line: gate.raw, status: gate.status, tree: await deps.git.treeHash(worktree) });
-      await deps.git.push(worktree, issueNumber);
-      await moveLabel(deps, config, issueNumber, LABEL.building, LABEL.verifying);
-      stage = "verify";
-      continue;
-    }
-
-    if (stage === "verify") {
-      // A verdict is only as good as its evidence: gate.json must describe
-      // the tree being verified, so a resumed or amended run re-measures it.
-      const tree = await deps.git.treeHash(worktree);
-      const seen = await readGateEvidence(worktree, issueNumber);
-      if (seen?.tree !== tree) {
-        const fresh = await runGates(deps.gateRunner, worktree);
-        deps.state.updateRun(config.repo, issueNumber, { gate_line: fresh.raw });
-        await writeGateEvidence(worktree, issueNumber, { line: fresh.raw, status: fresh.status, tree });
-        // Red evidence is a build problem, not something for the verifier to judge.
-        if (fresh.status !== "GREEN") {
-          ctx.rejectRound += 1;
-          const capped = ctx.rejectRound > MAX_VERIFY_REJECTS;
-          await moveLabel(deps, config, issueNumber, LABEL.verifying, capped ? LABEL.failed : LABEL.building);
-          if (capped) {
-            finish(deps, config, issueNumber, "failed", `gates ${fresh.status.toLowerCase()} before verify, ${ctx.rejectRound} times`);
-            return "failed";
-          }
-          stage = "build";
-          continue;
-        }
-      }
-      // Also a build problem, not something for the verifier to judge: a
-      // holdout test the build never saw is the one check its own gates.sh
-      // cannot have been tuned to pass. Unlike the gates recheck above, this
-      // runs on every entry to verify, not only a stale one — a fresh build
-      // flowing straight into verify in the same tick is the common case,
-      // and gate.json (written by the build, which never saw these paths)
-      // cannot possibly already cover them.
-      if (holdoutEnabled(config.holdout)) {
-        const holdout = await runHoldout(deps.holdoutRunner, worktree, config.base, config.holdout);
-        if (!holdout.ok) {
-          ctx.rejectRound += 1;
-          await postComment(deps, config, issueNumber, `Holdout tests failed:\n\n\`\`\`\n${holdout.detail}\n\`\`\``, { stage: "verify", json: { holdout: holdout.detail } });
-          if (ctx.rejectRound > MAX_VERIFY_REJECTS) {
-            await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
-            await runRetro(deps, config, issue, "gave-up");
-            finish(deps, config, issueNumber, "needs-human", `holdout tests failed ${ctx.rejectRound} times`);
-            return "needs-human";
-          }
-          await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.building);
-          stage = "build";
-          continue;
-        }
-      }
-      if (deps.proofGit) {
-        const plan = (await readStageArtifacts(worktree, issueNumber, "plan")).json as { proof?: "test" | "check" } | undefined;
-        const testCmd = config.gates.find((g) => g.name === "test")?.cmd;
-        let proof: ProofResult;
-        try {
-          proof = await runProof(deps.proofGit, worktree, config.base, plan?.proof, testCmd);
-        } catch (err) {
-          proof = { status: "skipped", reverted: [], tests: [], cmd: testCmd ?? "", tail: `the runner could not run the proof: ${(err as Error).message}` };
-        }
-        await Bun.write(`${worktree}/${runDir(issueNumber)}/proof.json`, `${JSON.stringify(proof, null, 2)}\n`);
-      }
-      const result = await runStage(deps, config, issue, "verify", worktree);
-      const art = await readStageArtifacts(worktree, issueNumber, "verify");
-      const checked = art.json === undefined ? undefined : validateVerdict(art.json);
-      let json = checked?.ok ? { ...checked.verdict, rounds: ctx.rejectRound + 1 } : undefined;
-      let recheckNote = "";
-      if (json && deps.rechecker && json.findings.some(isChecked)) {
-        const rechecked = await recheckFindings(deps, config, worktree, json);
-        json = rechecked.verdict;
-        recheckNote = rechecked.note;
-      }
-      if (json) deps.state.setVerifyVerdict(config.repo, issueNumber, json.result);
-      if (checked && !checked.ok) {
-        await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
-        finish(deps, config, issueNumber, "needs-human", checked.reason);
-        return "needs-human";
-      }
-      const verifyStop = stepStop(json);
-      if (verifyStop) return stopStep(deps, config, issueNumber, LABEL.verifying, verifyStop);
-      if (result.exitCode !== 0 || !json || json.result === "uncertain") {
-        // The human needs the verdict to act on, and the post is the marker that retires the retry that led here.
-        if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
-        await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
-        finish(
-          deps,
-          config,
-          issueNumber,
-          "needs-human",
-          stageFailure(result, json ? "verify uncertain" : "verify produced no valid verdict.json"),
-        );
-        return "needs-human";
-      }
-      if (art.comment) await postComment(deps, config, issueNumber, `${art.comment}${recheckNote}`, { stage: "verify", json });
-      if (json.result === "reject") {
-        ctx.rejectRound += 1;
-        if (ctx.rejectRound > MAX_VERIFY_REJECTS) {
-          await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.needsHuman);
-          await runRetro(deps, config, issue, "gave-up");
-          finish(deps, config, issueNumber, "needs-human", `rejected ${ctx.rejectRound} times`);
-          return "needs-human";
-        }
-        await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.building);
-        stage = "build";
-        continue;
-      }
-      await moveLabel(deps, config, issueNumber, LABEL.verifying, LABEL.inReview);
-      stage = "pr";
-      continue;
-    }
-
-    // stage === "pr"
-    await runStage(deps, config, issue, "pr", worktree);
-    const art = await readStageArtifacts(worktree, issueNumber, "pr");
-    // A revise from in-review re-enters here with the PR already open;
-    // the push in build already updated its branch.
-    const head = deps.git.branchName(issueNumber);
-    const existing = await deps.github.findPrByHead(config.repo, head);
-    const prUrl =
-      existing?.url ??
-      (await deps.github.createPr({
-        repo: config.repo,
-        base: config.base,
-        head,
-        title: `${issue.title} (#${issueNumber})`,
-        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx),
-        draft: true,
-      }));
-    // Opened as a draft while the factory works; ready is the hand-off to a human.
-    await deps.github.markReady(config.repo, head, true);
-    deps.state.updateRun(config.repo, issueNumber, { pr_url: prUrl });
-    finish(deps, config, issueNumber, "shipped");
-    return "shipped";
-  }
-}
-
-// The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
-function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx): string {
-  if (!config.prRunSummary) return body;
-  const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
-  const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;
-  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries })}`;
+function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, stepId: string, worktree: string, ctx?: RunCtx): Promise<Outcome> {
+  return runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx);
 }
 
 export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config: FactoryConfig): Promise<Outcome> {
@@ -819,8 +81,9 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   }
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], LABEL.triaging);
-  return runFromStage(deps, config, issue, "triage", worktree);
+  const start = workflowOf(deps).start;
+  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], labelOf(deps, start));
+  return runFromStage(deps, config, issue, start, worktree);
 }
 
 // `/factory cancel` in any waiting state: drop the lifecycle labels, close the
@@ -848,8 +111,8 @@ function findPlanComment(issue: GhIssue): GhComment | undefined {
   return [...issue.comments].reverse().find((c) => c.body.includes("<!-- factory:plan v1"));
 }
 
-function ctxFrom(issue: GhIssue): RunCtx {
-  const derived = deriveIssueState(issue);
+function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
+  const derived = deriveIssueState(issue, workflowOf(deps));
   return { rejectRound: derived.rejectRounds, questionRound: derived.questionRounds };
 }
 
@@ -864,12 +127,12 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   if (!reply) return "waiting";
   if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
-  const derived = deriveIssueState(issue);
+  const derived = deriveIssueState(issue, workflowOf(deps));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
   await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], STAGE_LABEL[derived.resumeStage]);
-  return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(issue));
+  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], labelOf(deps, derived.resumeStage));
+  return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(deps, issue));
 }
 
 // `/factory approve|revise|retry|cancel` on a plan awaiting approval (plan
@@ -883,23 +146,18 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
   const command = parseChatOps(reply.body);
   const worktree = worktreeFor(deps, issue.number);
 
-  if (command.type === "approve") {
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.building);
-    return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
-  }
-  if (command.type === "revise") {
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
-    await writeRevision(worktree, issue, reply, command.text);
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
-    return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
-  }
   if (command.type === "cancel") return cancelRun(issue, deps, config);
-  if (command.type === "retry") {
+  // The step that parked here names where approve and revise go.
+  const edge = parkEdgeOf(workflowOf(deps), deriveIssueState(issue, workflowOf(deps)).resumeStage);
+  if (!edge) return "waiting";
+  const resumeAt = async (stepId: string): Promise<Outcome> => {
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], LABEL.planning);
-    return runFromStage(deps, config, issue, "plan", worktree, ctxFrom(issue));
-  }
+    if (command.type === "revise") await writeRevision(worktree, issue, reply, command.text);
+    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, stepId));
+    return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
+  };
+  if (command.type === "approve") return resumeAt(edge.approve);
+  if (command.type === "revise" || command.type === "retry") return resumeAt(edge.revise);
   // A plain reply that is not a command: nothing to do yet.
   return "waiting";
 }
@@ -920,11 +178,11 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
 
-  const derived = deriveIssueState(issue);
+  const derived = deriveIssueState(issue, workflowOf(deps));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
   await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`);
-  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], STAGE_LABEL[derived.resumeStage]);
+  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, derived.resumeStage));
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
     rejectRound: derived.rejectRounds,
     questionRound: 0, // a human asked for a retry; give it a fresh round of questions if needed
@@ -986,14 +244,15 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   if (latest) {
     const command = parseChatOps(latest.body);
     if (command.type === "cancel") return cancelRun(issue, deps, config);
-    if (command.type === "revise") {
+    const reviseTo = stepByLabel(workflowOf(deps), LABEL.inReview)?.revise;
+    if (command.type === "revise" && reviseTo) {
       const worktree = worktreeFor(deps, issue.number);
       if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.inReview))) return "needs-human";
       await writeRevision(worktree, issue, latest, command.text);
       const head = deps.git.branchName(issue.number);
       if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
-      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], LABEL.building);
-      return runFromStage(deps, config, issue, "build", worktree, ctxFrom(issue));
+      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], labelOf(deps, reviseTo));
+      return runFromStage(deps, config, issue, reviseTo, worktree, ctxFrom(deps, issue));
     }
   }
   // A human command always wins over auto-merge, so this only runs once
@@ -1120,12 +379,16 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
 // labels are ones pollOnce's resume functions look for (audit finding #21).
 // Call once, before the first poll.
 export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): Promise<number[]> {
-  const lists = await Promise.all(RUNNING_LABELS.map((l) => deps.github.listIssuesByLabel(config.repo, l)));
+  // Every label a step holds while it runs; a terminal step's (in-review) is a waiting state.
+  const running = Object.values(workflowOf(deps).steps)
+    .filter((s) => !STEP_TYPES[s.uses]!.terminal)
+    .map((s) => s.label);
+  const lists = await Promise.all(running.map((l) => deps.github.listIssuesByLabel(config.repo, l)));
   const issues = lists.flat();
   await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
-    const derived = deriveIssueState(issue);
+    const derived = deriveIssueState(issue, workflowOf(deps));
     const worktree = worktreeFor(deps, issue.number);
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, STAGE_LABEL[derived.resumeStage]))) return "needs-human";
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, derived.resumeStage)))) return "needs-human";
     return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
       rejectRound: derived.rejectRounds,
       questionRound: derived.questionRounds,

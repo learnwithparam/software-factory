@@ -9,6 +9,12 @@ import { existsSync } from "node:fs";
 import type { CommandRunner } from "./github";
 import { reposDir } from "./paths";
 
+// The GitHub host: github.com, or a GitHub Enterprise Server named by GH_HOST,
+// the variable gh itself reads, so the CLI calls and the clone URLs agree.
+export function githubHost(env: NodeJS.ProcessEnv = process.env): string {
+  return env.GH_HOST?.trim() || "github.com";
+}
+
 export function cloneDirFor(repoSlug: string, env: NodeJS.ProcessEnv = process.env): string {
   return `${reposDir(env)}/${repoSlug.replace("/", "__")}`;
 }
@@ -22,7 +28,7 @@ async function run(runner: CommandRunner, args: string[], cwd?: string): Promise
 export interface EnsureRepoCloneOptions {
   readonly env?: NodeJS.ProcessEnv;
   // Overrides the clone URL; tests point this at a local bare repo instead
-  // of https://github.com/<repoSlug>.git.
+  // of https://<githubHost>/<repoSlug>.git.
   readonly remoteUrl?: string;
 }
 
@@ -33,7 +39,7 @@ export async function ensureRepoClone(
 ): Promise<string> {
   const env = opts.env ?? process.env;
   const dir = cloneDirFor(repoSlug, env);
-  const remoteUrl = opts.remoteUrl ?? `https://github.com/${repoSlug}.git`;
+  const remoteUrl = opts.remoteUrl ?? `https://${githubHost(env)}/${repoSlug}.git`;
 
   if (!existsSync(`${dir}/.git`)) {
     await run(runner, ["clone", remoteUrl, dir]);

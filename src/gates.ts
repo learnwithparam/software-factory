@@ -4,14 +4,10 @@
 // `.factory/gates.sh` directly and parses the one line it's contracted to
 // print: `FACTORY_GATES: status=... passed=N failed=N skipped=N failed_gates=a,b`.
 
-export interface GateResult {
-  readonly status: "GREEN" | "RED" | "MISCONFIGURED";
-  readonly passed: number;
-  readonly failed: number;
-  readonly skipped: number;
-  readonly failedGates: string[];
-  readonly raw: string;
-}
+import type { ExecutionPort } from "./ports/execution";
+import type { GateResult, GateRunner } from "./ports/check";
+import { LocalExecution } from "./adapters/local/execution";
+export type { GateResult, GateRunner };
 
 const LINE_RE = /FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+skipped=(\d+)\s+failed_gates=(\S*)/;
 
@@ -29,19 +25,10 @@ export function parseGateLine(output: string): GateResult | undefined {
   };
 }
 
-export interface GateRunner {
-  run(worktreeDir: string): Promise<{ stdout: string; stderr: string; code: number }>;
-}
-
 export class ShellGateRunner implements GateRunner {
-  async run(worktreeDir: string): Promise<{ stdout: string; stderr: string; code: number }> {
-    const proc = Bun.spawn(["bash", ".factory/gates.sh"], { cwd: worktreeDir, stdout: "pipe", stderr: "pipe" });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { stdout, stderr, code };
+  constructor(private readonly exec: ExecutionPort = new LocalExecution()) {}
+  run(worktreeDir: string) {
+    return this.exec.run("bash .factory/gates.sh", worktreeDir);
   }
 }
 

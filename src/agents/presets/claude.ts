@@ -92,9 +92,12 @@ export function parseStreamJsonLine(line: string): StageEvent[] {
 // no guarantee that repeating the flag concatenates rather than overriding,
 // so this sends one flag with one value rather than risk losing STAGE_GUIDANCE.
 export function claudeArgs(opts: StageRunOptions, contextPack = ""): string[] {
+  const command = `/factory-${opts.stage} ${opts.issue}`;
   return [
     "-p",
-    `/factory-${opts.stage} ${opts.issue}`,
+    opts.resume ? `${command}\n\nThe last attempt was sent back. The tail of why:\n\n${opts.resume.failure}` : command,
+    // A fork keeps the earlier attempt's context but records this one under its own session id.
+    ...(opts.resume ? ["--resume", opts.resume.sessionId, "--fork-session"] : []),
     "--output-format",
     "stream-json",
     "--verbose",

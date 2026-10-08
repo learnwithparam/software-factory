@@ -9,6 +9,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { STAGE_GUIDANCE, stageAllowRules } from "../src/stage-permissions";
+import { defaultWorkflow } from "../src/engine/workflows";
 
 const SKILLS_DIR = join(import.meta.dir, "..", "template", ".claude", "skills");
 
@@ -152,10 +153,12 @@ describe("skills-ref validate (the authority make check calls)", () => {
 // A revise writes revise.md and reruns a stage (src/watch.ts). A stage whose skill never reads it reruns blind:
 // on v2.12.0 a PR's `/factory revise add a curl example` rebuilt with no change.
 describe("every stage a revise reruns reads revise.md", () => {
-  const watch = readFileSync(join(import.meta.dir, "..", "src", "watch.ts"), "utf8");
-  const stages = [...watch.matchAll(/writeRevision\([\s\S]*?runFromStage\([^)]*?"(\w+)"/g)].map((m) => m[1]!);
-  test("watch.ts reruns plan and build on a revise", () => expect([...new Set(stages)].sort()).toEqual(["build", "plan"]));
-  for (const stage of new Set(stages))
+  // A revise lands on a park edge's `revise:` or a step's own `revise:`; that step's skill must read it.
+  const wf = defaultWorkflow();
+  const targets = Object.values(wf.steps).flatMap((s) => [...s.next.flatMap((e) => ("park" in e ? [e.revise] : [])), ...(s.revise ? [s.revise] : [])]);
+  const stages = [...new Set(targets.map((id) => wf.steps[id]!.uses))].sort();
+  test("feature-to-pr reruns plan and build on a revise", () => expect(stages).toEqual(["build", "plan"]));
+  for (const stage of stages)
     test(`factory-${stage}`, () => expect(readFileSync(join(SKILLS_DIR, `factory-${stage}`, "SKILL.md"), "utf8")).toContain("revise.md"));
 });
 

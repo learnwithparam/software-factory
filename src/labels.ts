@@ -130,15 +130,21 @@ export function findLabel(name: string): FactoryLabel | undefined {
   return LABELS.find((l) => l.name === name);
 }
 
+const CUSTOM_STEP_COLOR = "fbca04"; // yellow: a step label from this repo's own workflow
 const CUSTOM_TYPE_COLOR = "c5def5"; // light blue: a type this repo added itself, not one of the five defaults
 
 // LABELS plus one entry per repo-added type (a routes key not already in
 // TYPE_LABELS), so `factory doctor --fix` creates those labels too.
-export function labelsFor(routes: Readonly<Record<string, unknown>> | undefined): readonly FactoryLabel[] {
+// `stepLabels` are a workflow's own step labels; one the factory does not
+// already ship (a custom check step's `factory:linting`) is created too.
+export function labelsFor(routes: Readonly<Record<string, unknown>> | undefined, stepLabels: readonly string[] = []): readonly FactoryLabel[] {
   const extra = Object.keys(routes ?? {})
     .filter((t) => !(TYPE_LABELS as readonly string[]).includes(t))
     .map((name) => ({ name, color: CUSTOM_TYPE_COLOR, description: `Type added by this repo's config.routes`, category: "type" as const }));
-  return [...LABELS, ...extra];
+  const steps = [...new Set(stepLabels)]
+    .filter((name) => !LABELS.some((l) => l.name === name))
+    .map((name) => ({ name, color: CUSTOM_STEP_COLOR, description: "A step of this repo's workflow", category: "state" as const }));
+  return [...LABELS, ...extra, ...steps];
 }
 
 // Labels that mark an issue as "in the loop, not yet parked and not done".

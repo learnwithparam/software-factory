@@ -1,0 +1,437 @@
+// What every step and every resume path shares: the deps, the comment and
+// label helpers, running one agent stage, retro, and the spend caps. Moved
+// verbatim from watch.ts when the pipeline became a workflow (v3.1).
+
+import { holdoutEnabled, type FactoryConfig } from "../config";
+import type { HoldoutRunner } from "../holdout";
+import { TRUNCATION_KIND } from "../event-budget";
+import { costFor } from "../pricing";
+import { OPERATOR_TAKEOVER, type Executor, type StageName, type StageRunOptions, type StageRunResult } from "../executor";
+import { renderRunSummary } from "../run-summary";
+import type { IssueView } from "../tmux";
+import { clearStageArtifacts, validateStepJson, readStageArtifacts, runDir, type RetroArtifact, type VerdictArtifact } from "../artifacts";
+import { hasBlocking, isChecked, keepSupported, type Rechecker } from "../recheck";
+import { isHumanComment, parseChatOps } from "../chatops";
+import { deriveIssueState } from "../derive";
+import { rehydrate } from "../rehydrate";
+import type { GateRunner } from "../gates";
+import type { ProofGit } from "../proof";
+import type { GhIssue } from "../github";
+import type { ScmPort } from "../ports/scm";
+import type { Git } from "../git";
+import type { Workflow } from "../core/workflow";
+import { ensureSetup, ShellSetupRunner, type SetupRunner } from "../setup";
+import { FactoryState, type RetroTrigger, type Stage } from "../state";
+import { LABEL, issueType } from "../labels";
+import type { MachineConfig, MachineLeases, MachineSpend } from "../machine";
+
+export type { Stage };
+export type Outcome =
+  | "needs-info"
+  | "awaiting-approval"
+  | "needs-human"
+  | "failed"
+  | "shipped"
+  | "cancelled"
+  | "lost-claim"
+  | "waiting";
+
+export interface WatchDeps {
+  readonly github: ScmPort;
+  readonly git: Git;
+  readonly state: FactoryState;
+  readonly executor: Executor;
+  readonly gateRunner: GateRunner;
+  readonly holdoutRunner: HoldoutRunner;
+  // A tool-free second look at must/should findings; absent means findings stand as written.
+  readonly rechecker?: Rechecker;
+  // Runs the proof:test revert check before verify and writes proof.json; absent means verify does it by hand.
+  readonly proofGit?: ProofGit;
+  readonly cloneDir: string;
+  readonly workspacesDir: string;
+  // Runs config.setup once per worktree; defaults to a real shell so tests
+  // can inject a fake instead of actually running `npm ci`.
+  readonly setupRunner?: SetupRunner;
+  // Absent means this process alone decides concurrency (config.concurrency,
+  // unchanged pre-v2.7.0 behaviour). Present means every dispatch first takes
+  // a machine-wide lease, so a second watcher (another repo, same
+  // FACTORY_HOME) sharing this machine's slots is respected too (plan
+  // v2.7.0 item 5).
+  readonly machine?: { readonly leases: MachineLeases; readonly config: MachineConfig; readonly spend: MachineSpend };
+  // Where a stage streams its transcript and its pid/session (`factory takeover`). Absent: neither is written.
+  readonly runFiles?: { transcript(issue: number): string; live(issue: number): string };
+  // A live window per issue (tmux). Only a viewer: a failure here never fails a stage.
+  readonly view?: IssueView;
+  // The steps an issue walks; absent means the bundled feature-to-pr.
+  readonly workflow?: Workflow;
+}
+
+// Thrown by runStage when an operator stopped the agent to take it over;
+// runWorkflow parks the issue instead of counting a failure.
+export class OperatorTakeover extends Error {
+  constructor(readonly stage: Stage) {
+    super(`operator takeover during ${stage}`);
+  }
+}
+export function worktreeFor(deps: WatchDeps, issue: number): string {
+  return `${deps.workspacesDir}/issue-${issue}`;
+}
+
+export function labelsOf(issue: Pick<GhIssue, "labels">): string[] {
+  return issue.labels.map((l) => l.name);
+}
+
+// Every label transition names its own "from" — always the label the caller
+// just set (the loop's own `stage` variable, or the specific parked label a
+// resume function is leaving) — rather than guessing at the issue's current
+// label list, which is what let a restarted process reconstruct the wrong
+// state (audit finding #21).
+export async function moveLabel(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, to: string): Promise<void> {
+  await deps.github.setStateLabel(config.repo, issueNumber, [from], to);
+}
+
+// The one place every resume path prepares a worktree: creates it if needed,
+// then primes it with config.setup (idempotent). A setup failure parks the
+// issue with the command output attached instead of handing a stage a
+// worktree with no dependencies installed (plan v2.6.2 item 4).
+export async function ensureWorktreeReady(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  worktree: string,
+  fromLabel: string,
+): Promise<boolean> {
+  await deps.git.ensureWorktree(deps.cloneDir, worktree, issueNumber);
+  // Every resume path funnels through here, so this is the one place that has
+  // to hide holdout paths for triage, plan, build, verify and pr alike.
+  if (holdoutEnabled(config.holdout)) await deps.git.excludeFromSparseCheckout(worktree, config.holdout.paths);
+  const result = await ensureSetup(deps.setupRunner ?? new ShellSetupRunner(), worktree, config.setup);
+  if (result.ok) return true;
+  await moveLabel(deps, config, issueNumber, fromLabel, LABEL.needsHuman);
+  await postComment(deps, config, issueNumber, `Setup failed in the worktree, so this parked instead of starting a stage:\n\n\`\`\`\n${result.log.slice(-4000)}\n\`\`\``);
+  finish(deps, config, issueNumber, "needs-human", "setup failed");
+  return false;
+}
+
+export function withDataMarker(body: string, stage: string, json: unknown): string {
+  return `${body}\n\n<!-- factory:data ${JSON.stringify({ stage, json })} -->`;
+}
+
+export async function postComment(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  body: string,
+  dataTag?: { stage: string; json: unknown },
+): Promise<void> {
+  if (!body.trim()) return;
+  // No marker means it would read as an OWNER-authored human comment.
+  const full = dataTag ? withDataMarker(body, dataTag.stage, dataTag.json) : body.includes("<!-- factory:") ? body : `${body}\n\n<!-- factory:notice -->`;
+  await deps.github.commentIssue(config.repo, issueNumber, full);
+}
+
+// Drop the must/should findings the diff does not support. A reject that loses
+// every blocking finding becomes uncertain (a human looks), never a silent pass.
+export async function recheckFindings(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  worktree: string,
+  verdict: VerdictArtifact,
+): Promise<{ verdict: VerdictArtifact; note: string }> {
+  const checked = verdict.findings.filter(isChecked);
+  const supported = await deps.rechecker!.supported(checked, await deps.git.diff(worktree, config.base));
+  if (supported === undefined) return { verdict, note: "" };
+  const { kept, dropped } = keepSupported(verdict.findings, supported);
+  if (dropped.length === 0) return { verdict, note: "" };
+  const result = verdict.result === "reject" && !hasBlocking(kept) ? "uncertain" : verdict.result;
+  const list = dropped.map((f) => `- ${f.what}`).join("\n");
+  return { verdict: { ...verdict, findings: kept, result }, note: `\n\nThe diff does not support ${dropped.length} finding(s): none points at a line it changed, so they were dropped:\n${list}` };
+}
+
+// Build's status-comment.md is the one comment the runner keeps and edits in
+// place. Its id comes from SQLite when this process ran the earlier rounds,
+// or — for a resumed/restarted run — from the thread itself, so a restart
+// never posts a duplicate status comment (audit finding #21).
+export async function upsertStatusComment(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  body: string,
+  json?: unknown,
+): Promise<void> {
+  if (!body.trim()) return;
+  const full = json !== undefined ? withDataMarker(body, "build", json) : body;
+  const run = deps.state.getRun(config.repo, issue.number);
+  const existingId = run?.status_comment_id ?? deriveIssueState(issue).statusCommentId;
+  if (existingId) {
+    await deps.github.editComment(config.repo, existingId, full);
+    deps.state.updateRun(config.repo, issue.number, { status_comment_id: existingId });
+    return;
+  }
+  const id = await deps.github.commentIssue(config.repo, issue.number, full);
+  if (id !== undefined) deps.state.updateRun(config.repo, issue.number, { status_comment_id: id });
+}
+
+export function finish(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issueNumber: number,
+  status: "needs-info" | "awaiting-approval" | "needs-human" | "failed" | "shipped" | "cancelled",
+  reason?: string,
+): void {
+  deps.state.updateRun(config.repo, issueNumber, { status, reason: reason ?? null });
+  // Parked issues keep their window, so the operator can still read it.
+  if (deps.view && (status === "shipped" || status === "cancelled" || status === "failed")) {
+    deps.view.close(issueNumber).catch((e) => console.error(`[tmux] close #${issueNumber}: ${e}`));
+  }
+}
+
+// Skills never call `gh` (only the runner talks to GitHub), so the current
+// issue thread is handed to them as a file: they read it instead of fetching
+// it themselves. Written fresh before every stage so a resumed stage sees any
+// new trusted reply.
+export async function writeIssueSnapshot(worktree: string, issue: GhIssue): Promise<void> {
+  await Bun.write(`${worktree}/${runDir(issue.number)}/issue.json`, JSON.stringify(issue, null, 2));
+}
+
+// Why a stage produced nothing: a kill, then a refused tool call (named, so a
+// permission gap reads as one), then anything `claude` printed to stderr.
+export function stageFailure(result: StageRunResult, fallback: string): string;
+export function stageFailure(result: StageRunResult): string | undefined;
+export function stageFailure(result: StageRunResult, fallback?: string): string | undefined {
+  const denied = result.permissionDenials.length ? `permission denied: ${result.permissionDenials.join("; ")}` : undefined;
+  return result.killedReason ?? denied ?? result.stderrTail ?? fallback;
+}
+
+// The agent's own cost wins; otherwise price the tokens. No price means the
+// cost is unknown, which is stored as NULL with usage_complete = 0, never as $0.
+export function priceResult(result: StageRunResult): { cached: number; costUsd: number | null; usageComplete: boolean } {
+  const cached = result.tokensCached ?? 0;
+  const priced =
+    result.costReported === false
+      ? costFor(result.model, { tokensIn: result.tokensIn, tokensOut: result.tokensOut, tokensCached: cached })
+      : result.costUsd;
+  const usageComplete = result.usageComplete !== false && priced !== undefined;
+  const costUsd = usageComplete ? (priced ?? null) : null;
+  return { cached, costUsd, usageComplete };
+}
+
+export async function runStage(
+  deps: WatchDeps,
+  config: FactoryConfig,
+  issue: GhIssue,
+  stage: StageName,
+  worktree: string,
+  extra: Pick<StageRunOptions, "resume"> = {},
+): Promise<StageRunResult> {
+  const issueNumber = issue.number;
+  // rehydrate before clearing: rehydrate only ever repopulates *earlier*
+  // stages' artifacts from the thread, never this stage's own output, so the
+  // order only matters for readability, not correctness — but clearing after
+  // guarantees this stage never starts with a stale copy of its own last
+  // attempt (audit finding #9).
+  await rehydrate(worktree, issue);
+  await writeIssueSnapshot(worktree, issue);
+  await clearStageArtifacts(worktree, issueNumber, stage);
+
+  deps.state.upsertRun({ issue: issueNumber, repo: config.repo, title: issue.title, stage: stage as Stage, status: "running" });
+  const run = deps.state.getRun(config.repo, issueNumber)!;
+  const files = await stageFiles(deps, issueNumber);
+  const startedAt = new Date();
+  const result = await deps.executor.runStage({
+    stage,
+    issue: issueNumber,
+    cwd: worktree,
+    maxBudgetUsd: config.maxBudgetUsd[stage],
+    timeoutMinutes: config.stageTimeoutMinutes,
+    maxToolCalls: config.maxToolCalls,
+    agentCommands: config.agentCommands,
+    type: issueType(config.routes, labelsOf(issue)),
+    ...files,
+    ...extra,
+  });
+  for (const e of result.events) deps.state.appendEvent(run.id, stage as Stage, e.kind === "truncated" ? TRUNCATION_KIND : e.kind, e.text ?? e.toolName ?? "");
+  const finishedAt = new Date();
+  const { cached, costUsd, usageComplete } = priceResult(result);
+  deps.state.recordStageRun({
+    repo: config.repo,
+    issue: issueNumber,
+    stage: stage as Stage,
+    agent: result.agent ?? "claude", // ReplayExecutor reports none
+    model: result.model ?? null,
+    started_at: startedAt.toISOString(),
+    finished_at: finishedAt.toISOString(),
+    duration_ms: finishedAt.getTime() - startedAt.getTime(),
+    tool_calls: result.toolCalls,
+    tokens_in: result.tokensIn,
+    tokens_out: result.tokensOut,
+    tokens_cached: cached,
+    cost_usd: costUsd,
+    usage_complete: usageComplete ? 1 : 0,
+    exit_code: result.exitCode,
+    killed_reason: result.killedReason ?? null,
+    session_id: result.sessionId ?? null,
+  });
+  if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
+  deps.state.updateRun(config.repo, issueNumber, {
+    tool_calls: run.tool_calls + result.toolCalls,
+    tokens_in: run.tokens_in + result.tokensIn,
+    tokens_out: run.tokens_out + result.tokensOut,
+    cost_usd: run.cost_usd + (costUsd ?? 0),
+  });
+  if (result.killedReason === OPERATOR_TAKEOVER) throw new OperatorTakeover(stage as Stage);
+  return result;
+}
+
+// The transcript and live-file paths for a stage, and the issue's window
+// opened on the transcript. Both are optional; a view error is only logged.
+export async function stageFiles(deps: WatchDeps, issueNumber: number): Promise<{ transcriptFile?: string; liveFile?: string }> {
+  if (!deps.runFiles) return {};
+  const transcriptFile = deps.runFiles.transcript(issueNumber);
+  if (deps.view) {
+    await deps.view.show(issueNumber, transcriptFile).catch((e) => console.error(`[tmux] show #${issueNumber}: ${e}`));
+  }
+  return { transcriptFile, liveFile: deps.runFiles.live(issueNumber) };
+}
+
+// Plan v2.10.0 item 3: a read-only stage after a final outcome (merged,
+// rejected, or given up on after verify rejections). Never goes through
+// runStage: that wrapper's upsertRun would put an already-terminal run back
+// to "running", and retro's cost never rolls into runs.cost_usd (spendSummary
+// sums stage_runs, not runs, so the spend caps still see it via recordStageRun).
+// `existingId` is set only when a row was queued earlier (the dashboard's
+// operator-merge route, which has no Executor to run this itself) and is now
+// being drained by runQueuedRetros; the three watch.ts triggers queue and run
+// in the same call.
+export async function runRetro(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, outcome: RetroTrigger, existingId?: number): Promise<void> {
+  const id = existingId ?? deps.state.queueRetro(config.repo, issue.number, outcome);
+  const issueNumber = issue.number;
+  const worktree = worktreeFor(deps, issueNumber);
+  try {
+    await rehydrate(worktree, issue);
+    await writeIssueSnapshot(worktree, issue);
+    await clearStageArtifacts(worktree, issueNumber, "retro");
+    const startedAt = new Date();
+    const result = await deps.executor.runStage({
+      stage: "retro",
+      issue: issueNumber,
+      cwd: worktree,
+      maxBudgetUsd: config.maxBudgetUsd.retro,
+      timeoutMinutes: config.stageTimeoutMinutes,
+      maxToolCalls: config.maxToolCalls,
+      agentCommands: config.agentCommands,
+      ...(deps.runFiles ? { transcriptFile: deps.runFiles.transcript(issueNumber), liveFile: deps.runFiles.live(issueNumber) } : {}),
+    });
+    const finishedAt = new Date();
+    const { cached, costUsd, usageComplete } = priceResult(result);
+    deps.state.recordStageRun({
+      repo: config.repo,
+      issue: issueNumber,
+      stage: "retro" as Stage,
+      agent: result.agent ?? "claude",
+      model: result.model ?? null,
+      started_at: startedAt.toISOString(),
+      finished_at: finishedAt.toISOString(),
+      duration_ms: finishedAt.getTime() - startedAt.getTime(),
+      tool_calls: result.toolCalls,
+      tokens_in: result.tokensIn,
+      tokens_out: result.tokensOut,
+      tokens_cached: cached,
+      cost_usd: costUsd,
+      usage_complete: usageComplete ? 1 : 0,
+      exit_code: result.exitCode,
+      killed_reason: result.killedReason ?? null,
+      session_id: result.sessionId ?? null,
+    });
+    if (costUsd !== null) deps.machine?.spend.record(config.repo, costUsd);
+    const art = await readStageArtifacts(worktree, issueNumber, "retro");
+    deps.state.completeRetro(id, art.json as RetroArtifact | undefined);
+  } catch (err) {
+    console.error(`retro failed for #${issue.number}:`, err);
+    deps.state.completeRetro(id, undefined, "failed");
+  }
+}
+
+// Drains rows the dashboard's operator-merge route queued but could not run
+// itself. Called once per pollOnce tick.
+export async function runQueuedRetros(deps: WatchDeps, config: FactoryConfig): Promise<void> {
+  for (const row of deps.state.listQueuedRetros(config.repo)) {
+    try {
+      const issue = await deps.github.getIssue(config.repo, row.issue);
+      await runRetro(deps, config, issue, row.outcome, row.id);
+    } catch (err) {
+      console.error(`queued retro failed for #${row.issue}:`, err);
+      deps.state.completeRetro(row.id, undefined, "failed");
+    }
+  }
+}
+
+// A stage's JSON, or why it cannot be used: an unknown field is refused, and
+// an `outcome` of blocked or failed stops the run where the agent said it did.
+export type StepStage = "triage" | "plan" | "build";
+export function stageJson<T extends { outcome?: "complete" | "blocked" | "failed"; summary?: string }>(stage: StepStage, raw: unknown, types?: readonly string[]): { json?: T; problem?: string } {
+  if (raw === undefined) return {};
+  const checked = validateStepJson(stage, raw, types);
+  return checked.ok ? { json: raw as T } : { problem: checked.reason };
+}
+
+export async function stopStep(deps: WatchDeps, config: FactoryConfig, issueNumber: number, from: string, stop: { status: "needs-human" | "failed"; reason: string }): Promise<Outcome> {
+  await moveLabel(deps, config, issueNumber, from, stop.status === "failed" ? LABEL.failed : LABEL.needsHuman);
+  finish(deps, config, issueNumber, stop.status, stop.reason);
+  return stop.status;
+}
+
+export interface RunCtx {
+  rejectRound: number;
+  questionRound: number;
+  // Why the last attempt was sent back, for the rebuild that follows a reject.
+  failure?: string;
+}
+
+// How much of a failure a rebuild sees: the end of it, where the error is.
+export const FAILURE_TAIL_BYTES = 12 * 1024;
+
+export function failureTail(text: string): string {
+  const bytes = Buffer.from(text);
+  return bytes.length <= FAILURE_TAIL_BYTES ? text : bytes.subarray(bytes.length - FAILURE_TAIL_BYTES).toString().replace(/^\uFFFD+/, "");
+}
+
+export const EPOCH = "1970-01-01T00:00:00.000Z";
+
+export function startOfTodayUtc(): string {
+  return `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+}
+
+// Checked before every stage (plan v2.7.0 item 7): an issue's own lifetime
+// spend and unreported-run count, this repo's spend today, and — when a
+// machine is configured — the whole machine's spend today. The first
+// breached cap wins and its message is what parks the issue.
+export function checkSpendCap(deps: WatchDeps, config: FactoryConfig, issueNumber: number): string | undefined {
+  const { perIssueUsd, dailyUsd, maxUnreportedRuns } = config.spend;
+  const perIssue = deps.state.spendSummary(config.repo, EPOCH, issueNumber);
+  if (perIssueUsd !== undefined && perIssue.costUsd >= perIssueUsd) {
+    return `this issue has spent $${perIssue.costUsd.toFixed(2)}, at or over its perIssueUsd cap of $${perIssueUsd.toFixed(2)}`;
+  }
+  if (maxUnreportedRuns !== undefined && perIssue.unreportedRuns >= maxUnreportedRuns) {
+    return `this issue has ${perIssue.unreportedRuns} stage run(s) with unknown cost, at or over the maxUnreportedRuns cap of ${maxUnreportedRuns}`;
+  }
+  const repoToday = deps.state.spendSummary(config.repo, startOfTodayUtc());
+  if (dailyUsd !== undefined && repoToday.costUsd >= dailyUsd) {
+    return `${config.repo} has spent $${repoToday.costUsd.toFixed(2)} today, at or over its dailyUsd cap of $${dailyUsd.toFixed(2)}`;
+  }
+  const machineDailyUsd = deps.machine?.config.dailyUsd;
+  if (machineDailyUsd !== undefined) {
+    const machineToday = deps.machine!.spend.todayUsd();
+    if (machineToday >= machineDailyUsd) {
+      return `the machine has spent $${machineToday.toFixed(2)} today, at or over its dailyUsd cap of $${machineDailyUsd.toFixed(2)}`;
+    }
+  }
+  return undefined;
+}
+// The PR body, plus the "Factory run" summary unless config.prRunSummary is off.
+export function prBody(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, body: string, ctx: RunCtx): string {
+  if (!config.prRunSummary) return body;
+  const runs = deps.state.listStageRuns(config.repo, { issue: issue.number });
+  const retries = issue.comments.filter((c) => isHumanComment(c) && parseChatOps(c.body).type === "retry").length;
+  return `${body}\n\n${renderRunSummary(runs, { rejectRounds: ctx.rejectRound, retries })}`;
+}

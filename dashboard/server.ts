@@ -10,7 +10,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GitHub } from "../src/github";
+import { GitHub, type ScmPort } from "../src/github";
 import { FactoryState, DEFAULT_DB_PATH } from "../src/state";
 import { parseChatOps } from "../src/chatops";
 import { buildBoard } from "./board";
@@ -82,14 +82,14 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
 
-export function createDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
+export function createDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();
-  const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<GitHub["listOpenIssues"]>> }>();
-  const issuesInflight = new Map<string, Promise<Awaited<ReturnType<GitHub["listOpenIssues"]>>>>();
-  const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<GitHub["listPrs"]>> }>();
-  const prsInflight = new Map<string, Promise<Awaited<ReturnType<GitHub["listPrs"]>>>>();
+  const issuesCache = new Map<string, { at: number; issues: Awaited<ReturnType<ScmPort["listOpenIssues"]>> }>();
+  const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
+  const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
+  const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
 
   // The Agents page shows each configured agent's installed version and doctor rows.
   // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.

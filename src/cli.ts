@@ -4,7 +4,7 @@
 
 import { accessSync, constants, existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { GitHub } from "./github";
+import { GitHub, type ScmPort } from "./github";
 import { GitCommandRunner, Git } from "./git";
 import { FactoryState, DEFAULT_DB_PATH } from "./state";
 import { CommandExecutor } from "./agents/executor";
@@ -34,6 +34,7 @@ import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
+import { workflowFor } from "./engine/workflows";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -87,9 +88,10 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
 // Shared by watch/run/tick so all three modes (long-lived poll, one-shot CI
 // step, cron tick) resolve the exact same paths and construct the exact same
 // gate runner — one place, not three copies to drift (audit finding #1).
-function buildWatchDeps(cloneDir: string, config: FactoryConfig): WatchDeps {
+async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
   return {
+    workflow: await workflowFor(cloneDir, config),
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
     github: new GitHub(),
@@ -114,7 +116,7 @@ async function cmdWatch(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
   await requireTmux(config);
-  const deps = buildWatchDeps(cloneDir, config);
+  const deps = await buildWatchDeps(cloneDir, config);
   console.log(`factory watch: polling ${config.repo} every ${config.pollIntervalSeconds}s`);
   // Re-drive anything a crashed or previously-killed process left sitting in
   // a running label before the first poll — otherwise it just sits there,
@@ -144,7 +146,7 @@ async function cmdRun(): Promise<void> {
   const config = await loadConfig(cloneDir);
   const issueNumber = Number(flag("issue"));
   if (!issueNumber) throw new UsageError("run: --issue <N> is required");
-  const deps = buildWatchDeps(cloneDir, config);
+  const deps = await buildWatchDeps(cloneDir, config);
   const issue = await deps.github.getIssue(config.repo, issueNumber);
   const outcome = await advanceIssue(deps, config, issue);
   if (has("json")) console.log(successJson({ issue: issueNumber, outcome }, outcome !== "failed"));
@@ -158,7 +160,7 @@ async function cmdRun(): Promise<void> {
 async function cmdTick(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const deps = buildWatchDeps(cloneDir, config);
+  const deps = await buildWatchDeps(cloneDir, config);
   const result = await pollOnce(deps, config);
   console.log(has("json") ? successJson(result, !result.paused) : JSON.stringify(result, null, 2));
   if (result.paused) process.exit(EXIT.paused);
@@ -337,6 +339,7 @@ async function cmdDoctor(): Promise<void> {
       routes: config.routes,
       templateSkills: templateSkills(),
       templateOverrides: config.templateOverrides,
+      workflow: config.workflow,
       tmux: config.tmux.enabled,
       legacyStatePath: defaultStatePath(process.env),
       legacyWorkspacesDir: defaultWorkspacesDir(process.env),
@@ -349,7 +352,7 @@ async function cmdDoctor(): Promise<void> {
   else for (const c of checks) console.log(`  [${c.ok ? "ok" : c.warn ? "warn" : "FAIL"}] ${c.name} — ${c.detail}`);
   if (!allOk && has("fix")) {
     console.error("factory doctor --fix: creating missing labels");
-    await fixDoctor(github, config.repo, config.routes);
+    await fixDoctor(github, config.repo, config.routes, await workflowFor(cloneDir, config).catch(() => undefined));
   }
   if (!allOk && !has("fix")) process.exit(EXIT.checksFailed);
 }
@@ -361,7 +364,7 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: GitHub, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
+function serveDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
   const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet);
@@ -395,7 +398,7 @@ async function cmdUp(): Promise<void> {
   const config = await loadConfig(cloneDir);
   await requireTmux(config);
   if (has("tmux")) return upInTmux(cloneDir, config);
-  const deps = buildWatchDeps(cloneDir, config);
+  const deps = await buildWatchDeps(cloneDir, config);
   const recovered = await recoverInFlight(deps, config);
   if (recovered.length) console.log(`factory up: recovered #${recovered.join(", #")}`);
   startWatch(deps, config, (r) => {
@@ -448,7 +451,7 @@ async function cmdAttach(): Promise<void> {
 
 // Waits for the watcher to park the issue after a takeover, so the hand-back
 // retry lands on a parked issue and never races the stage it stopped.
-async function waitForLabel(github: GitHub, repo: string, n: number, label: string, timeoutMs = 60_000): Promise<boolean> {
+async function waitForLabel(github: ScmPort, repo: string, n: number, label: string, timeoutMs = 60_000): Promise<boolean> {
   const end = Date.now() + timeoutMs;
   for (;;) {
     const issue = await github.getIssue(repo, n);
@@ -513,7 +516,7 @@ async function cmdVerifyAgent(): Promise<void> {
   const loaded = await loadConfig(cloneDir);
   const config: FactoryConfig = { ...loaded, ...configFor(name) };
   const out = flag("out") ? resolve(flag("out")!) : defaultFixtureDir(name);
-  const deps = { ...buildWatchDeps(cloneDir, config), executor: new CommandExecutor(config.agents, config.stages, config.routes, new FixtureRecorder(out, name)) };
+  const deps = { ...(await buildWatchDeps(cloneDir, config)), executor: new CommandExecutor(config.agents, config.stages, config.routes, new FixtureRecorder(out, name)) };
   const outcome = await advanceIssue(deps, config, await deps.github.getIssue(config.repo, issueNumber));
   if (outcome === "awaiting-approval") {
     console.log(`Plan gate: read the plan on #${issueNumber}, approve it (/factory approve), then run this command again to finish and record the rest.`);
@@ -527,7 +530,7 @@ async function cmdVerifyAgent(): Promise<void> {
 async function cmdLearn(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  const deps = buildWatchDeps(cloneDir, config);
+  const deps = await buildWatchDeps(cloneDir, config);
   const result = await runLearn(deps, config.repo, config.base);
   if (has("json")) {
     console.log(successJson(result, true));
@@ -560,7 +563,7 @@ async function cmdInstall(): Promise<void> {
   // "next:" hint above, and `doctor --fix` stays the authoritative fixer.
   try {
     const config = await loadConfig(resolve(target));
-    await fixDoctor(new GitHub(), config.repo, config.routes);
+    await fixDoctor(new GitHub(), config.repo, config.routes, await workflowFor(resolve(target), config).catch(() => undefined));
     console.log(`factory install: labels ensured on ${config.repo}`);
   } catch {
     // no usable config.json yet

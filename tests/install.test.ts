@@ -192,7 +192,7 @@ describe("factory install calls fixDoctor", () => {
   const cmdInstall = bin.slice(start, end);
 
   test("calls fixDoctor after a real install", () => {
-    expect(cmdInstall).toContain("await fixDoctor(new GitHub(), config.repo, config.routes)");
+    expect(cmdInstall).toContain("await fixDoctor(new GitHub(), config.repo, config.routes, await workflowFor(resolve(target), config)");
   });
 
   test("returns before fixDoctor when --dry-run is set", () => {
