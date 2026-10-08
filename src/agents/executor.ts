@@ -12,6 +12,7 @@ import { buildContextPack } from "../context";
 import { aggregateStageEvents, OPERATOR_TAKEOVER, type Executor, type StageEvent, type StageRunOptions, type StageRunResult } from "../executor";
 import { plain } from "../display";
 import { takeoverMarker } from "../paths";
+import { McpError } from "../mcp";
 import { sanitizeEnv } from "./env";
 import { renderPrompt } from "./prompt";
 import { PRESETS } from "./presets";
@@ -137,7 +138,7 @@ export class CommandExecutor implements Executor {
     // A step that asked for MCP servers must get them, so an agent that cannot load them is an error, not a quiet run without.
     let mcpConfig: string | undefined;
     if (opts.mcp && Object.keys(opts.mcp).length > 0) {
-      if (!agent.preset?.mcp || agent.config.command) throw new Error(`${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`);
+      if (!agent.preset?.mcp || agent.config.command) throw new McpError(`${agent.name}: this step names MCP servers (${Object.keys(opts.mcp).join(", ")}), and only the claude preset can load them`);
       mcpConfig = join(scratch, "mcp.json");
       writeFileSync(mcpConfig, JSON.stringify({ mcpServers: opts.mcp }));
     }

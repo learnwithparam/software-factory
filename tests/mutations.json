@@ -186,7 +186,8 @@
   {"name": "mcp: a named server's tools are allowed", "file": "src/stage-permissions.ts", "find": ", ...mcpServers.map((s) => `mcp__${s}`)", "replace": "", "test": "tests/mcp.test.ts"},
   {"name": "mcp: only a preset that loads MCP takes servers", "file": "src/agents/executor.ts", "find": "if (!agent.preset?.mcp || agent.config.command) throw", "replace": "if (false) throw", "test": "tests/mcp.test.ts"},
   {"name": "mcp: a check step names no servers", "file": "src/core/workflow.ts", "find": "else if (kind && !kind.agent) problems.push", "replace": "else if (false) problems.push", "test": "tests/mcp.test.ts"},
-  {"name": "mcp: the registry gives only the named servers", "file": "src/engine/common.ts", "find": "const mcp = mcpNames?.length ? mcpServersFor(worktree, mcpNames) : undefined;", "replace": "const mcp = undefined;", "test": "tests/workflow.test.ts"},
+  {"name": "mcp: the registry gives only the named servers", "file": "src/engine/common.ts", "find": "const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;", "replace": "const mcp = undefined;", "test": "tests/workflow.test.ts"},
   {"name": "mcp: a missing server fails the issue", "file": "src/engine/runner.ts", "find": "    if (e instanceof McpError) {", "replace": "    if (false) {", "test": "tests/workflow.test.ts"},
-  {"name": "mcp: doctor checks the registry", "file": "src/doctor.ts", "find": "        ok: problems.length === 0,\n        detail: problems.length ? problems.join", "replace": "        ok: true,\n        detail: problems.length ? problems.join", "test": "tests/doctor.test.ts"}
+  {"name": "mcp: doctor checks the registry", "file": "src/doctor.ts", "find": "        ok: problems.length === 0,\n        detail: problems.length ? problems.join", "replace": "        ok: true,\n        detail: problems.length ? problems.join", "test": "tests/doctor.test.ts"},
+  {"name": "mcp: the registry is read from the base branch, not the worktree", "file": "src/engine/common.ts", "find": "mcpServersFor(deps.cloneDir, mcpNames)", "replace": "mcpServersFor(worktree, mcpNames)", "test": "tests/workflow.test.ts"}
 ]

@@ -229,9 +229,11 @@ export async function runStage(
   extra: Pick<StageRunOptions, "resume"> & { readonly mcp?: readonly string[] } = {},
 ): Promise<StageRunResult> {
   const issueNumber = issue.number;
-  // Read from this worktree's own .factory/mcp.json; a missing name throws before anything is recorded or spent.
+  // Read from the clone of the base branch, never the worktree: an earlier step's agent can write
+  // the worktree, and a server entry is a command this step would launch. A missing name throws
+  // before anything is recorded or spent.
   const { mcp: mcpNames, ...rest } = extra;
-  const mcp = mcpNames?.length ? mcpServersFor(worktree, mcpNames) : undefined;
+  const mcp = mcpNames?.length ? mcpServersFor(deps.cloneDir, mcpNames) : undefined;
   // rehydrate before clearing: rehydrate only ever repopulates *earlier*
   // stages' artifacts from the thread, never this stage's own output, so the
   // order only matters for readability, not correctness — but clearing after

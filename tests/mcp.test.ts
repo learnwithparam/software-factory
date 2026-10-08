@@ -91,6 +91,6 @@ describe("the executor", () => {
 
   test("a step with servers refuses an agent that cannot load them", async () => {
     const exec = new CommandExecutor({ sh: { command: ["true"] } }, { default: "sh" });
-    expect(exec.runStage({ stage: "build", issue: 5, cwd: repoWith(undefined), maxBudgetUsd: 1, mcp: { docs: DOCS } })).rejects.toThrow(/only the claude preset can load them/);
+    expect(exec.runStage({ stage: "build", issue: 5, cwd: repoWith(undefined), maxBudgetUsd: 1, mcp: { docs: DOCS } })).rejects.toThrow(McpError);
   });
 });

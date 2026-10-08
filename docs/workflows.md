@@ -16,15 +16,48 @@ and where it goes next. `config.workflow` names it (default `feature-to-pr`). Th
 | `reject` | where a rejection goes; required on `verify` |
 | `revise` | where `/factory revise` goes when the issue is parked on this step's label |
 | `run` | a `check` step's shell command; exit 0 moves on, anything else parks the issue as failed |
+| `mcp` | MCP server names from `.factory/mcp.json` this step's agent may use; not on a `check` step |
 
 An edge is `{ to: <step> }` or `{ park: awaiting-approval, approve: <step>, revise: <step> }`,
 with an optional `if:`. The first edge whose `if:` holds wins; the last has no `if:`.
 
 `limits.questions` caps needs-info rounds and `limits.rejects` caps rejections (both default 2).
 
+## `on:` schedules
+
+A workflow can file its own issues on a schedule:
+
+```yaml
+on:
+  cron:
+    - schedule: "0 2 * * *"      # minute hour day-of-month month day-of-week
+      tz: Europe/Berlin          # IANA zone, default UTC
+      title: Nightly dependency check
+      body: Bump what is safe.
+```
+
+At the matching minute the watcher files an issue labelled `factory:ready`, which the workflow then
+runs like any other. A poll that skipped past the minute catches up for up to an hour, and while an
+issue from the same trigger is still open no new one is filed.
+
+## `mcp:` servers per step
+
+`.factory/mcp.json` lists the servers, in Claude Code's own format:
+
+```json
+{ "mcpServers": { "docs": { "command": "docs-mcp", "args": ["--stdio"] } } }
+```
+
+A step that names `mcp: [docs]` runs with only `docs` loaded (`--mcp-config` with
+`--strict-mcp-config`) and with its tools allowed; every other step loads none. Only the `claude`
+preset can load servers, so a step naming one under another agent fails. The runner reads the
+registry from its clone of the base branch, never from the issue's worktree, so an agent cannot add
+a server for a later step to launch; a server entry is a command, trusted like a gate. A name missing from the
+registry fails the issue before the step runs, and `factory doctor` reports it first.
+
 ## `if:`
 
-`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk` and `config`. It
+`if:` reads a step's JSON by its id (`plan.risk`), `toggles.autoApproveLowRisk` and `config` (so `config.riskPolicy.autoApproveMaxRisk`). It
 has `==`, `!=`, `&&`, `||`, `!`, parentheses, and string, number and boolean literals. A name it
 cannot resolve is a load error.
 
