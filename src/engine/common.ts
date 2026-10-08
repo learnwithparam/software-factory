@@ -64,6 +64,8 @@ export interface WatchDeps {
   readonly view?: IssueView;
   // The steps an issue walks; absent means the bundled feature-to-pr.
   readonly workflow?: Workflow;
+  // The clock cron triggers read; absent means the real one.
+  readonly now?: () => Date;
 }
 
 // Thrown by runStage when an operator stopped the agent to take it over;

@@ -40,6 +40,7 @@ import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { STEP_TYPES } from "./engine/steps";
 import { defaultWorkflow } from "./engine/workflows";
 
+import { fireCron } from "./engine/triggers";
 export type { Outcome, Stage, WatchDeps } from "./engine/common";
 
 
@@ -320,6 +321,10 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const machineDailyCapHit = machineDailyUsd !== undefined && deps.machine!.spend.todayUsd() >= machineDailyUsd;
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;
   const intakeGated = autoStart && !stopIf && !budgetPaused;
+  // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
+  await fireCron(deps.github, deps.state, config.repo, workflowOf(deps), deps.now?.() ?? new Date()).catch((err) =>
+    console.error("factory watch: cron trigger failed", err),
+  );
   const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),

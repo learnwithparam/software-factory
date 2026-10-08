@@ -47,7 +47,13 @@ export class FakeGitHub extends GitHub {
   }
 
   override async listOpenIssues(_repo: string): Promise<GhIssue[]> {
-    return [...this.issues.values()];
+    return [...this.issues.values()].filter((i) => i.state !== "CLOSED");
+  }
+
+  override async createIssue(_repo: string, title: string, body: string, labels: string[]): Promise<number> {
+    const number = Math.max(0, ...this.issues.keys()) + 1;
+    this.issues.set(number, { number, title, body, labels: labels.map((name) => ({ name })), comments: [] });
+    return number;
   }
 
   override async commentIssue(_repo: string, number: number, body: string): Promise<number> {

@@ -512,6 +512,18 @@ export class FactoryState {
       .run({ $key: key, $value: value ? "1" : "0" });
   }
 
+  // A free-form value in the same key table as the toggles (a cron trigger's last-checked minute).
+  getSetting(key: string): string | undefined {
+    const row = this.db.query("SELECT value FROM toggles WHERE key = $key").get({ $key: key }) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  setSetting(key: string, value: string): void {
+    this.db
+      .query("INSERT INTO toggles (key, value) VALUES ($key, $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run({ $key: key, $value: value });
+  }
+
   close(): void {
     this.db.close();
   }

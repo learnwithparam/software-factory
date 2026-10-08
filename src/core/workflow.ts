@@ -4,6 +4,7 @@
 // problem named. Pure: no I/O, no adapter.
 
 import { parseExpr, rootsOf, ExprError, type Expr } from "./expr";
+import { parseCron, wallClock, CronError, type Cron } from "./cron";
 
 export type ParkState = "awaiting-approval";
 
@@ -24,8 +25,18 @@ export interface Step {
   readonly run?: string;
 }
 
+// `on: cron:` files an issue labelled factory:ready on a schedule, which the
+// workflow then picks up like any other.
+export interface CronTrigger {
+  readonly cron: Cron;
+  readonly tz: string;
+  readonly title: string;
+  readonly body: string;
+}
+
 export interface Workflow {
   readonly name: string;
+  readonly triggers: { readonly cron: readonly CronTrigger[] };
   readonly limits: { readonly questions: number; readonly rejects: number };
   readonly start: string;
   readonly steps: Readonly<Record<string, Step>>;
@@ -42,7 +53,9 @@ export interface StepKind {
 }
 
 const STEP_KEYS = new Set(["uses", "label", "next", "reject", "revise", "run"]);
-const TOP_KEYS = new Set(["name", "description", "limits", "steps"]);
+const TOP_KEYS = new Set(["name", "description", "on", "limits", "steps"]);
+const ON_KEYS = new Set(["cron"]);
+const CRON_KEYS = new Set(["schedule", "tz", "title", "body"]);
 const EDGE_KEYS = new Set(["if", "to", "park", "approve", "revise"]);
 const PARKS: readonly ParkState[] = ["awaiting-approval"];
 
@@ -66,6 +79,8 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
       else limits[k] = v as number;
     }
   }
+
+  const cron = parseOn(raw.on, problems);
 
   if (!isObj(raw.steps) || Object.keys(raw.steps).length === 0) {
     problems.push("steps: needs at least one step");
@@ -158,7 +173,39 @@ export function parseWorkflow(raw: unknown, kinds: Readonly<Record<string, StepK
     for (const id of ids) if (!reached.has(id)) problems.push(`steps.${id}: no edge reaches it from ${ids[0]}`);
   }
   if (problems.length > 0) return { ok: false, problems };
-  return { ok: true, workflow: { name, limits, start: ids[0]!, steps } };
+  return { ok: true, workflow: { name, triggers: { cron }, limits, start: ids[0]!, steps } };
+}
+
+function parseOn(on: unknown, problems: string[]): CronTrigger[] {
+  if (on === undefined) return [];
+  if (!isObj(on)) {
+    problems.push("on: must be a mapping");
+    return [];
+  }
+  for (const k of Object.keys(on)) if (!ON_KEYS.has(k)) problems.push(`on.${k}: unknown key (allowed: ${[...ON_KEYS].join(", ")})`);
+  if (on.cron === undefined) return [];
+  if (!Array.isArray(on.cron)) {
+    problems.push("on.cron: a list of {schedule, title}");
+    return [];
+  }
+  const out: CronTrigger[] = [];
+  on.cron.forEach((c, i) => {
+    const where = `on.cron[${i}]`;
+    if (!isObj(c)) return void problems.push(`${where}: must be a mapping`);
+    for (const k of Object.keys(c)) if (!CRON_KEYS.has(k)) problems.push(`${where}.${k}: unknown key (allowed: ${[...CRON_KEYS].join(", ")})`);
+    const tz = c.tz === undefined ? "UTC" : c.tz;
+    if (typeof c.title !== "string" || !c.title.trim()) problems.push(`${where}.title: required, the title of the issue it files`);
+    if (c.body !== undefined && typeof c.body !== "string") problems.push(`${where}.body: must be a string`);
+    try {
+      if (typeof tz !== "string") throw new CronError("tz must be a string");
+      wallClock(new Date(0), tz);
+      if (typeof c.schedule !== "string") throw new CronError("required, five cron fields");
+      out.push({ cron: parseCron(c.schedule), tz, title: String(c.title ?? ""), body: typeof c.body === "string" ? c.body : "" });
+    } catch (e) {
+      problems.push(`${where}.${e instanceof CronError && /zone|tz/.test(e.message) ? "tz" : "schedule"}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  });
+  return out;
 }
 
 // Every step id a step can hand the issue to, with the key that names it.
