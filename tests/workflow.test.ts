@@ -436,5 +436,8 @@ describe("factory harness", () => {
     const bad = run(repo({ ".factory/config.json": conf, ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n" }));
     expect(bad.exitCode).toBe(4);
     expect(bad.stdout.toString()).toContain("broken.yml");
+    const json = Bun.spawnSync(["bun", cli, "harness", "validate", "--json", "--repo-dir", repo({ ".factory/config.json": conf, ".factory/workflows/broken.yml": "name: broken\nsteps: {}\n" })], { stdout: "pipe" });
+    expect(json.exitCode).toBe(4);
+    expect(JSON.parse(json.stdout.toString()).ok).toBe(false);
   });
 });

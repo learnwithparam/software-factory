@@ -688,7 +688,7 @@ async function cmdHarness(): Promise<void> {
   const dir = resolve(flag("repo-dir") ?? ".");
   const report = await harnessReport(dir, await loadConfig(dir));
   if (has("json")) {
-    console.log(successJson({ problems: report.problems, workflows: report.entries.map(({ workflow, ...e }) => ({ ...e, steps: workflow ? Object.keys(workflow.steps) : [] })) }));
+    console.log(successJson({ problems: report.problems, workflows: report.entries.map(({ workflow, ...e }) => ({ ...e, steps: workflow ? Object.keys(workflow.steps) : [] })) }, sub === "inventory" || !report.problems.length));
   } else if (sub === "inventory") {
     for (const line of formatInventory(report)) console.log(line);
   } else {
