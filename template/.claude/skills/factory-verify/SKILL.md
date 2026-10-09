@@ -30,7 +30,7 @@ The runner has run the revert check and the gate on this tree. Read
 - `bites`: the new tests failed with the change reverted. Confirm from
   `tail` that they failed for the stated reason, not a compile error.
 - `passes-without`: the tests pass without the change, so prove nothing: reject.
-- `no-tests`, `skipped`, or no file: read
+- `no-tests`, `skipped`, `unavailable`, or no file: read
   `.claude/skills/factory-verify/references/prove.md` and prove it yourself.
 
 Every AC needs a command you ran or the proof's output as evidence; a

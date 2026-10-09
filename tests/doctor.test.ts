@@ -44,7 +44,7 @@ function deps(overrides: Partial<{ which: Set<string>; auth: { ok: boolean; deta
     git: new FakeGit(),
     which: async (bin: string) => which.has(bin),
     fileExists: async () => true,
-    readFile: async () => files.get("text") ?? "{}",
+    readFile: async () => files.get("text") ?? '{"gates": [{"name": "test", "cmd": "true", "required": true}]}',
     isExecutable: async () => files.get("exec") !== "no",
   };
 }
@@ -82,6 +82,13 @@ describe("runDoctor", () => {
     expect(binCheck.ok).toBe(true); // `which gh` still finds the binary
     expect(authCheck.ok).toBe(false);
     expect(authCheck.detail).toContain("not logged into");
+  });
+
+  test("flags a config with no gates", async () => {
+    files.set("text", '{"gates": []}');
+    const checks = await runDoctor(deps(), ctx);
+    files.clear();
+    expect(checks.find((c) => c.name === ".factory/config.json defines at least one gate")).toMatchObject({ ok: false });
   });
 
   test("flags TODO markers left in the scaffolded config and charter", async () => {

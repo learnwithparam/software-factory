@@ -22,6 +22,7 @@ import { typesFor } from "../labels";
 import { writeReply } from "./reply";
 import type { FixtureRecorder } from "./record";
 import { type AgentConfig, type AgentPreset, type StageAgents, stagePolicy } from "./types";
+import { portEnv } from "../port";
 
 const DEFAULT_TIMEOUT_MINUTES = 15;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -188,6 +189,7 @@ export class CommandExecutor implements Executor {
         FACTORY_ISSUE: String(opts.issue),
         FACTORY_STAGE: opts.stage,
         FACTORY_SCRATCH_DIR: scratch,
+        ...portEnv(opts.cwd),
       },
     });
     let sessionId: string | undefined;

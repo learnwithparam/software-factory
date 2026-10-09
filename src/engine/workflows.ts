@@ -12,7 +12,7 @@ export const DEFAULT_WORKFLOW = DEFAULT_CONFIG.workflow;
 // What an edge's `if:` may read besides the step ids.
 export const EXPR_ROOTS = ["toggles", "config"] as const;
 
-const BUNDLED_DIR = join(import.meta.dir, "..", "..", "template", ".factory", "workflows");
+export const BUNDLED_DIR = join(import.meta.dir, "..", "..", "template", ".factory", "workflows");
 
 export function parseWorkflowText(text: string): WorkflowResult {
   let raw: unknown;
@@ -58,4 +58,13 @@ export async function workflowFor(cloneDir: string, config: Pick<FactoryConfig, 
   const loaded = await loadWorkflow(cloneDir, config.workflow);
   if (!loaded.ok) throw new Error(`workflow ${config.workflow} is invalid:\n  - ${loaded.problems.join("\n  - ")}`);
   return loaded.workflow;
+}
+
+// Every workflow a route names (routes.<type>.workflow) other than the repo's, by name. Loaded at
+// boot like the repo's, so a typo stops the watcher instead of parking the first issue of that type.
+export async function routeWorkflowsFor(cloneDir: string, config: Pick<FactoryConfig, "workflow" | "routes">): Promise<Record<string, Workflow>> {
+  const names = new Set(Object.entries(config.routes ?? {}).flatMap(([type, r]) => (type.startsWith("_") || !r?.workflow || r.workflow === config.workflow ? [] : [r.workflow])));
+  const out: Record<string, Workflow> = {};
+  for (const name of names) out[name] = await workflowFor(cloneDir, { workflow: name });
+  return out;
 }

@@ -14,13 +14,13 @@ import { resolveBlockers } from "./blockers";
 import type { FactoryConfig } from "./config";
 import { writeRevision } from "./revision";
 import { runDir, readStageArtifacts, type PlanArtifact } from "./artifacts";
-import { isHumanComment, latestTrustedCommentAfter, parseChatOps } from "./chatops";
+import { isHumanComment, isTrusted, latestTrustedCommentAfter, parseChatOps } from "./chatops";
 import { ciStatusNow, validatePr } from "./ci";
-import { deriveIssueState } from "./derive";
+import { deriveIssueState, latestDataFor, parseDataMarkers } from "./derive";
 import { attemptMerge, decideMerge, mergePolicyMarker, renderAuditComment } from "./merge-policy";
 import { runPool } from "./pool";
 import type { GhComment, GhIssue } from "./github";
-import { LABEL } from "./labels";
+import { issueType, LABEL } from "./labels";
 import { effectiveSlots } from "./machine";
 import { stepByLabel, type Workflow } from "./core/workflow";
 import {
@@ -36,6 +36,7 @@ import {
   type Outcome,
   type RunCtx,
   type WatchDeps,
+  withDataMarker,
 } from "./engine/common";
 import { parkEdgeOf, runWorkflow } from "./engine/runner";
 import { STEP_TYPES } from "./engine/steps";
@@ -52,19 +53,49 @@ export interface PollResult {
   readonly processed: number[];
 }
 
-function workflowOf(deps: WatchDeps): Workflow {
-  return deps.workflow ?? defaultWorkflow();
+// The workflow an issue runs: the one its pickup recorded (a route's, see
+// chooseWorkflow), else the repo's. Read from the thread, so it holds across
+// restarts and machines, and an issue never switches workflow mid-run.
+function workflowOf(deps: WatchDeps, issue?: GhIssue): Workflow {
+  const chosen = issue ? recordedWorkflow(issue) : undefined;
+  return (chosen && deps.routeWorkflows?.[chosen]) || deps.workflow || defaultWorkflow();
 }
 
-function labelOf(deps: WatchDeps, stepId: string): string {
-  return workflowOf(deps).steps[stepId]!.label;
+// The first choice a trusted comment recorded. Anyone can paste a marker into a comment, so an
+// outsider's is ignored, and a later one never switches an issue (say, off a workflow that parks
+// every plan) mid-run.
+function recordedWorkflow(issue: GhIssue): string | undefined {
+  const marker = parseDataMarkers(issue.comments.filter(isTrusted)).find((m) => m.stage === WORKFLOW_MARKER);
+  return (marker?.json as { name?: string } | undefined)?.name;
+}
+
+const WORKFLOW_MARKER = "workflow";
+
+// The repo's workflow and every one a route names: what cron fires and recovery scans.
+function allWorkflows(deps: WatchDeps): Workflow[] {
+  return [workflowOf(deps), ...Object.values(deps.routeWorkflows ?? {})];
+}
+
+// At pickup: the workflow its type's route names (routes.<type>.workflow), recorded on the issue so
+// every later step reads the same one. An issue whose type has none runs the repo's, and gets no comment.
+async function chooseWorkflow(deps: WatchDeps, config: FactoryConfig, issue: GhIssue): Promise<GhIssue> {
+  const type = issueType(config.routes, labelsOf(issue));
+  const name = type ? config.routes[type]?.workflow : undefined;
+  if (!name || !deps.routeWorkflows?.[name] || name === workflowOf(deps).name || recordedWorkflow(issue)) return issue;
+  const body = withDataMarker(`Running workflow \`${name}\` (\`routes.${type}.workflow\`).`, WORKFLOW_MARKER, { name });
+  const id = await deps.github.commentIssue(config.repo, issue.number, body);
+  return { ...issue, comments: [...issue.comments, { id: id ?? 0, author: "factory", authorAssociation: "OWNER", body, createdAt: new Date().toISOString() }] };
+}
+
+function labelOf(deps: WatchDeps, issue: GhIssue, stepId: string): string {
+  return workflowOf(deps, issue).steps[stepId]!.label;
 }
 
 function runFromStage(deps: WatchDeps, config: FactoryConfig, issue: GhIssue, stepId: string, worktree: string, ctx?: RunCtx): Promise<Outcome> {
   // With leases on, only the lease holder walks the steps: a second worker
   // (another machine, a CI job) gets "waiting", and a dead worker's issue is
   // reclaimed by whoever resumes it after the TTL.
-  return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps), issue, stepId, worktree, ctx));
+  return leased(deps, issue.number, () => runWorkflow(deps, config, workflowOf(deps, issue), issue, stepId, worktree, ctx));
 }
 
 // Intake trust (P36): a label is a request to spend tokens and push a branch,
@@ -126,8 +157,9 @@ export async function processReadyIssue(issue: GhIssue, deps: WatchDeps, config:
   }
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.ready))) return "needs-human";
-  const start = workflowOf(deps).start;
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], labelOf(deps, start));
+  issue = await chooseWorkflow(deps, config, issue);
+  const start = workflowOf(deps, issue).start;
+  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.ready], labelOf(deps, issue, start));
   return runFromStage(deps, config, issue, start, worktree);
 }
 
@@ -157,7 +189,7 @@ function findPlanComment(issue: GhIssue): GhComment | undefined {
 }
 
 function ctxFrom(deps: WatchDeps, issue: GhIssue): RunCtx {
-  const derived = deriveIssueState(issue, workflowOf(deps));
+  const derived = deriveIssueState(issue, workflowOf(deps, issue));
   return { rejectRound: derived.rejectRounds, questionRound: derived.questionRounds };
 }
 
@@ -172,11 +204,11 @@ export async function resumeNeedsInfo(issue: GhIssue, deps: WatchDeps, config: F
   if (!reply || !(await commandIsTrusted(deps, config, reply))) return "waiting";
   if (parseChatOps(reply.body).type === "cancel") return cancelRun(issue, deps, config);
 
-  const derived = deriveIssueState(issue, workflowOf(deps));
+  const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.needsInfo))) return "needs-human";
   await Bun.write(`${worktree}/${runDir(issue.number)}/answer.md`, reply.body);
-  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], labelOf(deps, derived.resumeStage));
+  await deps.github.setStateLabel(config.repo, issue.number, [LABEL.needsInfo], labelOf(deps, issue, derived.resumeStage));
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, ctxFrom(deps, issue));
 }
 
@@ -193,12 +225,12 @@ export async function resumeAwaitingApproval(issue: GhIssue, deps: WatchDeps, co
 
   if (command.type === "cancel") return cancelRun(issue, deps, config);
   // The step that parked here names where approve and revise go.
-  const edge = parkEdgeOf(workflowOf(deps), deriveIssueState(issue, workflowOf(deps)).resumeStage);
+  const edge = parkEdgeOf(workflowOf(deps, issue), deriveIssueState(issue, workflowOf(deps, issue)).resumeStage);
   if (!edge) return "waiting";
   const resumeAt = async (stepId: string): Promise<Outcome> => {
     if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.awaitingApproval))) return "needs-human";
     if (command.type === "revise") await writeRevision(worktree, issue, reply, command.text);
-    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, stepId));
+    await deps.github.setStateLabel(config.repo, issue.number, [LABEL.awaitingApproval], labelOf(deps, issue, stepId));
     return runFromStage(deps, config, issue, stepId, worktree, ctxFrom(deps, issue));
   };
   if (command.type === "approve") return resumeAt(edge.approve);
@@ -224,11 +256,11 @@ export async function resumeParked(issue: GhIssue, deps: WatchDeps, config: Fact
   const currentLabel = labelsOf(issue).find((n) => n === LABEL.failed || n === LABEL.needsHuman);
   if (!currentLabel) return undefined;
 
-  const derived = deriveIssueState(issue, workflowOf(deps));
+  const derived = deriveIssueState(issue, workflowOf(deps, issue));
   const worktree = worktreeFor(deps, issue.number);
   if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, currentLabel))) return "needs-human";
   await deps.github.commentIssue(config.repo, issue.number, `Retrying from ${derived.resumeStage}.\n\n<!-- factory:retry v1 -->`);
-  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, derived.resumeStage));
+  await deps.github.setStateLabel(config.repo, issue.number, [currentLabel], labelOf(deps, issue, derived.resumeStage));
   return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
     rejectRound: derived.rejectRounds,
     questionRound: 0, // a human asked for a retry; give it a fresh round of questions if needed
@@ -290,14 +322,14 @@ export async function resumeInReview(issue: GhIssue, deps: WatchDeps, config: Fa
   if (latest && (await commandIsTrusted(deps, config, latest))) {
     const command = parseChatOps(latest.body);
     if (command.type === "cancel") return cancelRun(issue, deps, config);
-    const reviseTo = stepByLabel(workflowOf(deps), LABEL.inReview)?.revise;
+    const reviseTo = stepByLabel(workflowOf(deps, issue), LABEL.inReview)?.revise;
     if (command.type === "revise" && reviseTo) {
       const worktree = worktreeFor(deps, issue.number);
       if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, LABEL.inReview))) return "needs-human";
       await writeRevision(worktree, issue, latest, command.text);
       const head = deps.git.branchName(issue.number);
       if (await deps.github.findPrByHead(config.repo, head)) await deps.github.markReady(config.repo, head, false);
-      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], labelOf(deps, reviseTo));
+      await deps.github.setStateLabel(config.repo, issue.number, [LABEL.inReview], labelOf(deps, issue, reviseTo));
       return runFromStage(deps, config, issue, reviseTo, worktree, ctxFrom(deps, issue));
     }
   }
@@ -367,9 +399,11 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
   const budgetPaused = repoDailyCapHit || machineDailyCapHit;
   const intakeGated = autoStart && !stopIf && !budgetPaused;
   // A schedule files its issue even while intake is paused; the issue waits in factory:ready.
-  await fireCron(deps.github, deps.state, config.repo, workflowOf(deps), deps.now?.() ?? new Date()).catch((err) =>
-    console.error("factory watch: cron trigger failed", err),
-  );
+  for (const workflow of allWorkflows(deps)) {
+    await fireCron(deps.github, deps.state, config.repo, workflow, deps.now?.() ?? new Date()).catch((err) =>
+      console.error("factory watch: cron trigger failed", err),
+    );
+  }
   const [readyRaw, needsInfo, awaitingApproval, failed, needsHuman, inReview, blockedRaw] = await Promise.all([
     intakeGated ? deps.github.listIssuesByLabel(config.repo, LABEL.ready) : Promise.resolve([]),
     deps.github.listIssuesByLabel(config.repo, LABEL.needsInfo),
@@ -430,15 +464,13 @@ export async function pollOnce(deps: WatchDeps, config: FactoryConfig, inFlight?
 // Call once, before the first poll.
 export async function recoverInFlight(deps: WatchDeps, config: FactoryConfig): Promise<number[]> {
   // Every label a step holds while it runs; a terminal step's (in-review) is a waiting state.
-  const running = Object.values(workflowOf(deps).steps)
-    .filter((s) => !STEP_TYPES[s.uses]!.terminal)
-    .map((s) => s.label);
-  const lists = await Promise.all(running.map((l) => deps.github.listIssuesByLabel(config.repo, l)));
-  const issues = lists.flat();
+  const running = new Set(allWorkflows(deps).flatMap((w) => Object.values(w.steps).filter((s) => !STEP_TYPES[s.uses]!.terminal).map((s) => s.label)));
+  const lists = await Promise.all([...running].map((l) => deps.github.listIssuesByLabel(config.repo, l)));
+  const issues = [...new Map(lists.flat().map((i) => [i.number, i])).values()];
   await runPool(issues, dispatchConcurrency(deps, config), async (issue) => {
-    const derived = deriveIssueState(issue, workflowOf(deps));
+    const derived = deriveIssueState(issue, workflowOf(deps, issue));
     const worktree = worktreeFor(deps, issue.number);
-    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, derived.resumeStage)))) return "needs-human";
+    if (!(await ensureWorktreeReady(deps, config, issue.number, worktree, labelOf(deps, issue, derived.resumeStage)))) return "needs-human";
     return runFromStage(deps, config, issue, derived.resumeStage, worktree, {
       rejectRound: derived.rejectRounds,
       questionRound: derived.questionRounds,

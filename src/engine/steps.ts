@@ -4,7 +4,8 @@
 // and moves the label), "reject" (the engine follows `reject:`), or "stop"
 // once it has parked or finished the issue itself, from `step.label`.
 
-import { holdoutEnabled, type FactoryConfig } from "../config";
+import { readFileSync } from "node:fs";
+import { holdoutEnabled, testGate, type FactoryConfig } from "../config";
 import { runHoldout } from "../holdout";
 import {
   stepStop,
@@ -18,8 +19,8 @@ import {
   type TriageArtifact,
 } from "../artifacts";
 import { isChecked } from "../recheck";
-import { runGates } from "../gates";
-import { runProof, type ProofResult } from "../proof";
+import { hasNoGates, NO_GATES_COMMENT, runGates } from "../gates";
+import { runProof, type ProofResult, type ProofStatus } from "../proof";
 import { touchesProtectedPath } from "../boundary";
 import { ShellSetupRunner } from "../setup";
 import type { GhIssue } from "../github";
@@ -153,6 +154,10 @@ const build: StepType = {
   async run(sc) {
     const { deps, config, issue, worktree, step } = sc;
     const issueNumber = issue.number;
+    if (hasNoGates(worktree)) {
+      await postComment(deps, config, issueNumber, NO_GATES_COMMENT);
+      return stop(await stopStep(deps, config, issueNumber, step.label, { status: "needs-human", reason: "no gates in .factory/config.json" }));
+    }
     const result = await runStage(deps, config, issue, "build", worktree, { ...rebuildFrom(sc), mcp: step.mcp });
     const art = await readStageArtifacts(worktree, issueNumber, "build");
     const built = stageJson<BuildArtifact>("build", art.json);
@@ -263,7 +268,7 @@ const verify: StepType = {
     }
     if (deps.proofGit) {
       const planJson = (await readStageArtifacts(worktree, issueNumber, "plan")).json as { proof?: "test" | "check" } | undefined;
-      const testCmd = config.gates.find((g) => g.name === "test")?.cmd;
+      const testCmd = testGate(config.gates)?.cmd;
       let proof: ProofResult;
       try {
         proof = await runProof(deps.proofGit, worktree, config.base, planJson?.proof, testCmd);
@@ -313,6 +318,14 @@ const verify: StepType = {
   },
 };
 
+function readProofStatus(worktree: string, issueNumber: number): ProofStatus | undefined {
+  try {
+    return (JSON.parse(readFileSync(`${worktree}/${runDir(issueNumber)}/proof.json`, "utf8")) as ProofResult).status;
+  } catch {
+    return undefined; // the proof did not run
+  }
+}
+
 const pr: StepType = {
   agent: true,
   terminal: true,
@@ -332,7 +345,7 @@ const pr: StepType = {
         base: config.base,
         head,
         title: `${issue.title} (#${issueNumber})`,
-        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx),
+        body: prBody(deps, config, issue, art.comment ?? `Closes #${issueNumber}`, ctx, readProofStatus(worktree, issueNumber)),
         draft: true,
       }));
     // Opened as a draft while the factory works; ready is the hand-off to a human.

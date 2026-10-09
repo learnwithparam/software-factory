@@ -239,7 +239,12 @@ instead (writing `.claude/settings.json.factory-new` for you to reconcile), and 
 
 Then make three repo-owned files yours:
 
-1. `.factory/config.json` (copy `config.example.json`). The runner refuses to start without it.
+1. `.factory/config.json`. `factory init --repo-dir ../your-repo` writes it: it reads the
+   lockfile, `package.json` scripts, `pyproject.toml`, `go.mod`, `Gemfile`, `Cargo.toml` or a
+   Makefile `check` target, and turns them into gates, setup commands and the commands the build
+   and verify stages may run. It installs the template first when it is missing, leaves a
+   filled-in config alone unless `--force`, and `--pr` opens the result as one pull request.
+   Or copy `config.example.json` by hand. The runner refuses to start without it.
 2. `.factory/charter.md`: what the agent may and may not do here. Replace every `TODO`.
 3. `.factory/gates.sh`: runs your checks from `config.gates` and prints one line the runner parses.
 
@@ -280,6 +285,19 @@ Add `gates` (the commands `gates.sh` runs, each `{ "name": ..., "cmd": ... }`) a
 build). Stages get only what the config grants, through `--settings` on `claude -p`; a project
 `permissions.allow` block is ignored in headless mode. `gates.sh` prints
 `FACTORY_GATES: status=GREEN|RED|MISCONFIGURED passed=N failed=N skipped=N failed_gates=a,b`.
+A gate may name its `role` (`test`, `lint`, `typecheck`, `build`, `format`, `audit` or `docs`). The
+proof reverts the change and runs the `role: "test"` gate, or the one named `test`; with neither,
+the PR's run summary says the proof was unavailable. A config with no gates parks each issue
+before the build agent runs, with a comment saying how to add one. A docs-only repo needs only a
+lint or link-check gate.
+In a monorepo, `packages` lists each package as `{ "path": "packages/api", "gates": [...] }`. Its
+gates run from its own directory, and only when the diff against `base` touches a file under its
+path; `"always": true` runs them every time. Top-level `gates` always run. With no base to diff
+against, or a diff that touches no package, every package runs. The proof runs only a top-level
+test gate.
+Each worktree gets its own free port in `$FACTORY_PORT`, set for every stage and for `gates.sh`.
+An app that binds a port (a dev server, an end-to-end test) should read it, so builds of two
+issues at once never collide.
 `postEditCommand` (off by default) is an argv list the build stage runs after every edit, with
 `{file}` replaced by the edited path, for example `["bunx", "biome", "check", "--write", "--no-errors-on-unmatched", "{file}"]` (the flag keeps an edit to a file Biome skips, such as Markdown, from failing);
 a failure's output goes straight back to the agent. Unknown keys and a missing `repo` are errors, other missing fields take the defaults in
@@ -332,6 +350,7 @@ dependency bump), clone it to see the loop run against something real before wir
 
 | Command | Does |
 |---|---|
+| `factory init [--repo-dir <path>] [--dry-run] [--force] [--pr]` | detect the repo's stack and write `.factory/config.json`, installing the template first if missing |
 | `factory install <target-dir> [--dry-run] [--update] [--ci]` | install or update the template in a repo |
 | `factory doctor --repo-dir <path> [--fix]` | check `gh`, each agent's binary, `python3`, `jq` on PATH, `gh auth status`, config, charter, gates.sh, baseline tag, labels |
 | `factory up [--repo-dir <path> \| --repo <owner/name>] [--tmux]` | watch + dashboard in one process, the Docker/VM entrypoint; `--tmux` runs each in a tmux window |
@@ -342,7 +361,7 @@ dependency bump), clone it to see the loop run against something real before wir
 | `factory tick [--repo-dir <path> \| --repo <owner/name>]` | one poll pass across every open issue, then exit (cron) |
 | `factory park --repo-dir <path> --issue <N> --reason <text>` | park an issue as `needs-human` from outside the loop |
 | `factory dashboard [--repo <owner/name>] [--port <n>]` | serve the board on :4100 |
-| `factory scan --repo-dir <path>` | file issues from `bun audit` findings, one per package. Bun/npm projects only |
+| `factory scan --repo-dir <path>` | file issues from `osv-scanner` findings, one per package, for any lockfile it reads; without osv-scanner, a Bun project falls back to `bun audit` |
 | `factory rebaseline --repo-dir <path> [--dry-run]` | move the baseline tag to the current base, keeping merged setup changes across reset |
 | `factory reset --repo-dir <path> [--dry-run]` | **destructive**: force-pushes the base branch to the baseline tag |
 

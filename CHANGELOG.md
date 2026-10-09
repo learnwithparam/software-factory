@@ -1,5 +1,43 @@
 # Changelog
 
+## v3.4.0
+
+Any repo, any stack. Upgraders: nothing to change. A gate with no `role` still runs; give your test
+gate `"role": "test"` so the proof can find it.
+
+- Gate roles: `role` on a gate (`test`, `typecheck`, `lint`, `build`). The proof runs the `test`
+  gate. A repo with no test gate records `proof: unavailable` in the PR summary instead of skipping
+  silently. A repo with no gates at all parks each issue before build with "add a gate".
+- `factory init`: reads the repo's own files (Bun, npm, pnpm, yarn, uv, poetry, pip, Go, Ruby and
+  Rails, Rust, a Makefile `check` target) and writes `.factory/config.json` gates, setup and the
+  commands build and verify may run. It installs the template first if it is missing, leaves a
+  filled-in config alone unless `--force`, and `--pr` opens the change as one pull request.
+- Monorepos: `packages` in config gives each path its own gates. Only the packages the diff touches
+  run, plus any marked `always`; a diff that touches none runs them all.
+- `factory scan` uses `osv-scanner` for any lockfile and falls back to `bun audit`. The CI scan job
+  installs a pinned, checksummed `osv-scanner`, so it is no longer Bun only.
+- `FACTORY_PORT`: each worktree gets its own free port, kept for its life, in the agent's env and the
+  gates', so two builds of an app that binds a port do not collide.
+- Workflow library: `bug-to-pr`, `docs-to-pr` and `approved-plan-to-pr` ship next to
+  `feature-to-pr`. `routes.<type>.workflow` runs an issue type on its own workflow, recorded on the
+  thread at pickup so resume, recovery and cron follow it. See [docs/workflows.md](docs/workflows.md).
+- `factory harness validate` loads every workflow the repo has or names and exits 4 on a problem;
+  `factory harness inventory` lists each one's steps, cron triggers and routed types.
+
+Not in this release:
+
+- Per-package owners and protected paths; `packages` gives gates only.
+- The proof in a monorepo runs only the top-level `test` gate, not a package's.
+- A workflow is chosen from the type label an issue was filed with; a type triage assigns later does
+  not switch it.
+- Library workflows that need new step types: pr-review, test-authoring, coverage-gap, flaky-test,
+  dependency-update, ci-fix, ci-cd-authoring, release-notes, harness-learn, ui-component,
+  spec-to-plan and backlog-triage.
+- `factory harness scaffold` and `eval`.
+- Per-language Docker images and devcontainer support for the docker and ssh runtimes.
+- Concrete `scaleup` and `enterprise` profile rules (CODEOWNERS approvers, org caps, forced sandbox).
+- A `toolchain` config key, and `factory init` writing `charter.md`.
+
 ## v3.3.0
 
 Remote and async execution, with GitHub as the store that every worker shares. Upgraders: nothing

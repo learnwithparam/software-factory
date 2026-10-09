@@ -36,10 +36,14 @@ import { FixtureRecorder } from "./agents/record";
 import { configFor, defaultFixtureDir, formatReport, reportFor } from "./verify-agent";
 import { ShellProofGit } from "./proof";
 import { runLearn } from "./learn";
-import { workflowFor } from "./engine/workflows";
+import { routeWorkflowsFor, workflowFor } from "./engine/workflows";
+import { formatInventory, harnessReport } from "./harness";
 import { GitLeases } from "./adapters/git-lease/lease";
 import { GitHubSpend } from "./adapters/github-store/spend";
 import { runtimeRefs, runtimesFrom, unknownRuntimes } from "./runtimes";
+import { detectStack, diskFiles } from "./stack";
+import { describeStack, initConfig, isFilledIn } from "./init";
+import { repoFromRemoteUrl } from "./config";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -96,15 +100,17 @@ async function requireTmux(config: FactoryConfig): Promise<void> {
 async function buildWatchDeps(cloneDir: string, config: FactoryConfig): Promise<WatchDeps> {
   const tmux = tmuxFor(config);
   const workflow = await workflowFor(cloneDir, config);
+  const routeWorkflows = await routeWorkflowsFor(cloneDir, config);
   const machineConfig = loadMachineConfig();
   const runtimes = runtimesFrom(machineConfig.runtimes);
-  const unknown = unknownRuntimes(runtimeRefs(config, workflow.steps), runtimes);
+  const unknown = [...new Set([workflow, ...Object.values(routeWorkflows)].flatMap((w) => unknownRuntimes(runtimeRefs(config, w.steps), runtimes)))];
   if (unknown.length) throw new Error(unknown.join("\n"));
   const github = new GitHub();
   // This process, as leases and the spend ledger name it.
   const holder = `${hostname()}-${process.pid}`;
   return {
     workflow,
+    routeWorkflows,
     runtimes,
     runFiles: { transcript: (n) => transcriptPath(config.repo, n), live: (n) => livePath(config.repo, n) },
     ...(tmux ? { view: tmuxIssueView(tmux, config.repo) } : {}),
@@ -257,10 +263,11 @@ async function cmdInbox(): Promise<void> {
 async function cmdScan(): Promise<void> {
   const cloneDir = await resolveCloneDir();
   const config = await loadConfig(cloneDir);
-  // scan shells out to `bun audit`/`bun outdated`, not `git`: Bun projects only.
-  const bunRunner = {
-    run: async (a: string[], opts?: { cwd?: string }) => {
-      const proc = Bun.spawn(["bun", ...a], { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
+  // scan shells out to osv-scanner, or to `bun audit` without it: not `git`, so its own runner.
+  const runner = {
+    run: async (argv: string[], opts?: { cwd?: string }) => {
+      if (!Bun.which(argv[0]!)) return { stdout: "", stderr: `${argv[0]}: not installed`, code: 127 };
+      const proc = Bun.spawn(argv, { cwd: opts?.cwd, stdout: "pipe", stderr: "pipe" });
       const [stdout, stderr, code] = await Promise.all([
         new Response(proc.stdout).text(),
         new Response(proc.stderr).text(),
@@ -269,12 +276,12 @@ async function cmdScan(): Promise<void> {
       return { stdout, stderr, code };
     },
   };
-  const result = await scan({ github: new GitHub(), runner: bunRunner }, config.repo, cloneDir);
+  const result = await scan({ github: new GitHub(), runner }, config.repo, cloneDir);
   if (result.skippedReason) {
     console.log(`factory scan: skipped — ${result.skippedReason}`);
     return;
   }
-  console.log(`factory scan: filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
+  console.log(`factory scan (${result.source}): filed ${result.filed.length}, skipped ${result.skipped.length} (already open)`);
   for (const t of result.filed) console.log(`  + ${t}`);
 }
 
@@ -612,10 +619,7 @@ async function cmdInstall(): Promise<void> {
     ...(has("ci") ? ["--ci"] : []),
     ...(flag("agents") ? ["--agents", flag("agents")!] : []),
   ];
-  const script = resolve(import.meta.dir, "..", "install.sh");
-  const proc = Bun.spawn(["bash", script, target, ...passthrough], { stdout: "inherit", stderr: "inherit" });
-  const code = await proc.exited;
-  if (code !== 0) process.exit(code);
+  await runInstallScript(target, passthrough);
   if (has("dry-run")) return;
   // Labels are cheap and idempotent, so create them right after a real install
   // instead of making every repo run a separate `doctor --fix` first. Best
@@ -630,10 +634,76 @@ async function cmdInstall(): Promise<void> {
   }
 }
 
+async function runInstallScript(target: string, extra: string[] = []): Promise<void> {
+  const proc = Bun.spawn(["bash", resolve(import.meta.dir, "..", "install.sh"), target, ...extra], { stdout: "inherit", stderr: "inherit" });
+  const code = await proc.exited;
+  if (code !== 0) process.exit(code);
+}
+
+// `factory init`: install the template if it is missing, then write
+// .factory/config.json from what the repo's own files say. A filled-in
+// config is left alone unless --force. --pr opens it as one pull request.
+async function cmdInit(): Promise<void> {
+  const dir = resolve(flag("repo-dir") ?? ".");
+  const dry = has("dry-run");
+  if (!existsSync(join(dir, ".factory", "gates.sh")) && !dry) await runInstallScript(dir);
+  const stack = detectStack(diskFiles(dir));
+  for (const line of describeStack(stack)) console.log(`factory init: ${line}`);
+  const target = join(dir, ".factory", "config.json");
+  const current = existsSync(target) ? readFileSync(target, "utf8") : undefined;
+  if (isFilledIn(current) && !has("force")) {
+    console.log(`factory init: ${target} is already filled in; left alone (--force rewrites it)`);
+    return;
+  }
+  const remote = Bun.spawnSync(["git", "remote", "get-url", "origin"], { cwd: dir });
+  const repo = remote.exitCode === 0 ? repoFromRemoteUrl(remote.stdout.toString().trim()) : undefined;
+  const example = JSON.parse(readFileSync(resolve(import.meta.dir, "..", "template", ".factory", "config.example.json"), "utf8")) as Record<string, unknown>;
+  const text = `${JSON.stringify(initConfig(example, stack, repo), null, 2)}\n`;
+  if (dry) {
+    process.stdout.write(text);
+    return;
+  }
+  await Bun.write(target, text);
+  console.log(`factory init: wrote ${target}${repo ? "" : " (no github origin remote: set \"repo\" by hand)"}`);
+  if (has("pr")) {
+    const git = (...a: string[]) => {
+      const r = Bun.spawnSync(["git", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+      if (r.exitCode !== 0) throw new Error(`git ${a.join(" ")} failed: ${r.stderr.toString().trim()}`);
+    };
+    git("switch", "-c", "factory/init");
+    git("add", "-A", ".factory", ".claude", ".agents", "AGENTS.md");
+    git("commit", "-m", `factory: init for a ${stack.name} repo`);
+    git("push", "-u", "origin", "factory/init");
+    const pr = Bun.spawnSync(["gh", "pr", "create", "--head", "factory/init", "--title", "factory: init", "--body", describeStack(stack).map((l) => `- ${l}`).join("\n")], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+    if (pr.exitCode !== 0) throw new Error(`gh pr create failed: ${pr.stderr.toString().trim()}`);
+    console.log(`factory init: opened ${pr.stdout.toString().trim()}`);
+  }
+  console.log("factory init: next, fill the TODOs in .factory/charter.md, then run `factory doctor --repo-dir " + dir + "`");
+}
+
+// `factory harness validate|inventory`: the repo's workflows, checked as the watcher loads them, or listed.
+async function cmdHarness(): Promise<void> {
+  const sub = args[1];
+  if (sub !== "validate" && sub !== "inventory") throw new UsageError("usage: factory harness (validate | inventory) --repo-dir <path> [--json]");
+  const dir = resolve(flag("repo-dir") ?? ".");
+  const report = await harnessReport(dir, await loadConfig(dir));
+  if (has("json")) {
+    console.log(successJson({ problems: report.problems, workflows: report.entries.map(({ workflow, ...e }) => ({ ...e, steps: workflow ? Object.keys(workflow.steps) : [] })) }, sub === "inventory" || !report.problems.length));
+  } else if (sub === "inventory") {
+    for (const line of formatInventory(report)) console.log(line);
+  } else {
+    for (const p of report.problems) console.log(`factory harness: ${p}`);
+    if (!report.problems.length) console.log(`factory harness: ${report.entries.length} workflows, all valid`);
+  }
+  if (sub === "validate" && report.problems.length) process.exit(EXIT.checksFailed);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "up":
       return cmdUp();
+    case "init":
+      return cmdInit();
     case "watch":
       return cmdWatch();
     case "run":
@@ -668,6 +738,8 @@ async function main(): Promise<void> {
       return cmdTakeover();
     case "daemon":
       return cmdDaemon();
+    case "harness":
+      return cmdHarness();
     default:
       console.log(helpText());
       if (command && !["help", "--help", "-h"].includes(command)) process.exit(EXIT.error);

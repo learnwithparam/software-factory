@@ -4,9 +4,13 @@
 // `.factory/gates.sh` directly and parses the one line it's contracted to
 // print: `FACTORY_GATES: status=... passed=N failed=N skipped=N failed_gates=a,b`.
 
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ExecutionPort } from "./ports/execution";
 import type { GateResult, GateRunner } from "./ports/check";
 import { LocalExecution } from "./adapters/local/execution";
+import { gateCount } from "./config";
+import { worktreePort } from "./port";
 export type { GateResult, GateRunner };
 
 const LINE_RE = /FACTORY_GATES:\s*status=(\w+)\s+passed=(\d+)\s+failed=(\d+)\s+skipped=(\d+)\s+failed_gates=(\S*)/;
@@ -28,7 +32,8 @@ export function parseGateLine(output: string): GateResult | undefined {
 export class ShellGateRunner implements GateRunner {
   constructor(private readonly exec: ExecutionPort = new LocalExecution()) {}
   run(worktreeDir: string) {
-    return this.exec.run("bash .factory/gates.sh", worktreeDir);
+    const port = worktreePort(worktreeDir);
+    return this.exec.run(`${port ? `FACTORY_PORT=${port} ` : ""}bash .factory/gates.sh`, worktreeDir);
   }
 }
 
@@ -46,3 +51,20 @@ export async function runGates(gateRunner: GateRunner, worktreeDir: string): Pro
     raw: combined.slice(-2000),
   };
 }
+
+// True when the worktree's config lists no gates, so no build there can ever go
+// green. Checked before the build agent runs, so it costs no tokens. A missing or
+// unreadable config is left to gates.sh, which names it.
+export function hasNoGates(worktreeDir: string): boolean {
+  const file = join(worktreeDir, ".factory", "config.json");
+  if (!existsSync(file)) return false;
+  try {
+    return gateCount(JSON.parse(readFileSync(file, "utf8"))) === 0;
+  } catch {
+    return false;
+  }
+}
+
+export const NO_GATES_COMMENT = `This repo has no gates in \`.factory/config.json\`, so no build here can be checked, and the factory parked this issue instead of building it.
+
+Add a gate: run \`factory init\` to detect the stack and write them, or add one by hand. A docs-only repo can ship with one lint or link-check gate. Then move this issue back to \`factory:ready\`.`;

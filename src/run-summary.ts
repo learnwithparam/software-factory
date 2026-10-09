@@ -3,6 +3,7 @@
 // turns it off for a repo whose PRs should not show models and spend.
 
 import { OPERATOR_TAKEOVER } from "./executor";
+import type { ProofStatus } from "./proof";
 import type { StageRun } from "./state";
 
 export interface RunSummaryCtx {
@@ -10,7 +11,17 @@ export interface RunSummaryCtx {
   readonly rejectRounds: number;
   // Trusted /factory retry comments on the issue.
   readonly retries: number;
+  // The runner's revert check from proof.json, when it ran.
+  readonly proof?: ProofStatus;
 }
+
+const PROOF_LINE: Record<ProofStatus, string> = {
+  bites: "the new test fails without the change",
+  "passes-without": "the new test also passes without the change",
+  "no-tests": "the diff adds no test",
+  skipped: "skipped: the plan's proof is check, so the named checks were re-run instead",
+  unavailable: "unavailable: the repo has no test gate, so nothing showed the change works",
+};
 
 function seconds(ms: number): string {
   const s = Math.round(ms / 1000);
@@ -44,6 +55,7 @@ export function renderRunSummary(runs: readonly StageRun[], ctx: RunSummaryCtx):
   const known = rows.filter((r) => r.cost_usd !== null).reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
   const unknown = rows.filter((r) => r.cost_usd === null).length;
   const total = rows.reduce((sum, r) => sum + r.duration_ms, 0);
+  if (ctx.proof) lines.push("", `Proof: ${PROOF_LINE[ctx.proof]}.`);
   lines.push("", `${rows.length} stage runs, ${seconds(total)}, $${known.toFixed(2)}${unknown ? ` plus ${unknown} not reported` : ""}.`);
 
   const stages = [...new Set(rows.map((r) => r.stage))];
