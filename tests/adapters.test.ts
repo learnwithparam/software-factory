@@ -101,3 +101,27 @@ describe("adapters", () => {
     return { port, peer: () => port };
   });
 });
+
+describe("git-lease held()", () => {
+  test("another clone sees each lease ref with its holder, and a release as expiresAt 0", async () => {
+    const { port, peer } = gitLeases();
+    const other = peer();
+    expect(await other.held()).toEqual([]);
+    expect(await port.acquire("issue-7", "w1", 30_000, 1_000)).toBe(true);
+    expect(await port.acquire("issue-9", "w1", 30_000, 1_000)).toBe(true);
+    await port.release("issue-9", "w1");
+    const held = (await other.held()).sort((a, b) => a.key.localeCompare(b.key));
+    expect(held).toEqual([
+      { key: "issue-7", holder: "w1", expiresAt: 31_000 },
+      { key: "issue-9", holder: "w1", expiresAt: 0 },
+    ]);
+  });
+
+  // An empty list would read as "nobody holds anything"; the Settings page has to say it could not look.
+  test("a remote it cannot read throws instead of reporting no leases", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "factory-lease-"));
+    Bun.spawnSync(["git", "init", "-q", dir]);
+    Bun.spawnSync(["git", "remote", "add", "origin", join(dir, "missing.git")], { cwd: dir });
+    await expect(new GitLeases(dir).held()).rejects.toThrow(/ls-remote/);
+  });
+});

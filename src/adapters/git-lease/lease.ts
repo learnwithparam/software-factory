@@ -60,4 +60,20 @@ export class GitLeases implements LeasePort {
     if (cur === "error" || !cur || cur.record?.holder !== holder) return;
     await this.write(ref, cur.sha, encodeLease({ holder, expiresAt: 0 }));
   }
+
+  // Every lease ref on the remote and its record, for the dashboard's Settings page.
+  // Released and expired leases are listed too; the caller decides what is live.
+  async held(): Promise<Array<{ key: string; holder: string; expiresAt: number }>> {
+    const ls = await git(["ls-remote", "origin", "refs/factory/lease/*"], this.cloneDir);
+    if (ls.code !== 0) throw new Error(`git ls-remote: ${ls.stderr.trim() || `exit ${ls.code}`}`);
+    const refs = ls.stdout.split("\n").map((l) => l.split("\t")).filter((p): p is [string, string] => p.length === 2 && p[1]!.startsWith("refs/factory/lease/"));
+    if (refs.length === 0) return [];
+    if ((await git(["fetch", "-q", "origin", ...refs.map(([sha]) => sha)], this.cloneDir)).code !== 0) throw new Error("git fetch of the lease commits failed");
+    const out: Array<{ key: string; holder: string; expiresAt: number }> = [];
+    for (const [sha, ref] of refs) {
+      const record = decodeLease((await git(["log", "-1", "--format=%B", sha], this.cloneDir)).stdout);
+      if (record) out.push({ key: ref.slice("refs/factory/lease/".length), ...record });
+    }
+    return out;
+  }
 }

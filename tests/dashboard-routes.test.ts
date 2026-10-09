@@ -10,6 +10,8 @@ import { join } from "node:path";
 import { GitHub, type GhIssue, type GhPr, type MergeReadiness, type PrStatus } from "../src/github";
 import { LABEL } from "../src/labels";
 import { FactoryState, type StageRunInput } from "../src/state";
+import { DEFAULT_CONFIG, type FactoryConfig } from "../src/config";
+import type { DashboardProject } from "../dashboard/project";
 
 class FakeGitHub extends GitHub {
   posted: { issue: number; body: string }[] = [];
@@ -65,14 +67,14 @@ const TOKEN = "s3cret-token";
 const scratch = mkdtempSync(join(tmpdir(), "factory-routes-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
-async function make(token: string, issues: GhIssue[] = []) {
+async function make(token: string, issues: GhIssue[] = [], project?: DashboardProject) {
   const before = process.env.FACTORY_DASHBOARD_TOKEN;
   process.env.FACTORY_DASHBOARD_TOKEN = token;
   try {
     const mod = await import(`../dashboard/server.ts?token=${token || "none"}`);
     const state = new FactoryState(":memory:");
     const github = new FakeGitHub(issues);
-    return { mod, state, github, dashboard: mod.createDashboard(state, github, "acme/widgets", false, scratch) };
+    return { mod, state, github, dashboard: mod.createDashboard(state, github, "acme/widgets", false, scratch, undefined, undefined, project) };
   } finally {
     if (before === undefined) delete process.env.FACTORY_DASHBOARD_TOKEN;
     else process.env.FACTORY_DASHBOARD_TOKEN = before;
@@ -369,9 +371,78 @@ describe("line and assets", () => {
     const css = await dashboard.handle(new Request("http://localhost:4100/styles.css"), "10.0.0.9");
     expect(css.status).toBe(200);
     expect(css.headers.get("content-type")).toContain("text/css");
-    const font = await dashboard.handle(new Request("http://localhost:4100/fonts/manrope-latin.woff2"), "10.0.0.9");
+    const tokens = await dashboard.handle(new Request("http://localhost:4100/tokens.css"), "10.0.0.9");
+    expect(tokens.status).toBe(200);
+    expect(tokens.headers.get("content-type")).toContain("text/css");
+    const font = await dashboard.handle(new Request("http://localhost:4100/fonts/inter-400.woff2"), "10.0.0.9");
+    expect(font.status).toBe(200);
     expect(font.headers.get("content-type")).toContain("font/woff2");
     expect((await dashboard.handle(new Request("http://localhost:4100/lib/..%2Fserver.js"), "10.0.0.9")).status).toBe(401);
+  });
+});
+
+// A clone with one good repo workflow, one broken one, and a route to a workflow that does not exist.
+function project(over: Partial<DashboardProject> = {}): DashboardProject {
+  const cloneDir = mkdtempSync(join(scratch, "clone-"));
+  mkdirSync(join(cloneDir, ".factory", "workflows"), { recursive: true });
+  writeFileSync(join(cloneDir, ".factory", "workflows", "broken.yml"), "name: broken\nsteps: [\n");
+  const config = { ...DEFAULT_CONFIG, runtime: { gates: "box" }, routes: { ...DEFAULT_CONFIG.routes, bug: { ...DEFAULT_CONFIG.routes?.bug, workflow: "bug-to-pr" }, chore: { workflow: "nowhere" } } } as unknown as FactoryConfig;
+  return {
+    cloneDir,
+    config,
+    machine: { slots: 3, runtimes: { box: { kind: "ssh", host: "build-1", dir: "/w" } } },
+    leases: async () => [{ key: "issue-4", holder: "laptop", expiresAt: Date.now() + 20_000 }, { key: "issue-5", holder: "ci", expiresAt: 0 }],
+    ...over,
+  };
+}
+
+describe("workflows and settings", () => {
+  test("with no repo dir, both pages say how to get one instead of guessing", async () => {
+    const { dashboard } = await make("");
+    for (const path of ["/api/workflows", "/api/settings"]) {
+      const body = (await (await dashboard.handle(new Request(`http://localhost:4100${path}`), "127.0.0.1")).json()) as { available: boolean; reason: string };
+      expect(body).toMatchObject({ available: false });
+      expect(body.reason).toContain("--repo-dir");
+    }
+  });
+
+  test("/api/workflows is the harness report: every workflow, its routes, and each problem", async () => {
+    const { dashboard } = await make("", [], project());
+    const body = (await (await dashboard.handle(new Request("http://localhost:4100/api/workflows"), "127.0.0.1")).json()) as {
+      problems: string[];
+      workflows: { name: string; source: string; routedTypes: string[]; problems: string[]; steps: { id: string }[] }[];
+    };
+    const byName = Object.fromEntries(body.workflows.map((w) => [w.name, w]));
+    expect(byName["broken"]).toMatchObject({ source: "repo", steps: [] });
+    expect(byName["broken"]!.problems.length).toBeGreaterThan(0);
+    expect(byName["bug-to-pr"]).toMatchObject({ source: "runner", routedTypes: ["bug"] });
+    expect(byName["feature-to-pr"]!.routedTypes).toContain("*");
+    expect(byName["feature-to-pr"]!.steps.length).toBeGreaterThan(3);
+    expect(body.problems.some((p) => p.startsWith(".factory/workflows/broken.yml"))).toBe(true);
+    expect(body.problems.some((p) => p.startsWith("routes.chore.workflow"))).toBe(true);
+  });
+
+  test("/api/settings lists built-in and machine runtimes with what uses them, and every lease", async () => {
+    const { dashboard } = await make("", [], project());
+    const body = (await (await dashboard.handle(new Request("http://localhost:4100/api/settings"), "127.0.0.1")).json()) as {
+      slots: number;
+      runtimes: { name: string; kind: string; builtin: boolean; target: string; usedBy: string[] }[];
+      leases: { key: string; live: boolean }[];
+      leasesError: string | null;
+    };
+    expect(body.slots).toBe(3);
+    expect(body.runtimes.map((r) => r.name)).toEqual(["local", "lwpr", "box"]);
+    expect(body.runtimes.find((r) => r.name === "box")).toMatchObject({ kind: "ssh", builtin: false, target: "build-1:/w", usedBy: ["runtime.gates"] });
+    expect(body.runtimes.find((r) => r.name === "local")).toMatchObject({ builtin: true, usedBy: [] });
+    expect(body.leases).toEqual([expect.objectContaining({ key: "issue-4", live: true }), expect.objectContaining({ key: "issue-5", live: false })]);
+    expect(body.leasesError).toBeNull();
+  });
+
+  test("a remote that cannot be read is said on the page, and the rest still loads", async () => {
+    const { dashboard } = await make("", [], project({ leases: async () => { throw new Error("git ls-remote: no route to host"); } }));
+    const res = await dashboard.handle(new Request("http://localhost:4100/api/settings"), "127.0.0.1");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ leases: [], leasesError: "git ls-remote: no route to host" });
   });
 });
 
@@ -416,7 +487,7 @@ describe("text is plain()-ed on every read route", () => {
       number: 1, title: `t${ESC}`, body: `b${ESC}`, labels: [{ name: LABEL.needsInfo }],
       comments: [{ id: 1, author: "bot", authorAssociation: "NONE", body: `<!-- factory:plan v1 -->\nplan${ESC}`, createdAt: "2026-09-20T10:00:00Z" }],
     };
-    const { dashboard, state } = await make("", [issue]);
+    const { dashboard, state } = await make("", [issue], project({ leases: async () => [{ key: "issue-1", holder: `w${ESC}`, expiresAt: 1 }], machine: { slots: 1, runtimes: { box: { kind: "docker", image: `img${ESC}` } } } }));
     const run = state.upsertRun({ issue: 1, repo: "acme/widgets", title: `run${ESC}`, stage: "build", status: "running" });
     state.appendEvent(run.id, "build", "text", `event${ESC}`);
     state.recordStageRun({

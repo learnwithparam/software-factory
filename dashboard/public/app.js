@@ -15,9 +15,11 @@ const ICONS = {
   runs: "M4 5h16M4 10h16M4 15h16M4 20h10",
   analytics: "M5 20V10M12 20V4M19 20v-7",
   agents: "M8 8h8v8H8zM4 10v4M20 10v4M10 4h4M10 20h4",
+  workflows: "M4 5h6v4H4zM14 15h6v4h-6zM7 9v3h10v3",
+  settings: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1",
   theme: "M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z",
 };
-const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["analytics", "Analytics"], ["agents", "Agents"]];
+const NAV = [["inbox", "Inbox"], ["line", "Line"], ["runs", "Runs"], ["workflows", "Workflows"], ["analytics", "Analytics"], ["agents", "Agents"], ["settings", "Settings"]];
 
 const state = { route: routeFromHash(location.hash), inbox: [], repo: "", repos: [], repoFilter: "", selected: null, thread: null, review: null, filter: "all", data: {}, error: {} };
 
@@ -306,9 +308,50 @@ function agentsView() {
         h("td", null, r.stages.length ? r.stages.join(", ") : "None"))))))));
 }
 
+/* ---- Workflows: factory harness inventory and validate ---- */
+const ROUTED = (w) => (w.routedTypes.includes("*") ? "The repo's workflow" : w.routedTypes.length ? `Issue types: ${w.routedTypes.join(", ")}` : "Not routed");
+
+function workflowsView() {
+  return h("section", null, heading("Workflows", "Every workflow this repo can run, the issue types routed to each, and whether they all load."),
+    stateOr("workflows", (d) => !d.available ? quiet("No repo to read", d.reason) : h("div", null,
+      h("div", { class: "panel panel-pad harness" }, h("h2", null, "Harness check"),
+        d.problems.length
+          ? h("ul", { class: "plain-list" }, d.problems.map((p) => h("li", null, h("span", { class: "status", "data-tone": "bad" }, p))))
+          : h("span", { class: "status", "data-tone": "ok" }, "Every workflow loads, and every route names one that exists.")),
+      h("div", { class: "table-wrap" }, h("table", null,
+        h("thead", null, h("tr", null, ["Workflow", "From", "Runs for", "Steps", "Schedule"].map((c) => h("th", null, c)))),
+        h("tbody", null, d.workflows.map((w) => h("tr", null,
+          h("td", null, h("span", { class: "status", "data-tone": w.problems.length ? "bad" : "ok" }, w.name), w.problems.length ? h("div", { class: "muted" }, w.problems.join("; ")) : null),
+          h("td", null, w.source === "repo" ? ".factory/workflows" : "Runner"),
+          h("td", null, ROUTED(w)),
+          h("td", null, h("span", { class: "steps" }, w.steps.map((st) => h("code", { title: st.runtime ? `runs on ${st.runtime}` : st.uses }, st.uses === st.id ? st.id : `${st.id} (${st.uses})`)))),
+          h("td", null, w.cron.length ? w.cron.map((c) => h("div", null, `${c.schedule} ${c.tz}: ${c.title}`)) : "On issue labels")))))))));
+}
+
+/* ---- Settings: runtimes and leases ---- */
+function settingsView() {
+  return h("section", null, heading("Settings", "Where gates and checks run, and which worker holds each issue right now."),
+    stateOr("settings", (d) => !d.available ? quiet("No repo to read", d.reason) : h("div", null,
+      h("dl", { class: "kv" }, h("dt", null, "Slots"), h("dd", null, String(d.slots)), h("dt", null, "Daily cap"), h("dd", null, d.dailyUsd == null ? "None set" : money(d.dailyUsd))),
+      h("h2", null, "Runtimes"),
+      h("div", { class: "table-wrap" }, h("table", null,
+        h("thead", null, h("tr", null, ["Runtime", "Kind", "Target", "Used by"].map((c) => h("th", null, c)))),
+        h("tbody", null, d.runtimes.map((r) => h("tr", null,
+          h("td", null, h("span", { class: "status", "data-tone": r.usedBy.length ? "live" : "" }, r.name), r.builtin ? h("span", { class: "muted" }, " built in") : null),
+          h("td", null, r.kind), h("td", null, h("code", null, r.target)),
+          h("td", null, r.usedBy.length ? r.usedBy.join(", ") : "Nothing in this repo")))))),
+      h("h2", { class: "section-gap" }, "Issue leases"),
+      d.leasesError ? h("p", { class: "error" }, `Could not read the lease refs: ${d.leasesError}`)
+        : !d.leases.length ? quiet("No leases", "A worker takes refs/factory/lease/<issue> while it runs an issue.")
+        : h("div", { class: "table-wrap" }, h("table", null,
+          h("thead", null, h("tr", null, ["Issue", "Holder", "State"].map((c) => h("th", null, c)))),
+          h("tbody", null, d.leases.map((l) => h("tr", null, h("td", null, l.key), h("td", null, l.holder),
+            h("td", null, h("span", { class: "status", "data-tone": l.live ? "live" : "" }, l.live ? `Held, expires in ${Math.max(1, Math.round((l.expiresAt - Date.now()) / 1000))}s` : l.expiresAt === 0 ? "Released" : "Expired"))))))))));
+}
+
 /* ---- shell ---- */
-const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runsView, analytics: analyticsView, agents: agentsView };
-const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["runs", "/api/runs"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"] };
+const VIEWS = { inbox: inboxView, line: lineView, runs: runsView, task: runsView, workflows: workflowsView, analytics: analyticsView, agents: agentsView, settings: settingsView };
+const LOADERS = { line: ["line", "/api/line"], runs: ["runs", "/api/runs"], task: ["runs", "/api/runs"], workflows: ["workflows", "/api/workflows"], analytics: ["analytics", "/api/analytics"], agents: ["agents", "/api/agents"], settings: ["settings", "/api/settings"] };
 
 function renderNav() {
   const nav = document.getElementById("nav");

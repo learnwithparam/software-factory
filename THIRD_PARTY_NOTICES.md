@@ -79,12 +79,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-## Manrope (font)
+## Inter and Inconsolata (fonts)
 
-`dashboard/public/fonts/manrope-latin.woff2` is the Latin subset of Manrope, copied from the build output
-of owainlewis/machinist@3943516. Copyright 2018 The Manrope Project Authors
-(https://github.com/sharanda/manrope), SIL Open Font License 1.1. The licence text is in
-`dashboard/public/fonts/OFL.txt`, shipped beside the font.
+`dashboard/public/fonts/inter-{400,700}.woff2` are Inter (Copyright 2016 The Inter Project Authors,
+https://github.com/rsms/inter) and `inconsolata-{400,700}.woff2` are Inconsolata (Copyright 2006 The
+Inconsolata Project Authors, https://github.com/cyrealtype/Inconsolata), both SIL Open Font License 1.1,
+copied from the learnwithparam workshop design kit. Each licence text ships beside its font as
+`LICENSE-inter.txt` and `LICENSE-inconsolata.txt`.
 
 ## mastra-ai/mastra@68fece5
 
