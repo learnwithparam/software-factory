@@ -26,6 +26,8 @@ import { runDir, readGateEvidence, readStageArtifacts } from "../src/artifacts";
 import { ciStatusNow } from "../src/ci";
 import { attemptMerge, decideOperatorMerge, renderOperatorAuditComment } from "../src/merge-policy";
 import { analytics } from "./analytics";
+import { NO_PROJECT, settingsView, workflowsView, type DashboardProject } from "./project";
+import { harnessReport } from "../src/harness";
 import { readCapped, readDelivery, signatureMatches, WAKING_EVENTS, WEBHOOK_MAX_BYTES, WEBHOOK_SECRET_ENV } from "../src/webhook";
 
 // GitHub cannot hold a dashboard token, so this route authenticates by HMAC
@@ -89,7 +91,7 @@ function plainIssue<T extends { title: string; body: string; comments: { body: s
   return { ...issue, title: plain(issue.title), body: plain(issue.body), comments: issue.comments.map((c) => ({ ...c, body: plain(c.body) })) };
 }
 
-export function createDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }) {
+export function createDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, workspaces = workspacesDir(process.env, repo || undefined), fleet: Pick<FactoryConfig, "agents" | "stages"> = DEFAULT_CONFIG, probes: { which: typeof which; versionOf: typeof versionOf } = { which, versionOf }, project?: DashboardProject) {
   const indexHtml = readFileSync(join(here, "public", "index.html"), "utf8");
 
   const sessions = new Map<string, number>();
@@ -97,6 +99,15 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
   const issuesInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listOpenIssues"]>>>>();
   const prsCache = new Map<string, { at: number; prs: Awaited<ReturnType<ScmPort["listPrs"]>> }>();
   const prsInflight = new Map<string, Promise<Awaited<ReturnType<ScmPort["listPrs"]>>>>();
+
+  // Listing leases asks the remote, so the Settings page shares one answer for 15 s.
+  let leasesCache: { at: number; value: Awaited<ReturnType<DashboardProject["leases"]>> | Error } | null = null;
+  async function heldLeases(p: DashboardProject) {
+    if (leasesCache && Date.now() - leasesCache.at < 15_000) return leasesCache.value;
+    const value = await p.leases().catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    leasesCache = { at: Date.now(), value };
+    return value;
+  }
 
   // The Agents page shows each configured agent's installed version and doctor rows.
   // Probing spawns `--version`, so it is cached for a minute and shared by concurrent requests.
@@ -281,7 +292,7 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
     {
       // Static files of the page itself: no data, so public like the shell.
       method: "GET",
-      pattern: /^\/(styles\.css|app\.js|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
+      pattern: /^\/(styles\.css|tokens\.css|app\.js|lib\/[\w-]+\.js|fonts\/[\w-]+\.woff2)$/,
       label: "GET /assets",
       handler: (_req, _url, m) => {
         try {
@@ -477,6 +488,22 @@ export function createDashboard(state: FactoryState, github: ScmPort, repo: stri
       pattern: /^\/api\/agents$/,
       label: "GET /api/agents",
       handler: async () => json({ agents: await probedAgents() }),
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/workflows$/,
+      label: "GET /api/workflows",
+      handler: async () => (project ? json({ available: true, ...workflowsView(await harnessReport(project.cloneDir, project.config)) }) : json({ available: false, reason: NO_PROJECT })),
+    },
+    {
+      method: "GET",
+      pattern: /^\/api\/settings$/,
+      label: "GET /api/settings",
+      handler: async () => {
+        if (!project) return json({ available: false, reason: NO_PROJECT });
+        const [report, leases] = await Promise.all([harnessReport(project.cloneDir, project.config), heldLeases(project)]);
+        return json({ available: true, ...settingsView(project, report, leases, Date.now()) });
+      },
     },
     {
       method: "GET",

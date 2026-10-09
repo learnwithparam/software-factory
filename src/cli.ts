@@ -24,6 +24,7 @@ import { reset, rebaseline } from "./reset";
 import { runDoctor, fixDoctor } from "./doctor";
 import { loadMachineConfig, MachineLeases, MachineSpend } from "./machine";
 import { createDashboard } from "../dashboard/server";
+import type { DashboardProject } from "../dashboard/project";
 import { versionOf, which } from "./probes";
 import { workspacesDir as defaultWorkspacesDir, defaultStatePath, factoryHome, livePath, transcriptPath } from "./paths";
 import { issueWindow, shellQuote, ShellTmuxRunner, Tmux, tmuxIssueView } from "./tmux";
@@ -405,10 +406,10 @@ async function cmdDoctor(): Promise<void> {
 // and remoteAddress passed through so handle() can enforce it. Shared by
 // `dashboard` (cockpit only, any mode) and `up` (Docker's single-process
 // entrypoint: watch + dashboard together).
-function serveDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">): number {
+function serveDashboard(state: FactoryState, github: ScmPort, repo: string, autoApproveDefault = false, fleet?: Pick<FactoryConfig, "agents" | "stages">, project?: DashboardProject): number {
   const port = Number(flag("port") ?? process.env.FACTORY_DASHBOARD_PORT ?? 4100);
   const hostname = process.env.FACTORY_DASHBOARD_HOST ?? "127.0.0.1";
-  const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet);
+  const dashboard = createDashboard(state, github, repo, autoApproveDefault, undefined, fleet, undefined, project);
   const server = Bun.serve({
     port,
     hostname,
@@ -418,6 +419,12 @@ function serveDashboard(state: FactoryState, github: ScmPort, repo: string, auto
   return port;
 }
 
+// The repo the Workflows and Settings pages describe.
+function dashboardProject(cloneDir: string, config: FactoryConfig): DashboardProject {
+  const leases = new GitLeases(cloneDir);
+  return { cloneDir, config, machine: loadMachineConfig(), leases: () => leases.held() };
+}
+
 async function cmdDashboard(): Promise<void> {
   const repoDir = flag("repo-dir");
   const config = repoDir ? await loadConfig(resolve(repoDir)) : undefined;
@@ -425,7 +432,7 @@ async function cmdDashboard(): Promise<void> {
   const dbPath = flag("db") ?? process.env.FACTORY_DB_PATH ?? (repo ? defaultStatePath(process.env, repo) : DEFAULT_DB_PATH);
   const state = new FactoryState(dbPath);
   const github = new GitHub();
-  serveDashboard(state, github, repo, false, config);
+  serveDashboard(state, github, repo, false, config, repoDir && config ? dashboardProject(resolve(repoDir), config) : undefined);
   await new Promise(() => {}); // keep the process alive
 }
 
@@ -446,7 +453,7 @@ async function cmdUp(): Promise<void> {
     if (r.paused) console.log(`factory up: paused — ${r.reason}`);
     else if (r.processed.length) console.log(`factory up: processed #${r.processed.join(", #")}`);
   });
-  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk, config);
+  serveDashboard(deps.state, deps.github, config.repo, config.riskPolicy.autoApproveLowRisk, config, dashboardProject(cloneDir, config));
   console.log(`factory up: polling ${config.repo} every ${config.pollIntervalSeconds}s. Ctrl+C to stop.`);
   await new Promise(() => {}); // keep the process alive
 }

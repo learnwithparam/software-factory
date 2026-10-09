@@ -1,5 +1,33 @@
 # Changelog
 
+## v3.5.0
+
+The dashboard restyled on the lwp-deck palette, with two new pages. Upgraders: nothing to change.
+Start the dashboard with `--repo-dir` (`factory up` already does) to fill the new pages.
+
+- Colour comes from one place: `dashboard/design/tokens.json` (lwp-deck's palette) and the roles in
+  `dashboard/tokens.ts`. `make tokens` writes `dashboard/public/tokens.css`. `make check` fails when a
+  pair the page renders misses its WCAG level in either theme, when `tokens.css` is stale, when any
+  other file in `dashboard/public` holds a colour literal, or when the page uses an undefined
+  `var(--x)`.
+- Light and dark themes: the system setting by default, and the Theme toggle overrides it.
+- Inter and Inconsolata, self-hosted under the SIL Open Font License, replace Manrope.
+- Workflows page: every workflow the repo can run, where it comes from, the issue types routed to it,
+  its steps and its cron schedule, with the `factory harness validate` result on top. It is built
+  from the same report as the CLI command.
+- Settings page: slots and the daily cap from `machine.json`, each runtime with its kind, target and
+  the config or workflow steps that use it, and the issue leases on the remote with their holder and
+  expiry. A remote the dashboard cannot read says so instead of showing no leases.
+- The mobile nav scrolls sideways instead of wrapping.
+
+Not in this release:
+
+- A form editor that writes a workflow's YAML through a PR; the Workflows page is read-only.
+- An Events page with replay.
+- A live health probe per runtime; the Runtimes table shows configuration only.
+- Machine slot usage on the Settings page (slots are local; only issue leases are shown).
+- Settings tabs; the page is one section per topic.
+
 ## v3.4.0
 
 Any repo, any stack. Upgraders: nothing to change. A gate with no `role` still runs; give your test

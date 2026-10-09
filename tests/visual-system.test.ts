@@ -1,5 +1,6 @@
 // Structural: the cockpit's design system stays whole. Modelled on machinist
-// visual-system.test.js: tokens exist for both themes, the mobile bottom nav
+// visual-system.test.js: tokens exist for both themes (their contrast is
+// tests/tokens.test.ts), the mobile bottom nav
 // is in place, and every view goes through the shared heading. Also pins the
 // rule that page code never renders server text as HTML.
 
@@ -9,12 +10,13 @@ import { join } from "node:path";
 
 const dir = join(import.meta.dir, "..", "dashboard", "public");
 const css = readFileSync(join(dir, "styles.css"), "utf8");
+const tokensCss = readFileSync(join(dir, "tokens.css"), "utf8");
 const app = readFileSync(join(dir, "app.js"), "utf8");
-const TOKENS = ["background", "foreground", "surface", "sidebar", "muted", "muted-foreground", "border", "primary", "primary-foreground", "success", "warning", "danger", "ring"];
+const TOKENS = ["bg", "fg", "surface", "sidebar", "muted", "line", "track", "accent", "accent-text", "on-accent", "tone-pass", "tone-wait", "tone-fail"];
 
 function block(startsWith: string): string {
-  const start = css.indexOf(startsWith);
-  return css.slice(start, css.indexOf("}", start));
+  const start = tokensCss.indexOf(startsWith);
+  return tokensCss.slice(start, tokensCss.indexOf("}", start));
 }
 
 describe("visual system", () => {
@@ -29,7 +31,7 @@ describe("visual system", () => {
 
   test("mobile navigation is a bottom bar with safe-area padding", () => {
     expect(css).toMatch(/\.app-sidebar nav \{ position: fixed;[^}]*bottom: 0;/);
-    expect(css).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
+    expect(css).toMatch(/\.app-sidebar nav \{[^}]*grid-auto-flow: column;[^}]*overflow-x: auto;/);
     expect(css).toContain("padding-bottom: calc(4.15rem + env(safe-area-inset-bottom))");
   });
 
@@ -38,14 +40,15 @@ describe("visual system", () => {
     expect(css).toContain(":focus-visible");
   });
 
-  test("the font ships with its licence, and the file the CSS names exists", () => {
-    expect(existsSync(join(dir, "fonts", "manrope-latin.woff2"))).toBe(true);
-    expect(readFileSync(join(dir, "fonts", "OFL.txt"), "utf8")).toContain("SIL OPEN FONT LICENSE Version 1.1");
-    expect(css).toContain("/fonts/manrope-latin.woff2");
+  test("each font ships with its licence, and every file the CSS names exists", () => {
+    const named = [...css.matchAll(/url\("\/(fonts\/[\w-]+\.woff2)"\)/g)].map((m) => m[1]!);
+    expect(named.length).toBe(4);
+    for (const f of named) expect(existsSync(join(dir, f)), f).toBe(true);
+    for (const family of ["inter", "inconsolata"]) expect(readFileSync(join(dir, "fonts", `LICENSE-${family}.txt`), "utf8")).toContain("SIL Open Font License, Version 1.1");
   });
 
   test("every top-level view is built with the shared heading", () => {
-    for (const view of ["lineView", "inboxView", "runsView", "analyticsView", "agentsView"]) {
+    for (const view of ["lineView", "inboxView", "runsView", "workflowsView", "analyticsView", "agentsView", "settingsView"]) {
       const body = app.slice(app.indexOf(`function ${view}`));
       expect(body.slice(0, body.indexOf("\n}\n")), view).toMatch(/heading\("/);
     }
